@@ -4,903 +4,1011 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>KTY1994 เช็คชื่อพนักงาน</title>
-<meta name="theme-color" content="#24323A">
+<meta name="theme-color" content="#22313A">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="KTY เช็คชื่อ">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+/* ใช้รูปแบบสีที่เลือกไว้ก่อนวาดหน้า เพื่อไม่ให้จอกะพริบ */
+(function(){ try{ var t=localStorage.getItem('kty-theme'); if(t==='light'||t==='dark') document.documentElement.dataset.theme=t; }catch(e){} })();
+</script>
 <style>
+/* ================= tokens ================= */
 :root{
-  --concrete:#E9ECEA; --surface:#FFFFFF; --surface-2:#F4F6F5;
-  --ink:#1E2A30; --ink-2:#55646B; --line:#D3D9D7;
-  --slate:#24323A; --slate-ink:#FFFFFF;
-  --safety:#F2B705; --safety-ink:#2A2100;
-  --ok:#2F7D4F; --warn:#B26A00; --bad:#B3322B;
-  --ok-bg:#E3F1E8; --warn-bg:#FBEFD9; --bad-bg:#F8E1DF;
-  --radius-s:6px; --radius-m:10px;
+  --bg:#EEF1EF;--surface:#FFFFFF;--surface2:#F4F6F5;--ink:#1B262C;--ink2:#55636A;--line:#D5DBD9;
+  --bar:#22313A;--barInk2:#B9C8CC;--p:#22313A;--pInk:#FFFFFF;--accent:#F2B705;--accentInk:#2A2000;
+  --ok:#2E7D4E;--okBg:#E2F1E7;--warn:#8A5300;--warnBg:#FCEFD6;--bad:#B02E27;--badBg:#F9E1DE;
+  --input:#FFFFFF;--idc:#22313A;--shadow:0 1px 2px rgba(20,30,35,.06),0 4px 14px rgba(20,30,35,.06);
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){
-  :root{
-    --concrete:#151B1E; --surface:#1E262A; --surface-2:#252F34;
-    --ink:#E6EBEA; --ink-2:#9AA8AD; --line:#34424A;
-    --slate:#3A4C56; --slate-ink:#FFFFFF;
-    --safety:#F2B705; --safety-ink:#2A2100;
-    --ok:#6CC08E; --warn:#E7A746; --bad:#EE7A72;
-    --ok-bg:#1F3328; --warn-bg:#3A2D17; --bad-bg:#3D2321;
-    color-scheme:dark;
+  :root:not([data-theme="light"]){
+    --bg:#11171A;--surface:#1A2227;--surface2:#232D33;--ink:#E6ECEA;--ink2:#9EADB2;--line:#31404A;
+    --bar:#1A2227;--barInk2:#9EADB2;--p:#F2B705;--pInk:#2A2000;
+    --ok:#6CC592;--okBg:#1D3326;--warn:#F0B04F;--warnBg:#3A2C14;--bad:#F08178;--badBg:#3E2220;
+    --input:#141B1F;--idc:#26343C;--shadow:0 1px 2px rgba(0,0,0,.3);color-scheme:dark;
   }
 }
-*{box-sizing:border-box}
-html,body{height:100%;margin:0}
-body{font-family:"IBM Plex Sans Thai",Tahoma,"Segoe UI",sans-serif;background:var(--concrete);color:var(--ink);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
-:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root[data-theme="dark"]{
+  --bg:#11171A;--surface:#1A2227;--surface2:#232D33;--ink:#E6ECEA;--ink2:#9EADB2;--line:#31404A;
+  --bar:#1A2227;--barInk2:#9EADB2;--p:#F2B705;--pInk:#2A2000;
+  --ok:#6CC592;--okBg:#1D3326;--warn:#F0B04F;--warnBg:#3A2C14;--bad:#F08178;--badBg:#3E2220;
+  --input:#141B1F;--idc:#26343C;--shadow:0 1px 2px rgba(0,0,0,.3);color-scheme:dark;
+}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{font-family:"IBM Plex Sans Thai",Tahoma,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
-:focus-visible{outline:3px solid var(--safety);outline-offset:2px}
-.num{font-variant-numeric:tabular-nums}
-.muted{color:var(--ink-2)}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .hidden{display:none!important}
+.muted{color:var(--ink2)} .sm{font-size:13.5px} .xs{font-size:12px} .num{font-variant-numeric:tabular-nums}
+.grow{flex:1;min-width:0}
+.row{display:flex;align-items:center;gap:12px}
+.col{display:flex;flex-direction:column;gap:12px}
+.ico{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
 
-/* ---------- auth ---------- */
-.auth{min-height:100%;display:grid;place-items:center;padding:24px}
-.auth-box{width:100%;max-width:400px}
-.brand{display:flex;align-items:center;gap:12px;margin-bottom:22px}
-.brand-mark{width:44px;height:44px;border-radius:8px;background:var(--slate);display:grid;place-items:center;position:relative;overflow:hidden}
-.brand-mark::after{content:"";position:absolute;left:0;right:0;bottom:0;height:7px;background:repeating-linear-gradient(135deg,var(--safety) 0 6px,var(--slate) 6px 12px)}
-.brand-mark span{color:#fff;font-weight:700;font-size:15px;margin-bottom:6px}
-.brand h1{font-size:20px;margin:0;line-height:1.2}
-.brand p{margin:0;font-size:13px}
-.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-m);padding:22px}
-.tabs{display:flex;border-bottom:1px solid var(--line);margin:-6px -6px 18px}
-.tabs button{flex:1;background:none;border:0;padding:10px;font-weight:600;color:var(--ink-2);border-bottom:3px solid transparent}
-.tabs button.on{color:var(--ink);border-color:var(--safety)}
+/* ================= brand ================= */
+.brand{display:flex;align-items:center;gap:12px}
+.mark{width:44px;height:44px;border-radius:12px;background:#121B20;position:relative;overflow:hidden;display:grid;place-items:center;color:#fff;font-weight:700;font-size:14px;flex:none}
+.mark::after{content:"";position:absolute;left:0;right:0;bottom:0;height:8px;background:repeating-linear-gradient(135deg,#F2B705 0 6px,#121B20 6px 12px)}
+.mark span{margin-bottom:6px}
+.stripe{position:relative}
+.stripe::after{content:"";position:absolute;left:0;right:0;bottom:0;height:6px;background:repeating-linear-gradient(135deg,var(--accent) 0 9px,var(--bar) 9px 18px)}
 
-/* ---------- forms ---------- */
-.field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
-.field label{font-size:13px;font-weight:600;color:var(--ink-2)}
-.field .hint{font-size:12px;color:var(--ink-2)}
-.field .err{font-size:12px;color:var(--bad)}
-input[type=text],input[type=email],input[type=password],input[type=tel],input[type=number],select,textarea{
-  width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-s);background:var(--surface);min-height:42px}
-textarea{min-height:72px;resize:vertical}
-input:focus,select:focus,textarea:focus{border-color:var(--slate);outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--safety) 45%,transparent)}
-.row{display:grid;gap:12px}
-.row-2{grid-template-columns:1fr 1fr}
-.row-3{grid-template-columns:1fr 1fr 1fr}
-.date3{display:grid;grid-template-columns:70px 1fr 90px;gap:6px}
-@media (max-width:520px){.row-2,.row-3{grid-template-columns:1fr}}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:42px;padding:0 16px;border-radius:var(--radius-s);border:1px solid var(--line);background:var(--surface);font-weight:600}
-.btn:hover{background:var(--surface-2)}
-.btn-primary{background:var(--slate);border-color:var(--slate);color:var(--slate-ink)}
-.btn-primary:hover{background:color-mix(in srgb,var(--slate) 85%,#000)}
-.btn-danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+/* ================= controls ================= */
+.btn{min-height:48px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 18px;text-decoration:none}
+.btn:hover{background:var(--surface2)}
+.btn-p{background:var(--p);border-color:var(--p);color:var(--pInk)}
+.btn-p:hover{background:var(--p);filter:brightness(1.08)}
+.btn-acc{background:var(--accent);border-color:var(--accent);color:var(--accentInk)}
+.btn-bad{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 55%,transparent);background:transparent}
+.btn-sm{min-height:40px;border-radius:12px;font-size:14px;padding:0 14px}
 .btn-block{width:100%}
-.btn-sm{min-height:34px;padding:0 10px;font-size:13px}
-.btn:disabled{opacity:.55;cursor:wait}
-.linkbtn{background:none;border:0;color:var(--ink-2);text-decoration:underline;padding:4px 0;font-size:13px}
+.btn:disabled{opacity:.5;cursor:default}
+.ibtn{width:44px;height:44px;border-radius:12px;border:0;background:rgba(255,255,255,.1);color:inherit;display:grid;place-items:center;flex:none;padding:0;text-decoration:none}
+.linkbtn{background:none;border:0;color:var(--ink2);text-decoration:underline;padding:6px 0;font-size:13.5px}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field>label,.lab{font-size:13px;font-weight:600;color:var(--ink2)}
+.in{height:48px;border-radius:12px;border:1px solid var(--line);background:var(--input);color:var(--ink);font-weight:500;padding:0 14px;width:100%;min-width:0}
+textarea.in{height:auto;min-height:80px;padding:12px 14px;resize:vertical}
+select.in{appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--ink2) 50%),linear-gradient(135deg,var(--ink2) 50%,transparent 50%);background-position:calc(100% - 20px) 21px,calc(100% - 15px) 21px;background-size:5px 5px;background-repeat:no-repeat;padding-right:36px}
+.in:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 4px rgba(242,183,5,.28)}
+.in[readonly]{background:var(--surface2);color:var(--ink2)}
+.in::placeholder{color:var(--ink2);opacity:.85}
+.inwrap{position:relative}
+.inwrap .in{padding-right:46px}
+.inwrap .eye{position:absolute;right:4px;top:2px;width:44px;height:44px;border:0;background:none;color:var(--ink2);display:grid;place-items:center}
+.hint{font-size:12.5px;color:var(--ink2);display:flex;align-items:center;gap:6px;min-height:18px}
+.hint.ok{color:var(--ok)}.hint.warn{color:var(--warn)}.hint.bad{color:var(--bad)}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.g3{display:grid;grid-template-columns:76px minmax(0,1fr) 92px;gap:8px}
+.g2d{display:grid;gap:14px}
+@media (min-width:640px){.g2d{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}}
+.seg{display:flex;background:var(--surface2);border:1px solid var(--line);border-radius:14px;padding:4px;gap:4px}
+.seg button{flex:1;min-height:40px;border:0;border-radius:10px;background:transparent;color:var(--ink2);font-weight:600;font-size:14px;padding:0 6px}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+:root[data-theme="dark"] .seg button.on{background:var(--p);color:var(--pInk)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .seg button.on{background:var(--p);color:var(--pInk)}}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips.scroll{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px}
+.chips.scroll::-webkit-scrollbar{display:none}
+.chip{min-height:38px;border-radius:19px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:500;font-size:13.5px;padding:0 14px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex:none}
+.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.tag{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:12px;font-size:12px;font-weight:600;background:var(--surface2);color:var(--ink2);white-space:nowrap}
+.t-ok{background:var(--okBg);color:var(--ok)}.t-warn{background:var(--warnBg);color:var(--warn)}.t-bad{background:var(--badBg);color:var(--bad)}.t-acc{background:var(--accent);color:var(--accentInk)}
+.chk{display:flex;gap:10px;align-items:flex-start;cursor:pointer;font-size:14px}
+.chk input{width:22px;height:22px;accent-color:#F2B705;margin:0;flex:none}
+.sw{width:50px;height:30px;border-radius:15px;background:var(--line);position:relative;flex:none;border:0;padding:0}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:left .15s}
+.sw.on{background:var(--ok)}.sw.on::after{left:23px}
+@media (prefers-reduced-motion:reduce){.sw::after{transition:none}}
 
-/* ---------- shell ---------- */
-.shell{display:grid;grid-template-columns:232px 1fr;min-height:100%}
-.side{background:var(--slate);color:#E8EEEC;padding:18px 12px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
-.side .brand{margin:4px 6px 22px}
-.side .brand-mark{background:#18232A}
-.side .brand-mark::after{background:repeating-linear-gradient(135deg,var(--safety) 0 6px,#18232A 6px 12px)}
-.side .brand h1{color:#fff;font-size:16px}
-.side .brand p{color:#AFC0C4}
-.nav a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-s);color:#D5DFDD;text-decoration:none;font-weight:500;border-left:4px solid transparent}
-.nav a:hover{background:rgba(255,255,255,.07)}
-.nav a.on{background:rgba(255,255,255,.1);color:#fff;border-left-color:var(--safety)}
-.nav svg{width:20px;height:20px;flex:none}
-.side-foot{margin-top:auto;padding:12px;border-top:1px solid rgba(255,255,255,.12);font-size:13px}
-.side-foot .who{color:#fff;font-weight:600}
-.side-foot button{background:none;border:1px solid rgba(255,255,255,.25);color:#E8EEEC;border-radius:var(--radius-s);padding:6px 10px;margin-top:8px;font-size:13px}
-.main{padding:24px clamp(14px,3vw,36px) 40px;min-width:0}
-.topbar{display:none}
-.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
-.page-head h2{margin:0;font-size:24px;line-height:1.25}
-.page-head p{margin:2px 0 0;color:var(--ink-2);font-size:14px}
-.bottomnav{display:none}
-
-@media (max-width:860px){
-  .shell{grid-template-columns:1fr}
-  .side{display:none}
-  .topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--slate);color:#fff;position:sticky;top:0;z-index:20}
-  body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--slate)}
-  .topbar .brand{margin:0}
-  .topbar .brand-mark{width:34px;height:34px;background:#18232A}
-  .topbar .brand-mark::after{height:5px;background:repeating-linear-gradient(135deg,var(--safety) 0 5px,#18232A 5px 10px)}
-  .topbar .brand-mark span{font-size:12px;margin-bottom:4px}
-  .topbar .brand h1{color:#fff;font-size:15px}
-  .topbar button{background:none;border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:var(--radius-s);padding:5px 10px;font-size:13px}
-  .main{padding-bottom:96px}
-  .bottomnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
-  .bottomnav a{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 2px 6px;font-size:11px;color:var(--ink-2);text-decoration:none;border-top:3px solid transparent}
-  .bottomnav a.on{color:var(--ink);border-top-color:var(--safety);font-weight:600}
-  .bottomnav svg{width:22px;height:22px}
-}
-
-/* ---------- content ---------- */
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-m)}
-.card-pad{padding:18px}
-.stat-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));border:1px solid var(--line);border-radius:var(--radius-m);background:var(--surface);overflow:hidden;margin-bottom:18px}
-.stat{padding:14px 18px;border-right:1px solid var(--line)}
-.stat:last-child{border-right:0}
-.stat b{display:block;font-size:28px;line-height:1.15;font-variant-numeric:tabular-nums}
-.stat span{font-size:13px;color:var(--ink-2)}
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-@media (max-width:860px){.grid-2{grid-template-columns:1fr}}
-.section-title{font-size:16px;margin:0 0 12px}
-.bars{display:flex;flex-direction:column;gap:8px}
-.bar{display:grid;grid-template-columns:120px 1fr 32px;align-items:center;gap:10px;font-size:14px}
-.bar-track{height:12px;background:var(--surface-2);border-radius:3px;overflow:hidden}
-.bar-fill{height:100%;background:var(--slate)}
-.notice{padding:12px 14px;border-radius:var(--radius-s);background:var(--warn-bg);color:var(--ink);border-left:4px solid var(--safety);font-size:14px}
-
-.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-.toolbar input{flex:1 1 220px}
-.toolbar select{flex:0 1 170px;width:auto}
-
-table.list{width:100%;border-collapse:collapse}
-.list th{text-align:left;font-size:13px;color:var(--ink-2);font-weight:600;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--surface-2)}
-.list td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
-.list tr:last-child td{border-bottom:0}
-.list tbody tr{cursor:pointer}
-.list tbody tr:hover{background:var(--surface-2)}
-.person{display:flex;align-items:center;gap:10px}
-.avatar{width:36px;height:36px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);display:grid;place-items:center;font-weight:700;font-size:14px;flex:none}
-.person small{display:block;color:var(--ink-2);font-size:12px}
-.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600;background:var(--surface-2);border:1px solid var(--line);white-space:nowrap}
-.tag-ok{background:var(--ok-bg);color:var(--ok);border-color:transparent}
-.tag-warn{background:var(--warn-bg);color:var(--warn);border-color:transparent}
-.tag-bad{background:var(--bad-bg);color:var(--bad);border-color:transparent}
-.scroll-x{overflow-x:auto}
-@media (max-width:700px){
-  .list thead{display:none}
-  .list, .list tbody, .list tr, .list td{display:block;width:100%}
-  .list tr{padding:10px 12px;border-bottom:1px solid var(--line)}
-  .list td{border:0;padding:2px 0}
-  .list td.hide-m{display:none}
-  .list td[data-l]::before{content:attr(data-l) " ";color:var(--ink-2);font-size:12px}
-}
-
-/* stars */
-.stars{display:inline-flex;gap:1px;vertical-align:middle}
-.stars svg{width:16px;height:16px}
-.stars.lg svg{width:22px;height:22px}
-
-/* empty */
-.empty{padding:36px 18px;text-align:center;color:var(--ink-2)}
+/* ================= surfaces ================= */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:var(--shadow)}
+.card-l{padding:2px 16px}
+.h2{font-size:16px;font-weight:700;margin:0}
+.sec{font-size:14.5px;font-weight:700;margin:6px 0 -2px}
+.li{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);text-decoration:none;color:inherit;background:none;border-left:0;border-right:0;border-top:0;width:100%;text-align:left}
+.li:last-child{border-bottom:0}
+.li b{display:block;line-height:1.35}
+.kv{display:flex;justify-content:space-between;gap:16px;padding:11px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+.kv:last-child{border-bottom:0}
+.kv>span:first-child{color:var(--ink2);flex:none}
+.kv>span:last-child{font-weight:600;text-align:right;overflow-wrap:anywhere}
+.note{border-radius:14px;padding:12px 14px;font-size:13.5px;display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:var(--ink)}
+.n-warn{background:var(--warnBg)} .n-info{background:var(--surface2);color:var(--ink2)} .n-bad{background:var(--badBg)}
+.statg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (min-width:900px){.statg{grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.stat b{font-size:28px;line-height:1.15;font-variant-numeric:tabular-nums}
+.bar{display:grid;grid-template-columns:96px minmax(0,1fr) 28px;gap:10px;align-items:center;font-size:13.5px}
+.track{height:10px;border-radius:5px;background:var(--surface2);overflow:hidden}
+.track i{display:block;height:100%;background:var(--ink2);border-radius:5px}
+.track i.a{background:var(--accent)}
+.av{width:48px;height:48px;border-radius:14px;background:var(--surface2);border:1px solid var(--line);display:grid;place-items:center;font-weight:700;font-size:17px;flex:none;color:var(--ink);overflow:hidden;position:relative}
+.av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+.av.has-img img{display:block}.av.has-img span{visibility:hidden}
+.av.round{border-radius:50%}
+.lgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+.lcard{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 14px;display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit}
+.lcard:hover{border-color:var(--ink2)}
+.lcard b{display:block;line-height:1.35}
+.star{display:inline-flex;align-items:center;gap:4px;font-weight:700;font-size:14px}
+.star svg{width:16px;height:16px;fill:var(--accent)}
+.star.low svg{fill:var(--bad)}
+.stars5{display:inline-flex;gap:2px}
+.stars5 svg{width:18px;height:18px}
+.empty{padding:40px 18px;text-align:center;color:var(--ink2)}
 .empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
 
-/* modal */
-.modal-bg{position:fixed;inset:0;background:rgba(10,16,19,.55);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:max(20px,env(safe-area-inset-top,0px)) 12px 20px;overflow-y:auto}
-.modal{background:var(--surface);border-radius:var(--radius-m);width:100%;max-width:680px;border:1px solid var(--line);animation:pop .16s ease-out}
-.modal-sm{max-width:440px}
-@keyframes pop{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+/* ID card */
+.idc{border-radius:20px;overflow:hidden;background:var(--idc);color:#fff;position:relative;padding:18px 18px 26px}
+.idc::after{content:"";position:absolute;left:0;right:0;bottom:0;height:8px;background:repeating-linear-gradient(135deg,#F2B705 0 10px,transparent 10px 20px)}
+.photo{width:88px;height:108px;border-radius:14px;background:rgba(255,255,255,.12);border:1px dashed rgba(255,255,255,.4);display:grid;place-items:center;color:#C9D6D9;font-size:11px;text-align:center;flex:none;overflow:hidden;position:relative}
+.photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+.photo.has-img{border-style:solid}.photo.has-img img{display:block}.photo.has-img span{display:none}
+
+/* ================= shell ================= */
+.app{min-height:100vh}
+.side{display:none}
+.appbar{background:var(--bar);color:#fff;padding:14px 16px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:20}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bar)}
+.appbar h1{font-size:19px;margin:0;font-weight:700;flex:1;line-height:1.3;min-width:0}
+.appbar h1 small{display:block;color:var(--barInk2);font-size:13px;font-weight:400}
+.phead{display:none}
+.main{padding:16px 16px 110px;display:flex;flex-direction:column;gap:14px;max-width:1200px;margin:0 auto;width:100%}
+.bnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);padding:6px 4px calc(8px + env(safe-area-inset-bottom,0px))}
+.bnav a{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;color:var(--ink2);text-decoration:none;padding:4px 0;min-height:52px}
+.bnav a.on{color:var(--ink);font-weight:700}
+.pill{width:56px;height:30px;border-radius:15px;display:grid;place-items:center}
+.bnav a.on .pill{background:var(--accent);color:var(--accentInk)}
+.fab{position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:19;height:56px;border-radius:18px;background:var(--accent);color:var(--accentInk);border:0;font-weight:700;display:flex;align-items:center;gap:8px;padding:0 20px;box-shadow:0 6px 18px rgba(0,0,0,.22)}
+@media (min-width:900px){
+  .app{display:flex}
+  .side{display:flex;width:248px;background:var(--bar);color:#DCE5E3;padding:22px 14px;flex-direction:column;gap:4px;flex:none;position:sticky;top:0;height:100vh}
+  :root[data-theme="dark"] .side{background:#161D21;border-right:1px solid var(--line)}
+  .side .navl{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:12px;color:#CFDAD8;text-decoration:none;font-weight:500}
+  .side .navl:hover{background:rgba(255,255,255,.06)}
+  .side .navl.on{background:rgba(255,255,255,.1);color:#fff;box-shadow:inset 4px 0 0 #F2B705}
+  .side-foot{margin-top:auto;padding:14px 10px;border-top:1px solid rgba(255,255,255,.12)}
+  .side-foot button{margin-top:10px;background:none;border:1px solid rgba(255,255,255,.25);color:#E8EEEC;border-radius:10px;padding:7px 12px;font-size:13px}
+  .appwrap{flex:1;min-width:0}
+  .appbar,.bnav,body::before{display:none}
+  .phead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:6px 0 4px}
+  .phead h1{margin:0;font-size:26px;line-height:1.25}
+  .phead p{margin:2px 0 0;color:var(--ink2);font-size:14px}
+  .main{padding:28px 36px 48px}
+  .fab{display:none}
+}
+
+/* ================= auth ================= */
+.auth{min-height:100vh;display:flex;flex-direction:column}
+.auth-top{background:var(--bar);color:#fff;padding:48px 24px 96px}
+.auth-top p{margin:24px 0 0;font-size:21px;font-weight:600;line-height:1.4}
+.auth-card{margin:-68px 16px 0;display:flex;flex-direction:column;gap:16px;padding:20px}
+.auth-foot{margin-top:auto;padding:24px;text-align:center}
+@media (min-width:600px){.auth-top{padding:64px 24px 110px}.auth-top>div,.auth-card{max-width:420px;margin-left:auto;margin-right:auto;width:100%}.auth-card{margin-top:-80px}}
+
+/* ================= sheet (wizard / modal) ================= */
+.sheet-bg{position:fixed;inset:0;z-index:50;background:rgba(10,16,19,.55);display:flex;justify-content:center;align-items:flex-end}
+.sheet{background:var(--bg);width:100%;height:100%;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px)}
+.sheet .appbar{position:relative;top:auto;display:flex}
+.sheet-steps{display:flex;gap:6px;padding:14px 16px 6px;background:var(--surface);border-bottom:1px solid var(--line)}
+.sstep{flex:1;display:flex;flex-direction:column;gap:6px;background:none;border:0;padding:0;text-align:left;min-width:0}
+.sstep i{height:5px;width:100%;border-radius:3px;background:var(--line);display:block}
+.sstep.done i{background:var(--ink2)}.sstep.on i{background:var(--accent)}
+.sstep span{font-size:11.5px;color:var(--ink2);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sstep.on span{color:var(--ink);font-weight:700}
+.sheet-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px;-webkit-overflow-scrolling:touch}
+.sheet-foot{display:flex;gap:10px;padding:12px 16px calc(14px + env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--line)}
+.sheet-foot .btn{flex:1}
+@media (min-width:760px){
+  .sheet-bg{align-items:center;padding:24px}
+  .sheet{max-width:720px;height:min(92vh,900px);border-radius:22px;overflow:hidden;padding-top:0;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+  .sheet .appbar{border-radius:0}
+}
+.modal{background:var(--surface);border-radius:20px 20px 0 0;width:100%;max-width:460px;padding:20px 20px calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px;animation:up .18s ease-out}
+@media (min-width:560px){.modal{border-radius:20px}.sheet-bg.center{align-items:center}}
+@keyframes up{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.modal{animation:none}}
-.modal-head{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line)}
-.modal-head h3{margin:0;font-size:18px}
-.modal-head button{background:none;border:0;font-size:24px;line-height:1;color:var(--ink-2);padding:4px 8px}
-.modal-body{padding:18px 20px}
-.modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--line);flex-wrap:wrap}
-.fieldset{border:0;padding:0;margin:0 0 8px}
-.fieldset legend{font-weight:700;font-size:15px;padding:0;margin-bottom:10px}
-.fieldset + .fieldset{border-top:1px solid var(--line);padding-top:16px;margin-top:4px}
-.reason-box{background:var(--warn-bg);border-radius:var(--radius-s);padding:12px;margin-top:4px}
+.dd{border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:0 10px 30px rgba(0,0,0,.18);overflow:hidden;margin-top:4px}
+.dd button{display:block;width:100%;text-align:left;padding:11px 14px;border:0;border-bottom:1px solid var(--line);background:none;font-size:14px}
+.dd button:last-child{border-bottom:0}
+.dd button:hover,.dd button:focus{background:var(--surface2)}
+.photo-pick{display:flex;align-items:center;gap:14px}
+.photo-pick .pv{width:84px;height:84px;border-radius:22px;border:2px dashed var(--line);display:grid;place-items:center;color:var(--ink2);flex:none;overflow:hidden;position:relative}
+.photo-pick .pv img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 
-/* employee ID card */
-.idcard{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}
-.idcard-top{background:var(--slate);color:#fff;padding:16px 18px 22px;position:relative}
-.idcard-top::after{content:"";position:absolute;left:0;right:0;bottom:0;height:8px;background:repeating-linear-gradient(135deg,var(--safety) 0 8px,var(--slate) 8px 16px)}
-.idcard-top .co{font-size:12px;color:#B9C8CB}
-.idcard-top .nm{font-size:22px;font-weight:700;line-height:1.25;margin-top:6px}
-.idcard-top .nn{color:#DCE5E3;font-size:14px}
-.idcard-top .code{position:absolute;right:18px;top:16px;font-weight:600;font-size:13px;background:rgba(255,255,255,.12);padding:3px 8px;border-radius:4px}
-.idcard-body{display:grid;grid-template-columns:1fr 1fr;gap:0}
-.idcard-body div{padding:11px 18px;border-bottom:1px solid var(--line)}
-.idcard-body div:nth-child(odd){border-right:1px solid var(--line)}
-.idcard-body dt{font-size:12px;color:var(--ink-2)}
-.idcard-body dd{margin:0;font-weight:600}
-.idcard-body .wide{grid-column:1/-1;border-right:0!important}
-@media (max-width:520px){.idcard-body{grid-template-columns:1fr}.idcard-body div{border-right:0!important}}
-
-/* user rows */
-.urow{display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}
-.urow:last-child{border-bottom:0}
-.urow.pending{background:var(--warn-bg)}
-@media (max-width:760px){.urow{grid-template-columns:1fr}}
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-.chip{display:inline-flex;align-items:center;gap:4px;font-size:13px;border:1px solid var(--line);border-radius:99px;padding:3px 10px;background:var(--surface)}
-.chip input{margin:0}
-
-/* settings list */
-.slist{list-style:none;margin:0;padding:0}
-.slist li{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}
-.slist li:last-child{border-bottom:0}
-.slist li span{flex:1}
-
-/* toast & overlays */
-.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:10px 16px;border-radius:var(--radius-s);z-index:90;font-size:14px;max-width:90vw;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+/* ================= misc ================= */
+.toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 16px;border-radius:12px;z-index:90;font-size:14px;max-width:90vw;box-shadow:0 6px 20px rgba(0,0,0,.25)}
 .toast.bad{background:var(--bad);color:#fff}
-.offline{position:fixed;inset:0;z-index:100;background:rgba(10,16,19,.8);display:grid;place-items:center;padding:24px;color:#fff;text-align:center}
-.offline div{max-width:340px}
-.offline b{display:block;font-size:20px;margin-bottom:6px}
-.loading{display:grid;place-items:center;min-height:60vh;color:var(--ink-2)}
-.spin{width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--slate);border-radius:50%;animation:sp 0.8s linear infinite;margin:0 auto 10px}
+@media (min-width:900px){.toast{bottom:32px}}
+.offline{position:fixed;inset:0;z-index:100;background:rgba(10,16,19,.85);display:grid;place-items:center;padding:24px;color:#fff;text-align:center}
+.offline div{max-width:340px}.offline b{display:block;font-size:20px;margin-bottom:6px}
+.loading{display:grid;place-items:center;min-height:50vh;color:var(--ink2);text-align:center}
+.spin{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 10px}
 @keyframes sp{to{transform:rotate(360deg)}}
+.timeline .row{align-items:flex-start;padding-bottom:16px}
+.dot{width:24px;height:24px;border-radius:50%;border:2px solid var(--ink2);flex:none;display:grid;place-items:center}
+.dot.done{background:var(--accent);border-color:var(--accent);color:var(--accentInk)}
+.dot.now{border-color:var(--accent);background:rgba(242,183,5,.2)}
 </style>
 </head>
 <body>
 <div id="app"><div class="loading"><div><div class="spin"></div>กำลังเชื่อมต่อระบบ</div></div></div>
-<div id="offline" class="offline hidden"><div><b>ไม่มีการเชื่อมต่ออินเทอร์เน็ต</b>ระบบนี้บันทึกได้เฉพาะตอนออนไลน์ เพื่อให้ข้อมูลตรงกันทุกเครื่อง เชื่อมต่อเน็ตแล้วหน้านี้จะหายไปเอง</div></div>
+<div id="offline" class="offline hidden"><div><b>ไม่มีการเชื่อมต่ออินเทอร์เน็ต</b>ระบบบันทึกได้เฉพาะตอนออนไลน์ เพื่อให้ข้อมูลตรงกันทุกเครื่อง เมื่อเชื่อมต่อแล้วหน้านี้จะหายไปเอง</div></div>
 
 <script>
-	/* =====================================================================
-	ตั้งค่าการเชื่อมต่อ Supabase — นำค่ามาจาก Project Settings > API
-	===================================================================== */
-	const SUPABASE_URL = 'https://mydytzlrevzjpqusaohu.supabase.co';
-	const SUPABASE_ANON_KEY = 'sb_publishable_btZKjUqx12VOyTnyMAZOGQ_jpmiLHfl';
-	const COMPANY = 'หจก.กิตติยาก่อสร้าง 1994';
+/* =====================================================================
+   ตั้งค่าการเชื่อมต่อ Supabase — Project Settings > API Keys
+   ใส่ Project URL และ Publishable key (sb_publishable_...) เท่านั้น
+   ===================================================================== */
+const SUPABASE_URL = 'https://mydytzlrevzjpqusaohu.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_btZKjUqx12VOyTnyMAZOGQ_jpmiLHfl';
+const COMPANY = 'หจก.กิตติยาก่อสร้าง 1994';
+const PHOTO_BUCKET = 'employee-photos';
 
-	/* ---------- ค่าคงที่ ---------- */
-	const ROLES = {
-	pending:   'รออนุมัติ',
-	employee:  'พนักงาน',
-	foreman:   'โฟร์แมน/วิศวกร',
-	executive: 'ผู้บริหาร',
-	admin:     'แอดมิน'
-	};
-	const TITLES = ['นาย','นาง','นางสาว','ว่าที่ ร.ต.','อื่น ๆ'];
-	const TH_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-	const TH_MONTHS_S = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-	const ICON = {
-	home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',
-  people:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><circle cx="17" cy="9" r="2.6"/><path d="M16 14.6c2.7-.2 4.8 1.5 5.5 4.4"/></svg>',
-  key:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3M14 9l2 2"/></svg>',
-  gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>',
-  me:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4.2 4.2-6.5 8-6.5s7 2.3 8 6.5"/></svg>'
+/* ---------- ค่าคงที่ ---------- */
+const ROLES = { pending:'รออนุมัติ', employee:'พนักงาน', foreman:'โฟร์แมน/วิศวกร', executive:'ผู้บริหาร', admin:'แอดมิน' };
+const TITLES = ['นาย','นาง','นางสาว','อื่น ๆ'];
+const MARITAL = { single:'โสด', married:'สมรส', divorced:'หย่าร้าง', widowed:'หม้าย', separated:'แยกกันอยู่' };
+const MILITARY = { completed:'ผ่านการเกณฑ์แล้ว', exempt:'ได้รับการยกเว้น', reserve:'เรียน รด. ครบ', pending:'ยังไม่ผ่านการเกณฑ์' };
+const EMPTYPE = { permanent:'ประจำ', probation:'ทดลองงาน', daily:'รายวัน', temporary:'ชั่วคราว' };
+const GENDER = { male:'ชาย', female:'หญิง' };
+const RELATIONS = ['บิดา/มารดา','คู่สมรส','พี่น้อง','บุตร','ญาติ','อื่น ๆ'];
+const BANKS = ['กรุงเทพ','กสิกรไทย','กรุงไทย','ไทยพาณิชย์','กรุงศรีอยุธยา','ทหารไทยธนชาต (ttb)','ออมสิน','ธ.ก.ส.','อาคารสงเคราะห์','ซีไอเอ็มบี ไทย','ยูโอบี','เกียรตินาคินภัทร','แลนด์ แอนด์ เฮ้าส์','อิสลามแห่งประเทศไทย','อื่น ๆ'];
+const TH_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const TH_MONTHS_S = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const TH_DAYS = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+const STEPS = ['ส่วนตัว','บัตร','ที่อยู่','ติดต่อ','งาน'];
+const svg = (d, extra='') => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" ${extra}>${d}</svg>`;
+const IC = {
+  home: svg('<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'),
+  people: svg('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><circle cx="17" cy="9" r="2.6"/><path d="M16 14.6c2.7-.2 4.8 1.5 5.5 4.4"/>'),
+  key: svg('<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>'),
+  gear: svg('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>'),
+  me: svg('<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4.2 4.2-6.5 8-6.5s7 2.3 8 6.5"/>'),
+  back: svg('<path d="M15 6l-6 6 6 6"/>'),
+  close: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
+  plus: svg('<path d="M12 5v14M5 12h14"/>'),
+  search: svg('<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>'),
+  chev: svg('<path d="M9 6l6 6-6 6"/>'),
+  check: svg('<path d="M5 12l5 5 9-10"/>'),
+  eye: svg('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
+  lock: svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'),
+  clock: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
+  camera: svg('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'),
+  phone: svg('<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>'),
+  site: svg('<path d="M3 21h18M5 21V10l7-5 7 5v11M10 21v-5h4v5"/>'),
+  info: svg('<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 8h.01"/>'),
+  userplus: svg('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5"/><path d="M17 13v6M14 16h6"/>'),
+  sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
+  history: svg('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>')
 };
+const STAR_PATH = '<path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z"/>';
 
 /* ---------- state ---------- */
-const S = { session:null, profile:null, positions:[], sites:[], employees:[], route:'home' };
-let sb;
+const S = { session:null, profile:null, positions:[], sites:[], employees:[], photoUrl:{} };
+let sb, ADDR=null;
 
 /* ---------- utils ---------- */
-const $ = (sel, el=document) => el.querySelector(sel);
+const $ = (s, el=document) => el.querySelector(s);
+const $$ = (s, el=document) => [...el.querySelectorAll(s)];
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const localISO = (d=new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 const money = n => Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
-function toast(msg, bad=false){
-  const t=document.createElement('div'); t.className='toast'+(bad?' bad':''); t.textContent=msg;
-  document.body.appendChild(t); setTimeout(()=>t.remove(), bad?5000:2600);
-}
-function parseISO(iso){ if(!iso) return null; const [y,m,d]=iso.split('-').map(Number); return {y,m,d}; }
-function thaiDate(iso, short=true){
-  const p=parseISO(iso); if(!p) return '-';
-  return `${p.d} ${(short?TH_MONTHS_S:TH_MONTHS)[p.m-1]} ${p.y+543}`;
-}
-function ageOf(iso, ref=new Date()){
-  const p=parseISO(iso); if(!p) return null;
-  let y=ref.getFullYear()-p.y, m=(ref.getMonth()+1)-p.m;
-  if(ref.getDate()<p.d) m--;
-  if(m<0){ y--; m+=12; }
-  return {y,m};
-}
-const ageText = iso => { const a=ageOf(iso); return a ? `${a.y} ปี${a.m?` ${a.m} เดือน`:''}` : '-'; };
-const serviceText = iso => { const a=ageOf(iso); if(!a) return '-'; if(a.y<0) return 'ยังไม่เริ่มงาน'; return a.y ? `${a.y} ปี ${a.m} เดือน` : `${a.m} เดือน`; };
-function validThaiId(id){
-  if(!/^\d{13}$/.test(id)) return false;
-  let s=0; for(let i=0;i<12;i++) s+=Number(id[i])*(13-i);
-  return (11 - s%11)%10 === Number(id[12]);
-}
-const fmtId = id => id && id.length===13 ? `${id[0]}-${id.slice(1,5)}-${id.slice(5,10)}-${id.slice(10,12)}-${id[12]}` : (id||'-');
-const fullName = e => `${e.title==='อื่น ๆ'?'':e.title}${e.first_name} ${e.last_name}`;
+const localISO = (d=new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const parseISO = iso => { if(!iso) return null; const [y,m,d]=String(iso).slice(0,10).split('-').map(Number); return {y,m,d}; };
+function thaiDate(iso, short=true){ const p=parseISO(iso); if(!p) return '-'; return `${p.d} ${(short?TH_MONTHS_S:TH_MONTHS)[p.m-1]} ${p.y+543}`; }
+function todayLong(){ const d=new Date(); return `วัน${TH_DAYS[d.getDay()]}ที่ ${d.getDate()} ${TH_MONTHS[d.getMonth()]} ${d.getFullYear()+543}`; }
+function diffYM(iso, ref=new Date()){ const p=parseISO(iso); if(!p) return null; let y=ref.getFullYear()-p.y, m=(ref.getMonth()+1)-p.m; if(ref.getDate()<p.d) m--; if(m<0){y--;m+=12;} return {y,m}; }
+const ageText = iso => { const a=diffYM(iso); return a ? `${a.y} ปี${a.m?` ${a.m} เดือน`:''}` : '-'; };
+const serviceText = iso => { const a=diffYM(iso); if(!a) return '-'; if(a.y<0) return 'ยังไม่เริ่มงาน'; return a.y?`${a.y} ปี ${a.m} เดือน`:`${a.m} เดือน`; };
+function daysUntil(iso){ const p=parseISO(iso); if(!p) return null; const t=new Date(); t.setHours(0,0,0,0); return Math.round((new Date(p.y,p.m-1,p.d)-t)/86400000); }
+function untilText(iso){ const p=parseISO(iso); if(!p) return ''; const a=diffYM(localISO(), new Date(p.y,p.m-1,p.d)); if(!a||a.y<0) return ''; return a.y?`${a.y} ปี ${a.m} เดือน`:(a.m?`${a.m} เดือน`:`${daysUntil(iso)} วัน`); }
+function validThaiId(id){ if(!/^\d{13}$/.test(id)) return false; let s=0; for(let i=0;i<12;i++) s+=Number(id[i])*(13-i); return (11-s%11)%10===Number(id[12]); }
+const digits = v => String(v||'').replace(/\D/g,'');
+function fmtId(v){ const d=digits(v).slice(0,13); const parts=[d.slice(0,1),d.slice(1,5),d.slice(5,10),d.slice(10,12),d.slice(12,13)]; return parts.filter(Boolean).join('-'); }
+function fmtPhone(v){ const d=digits(v).slice(0,10); if(d.length<=3) return d; if(d.startsWith('02')&&d.length<=9) return d.length>5?`${d.slice(0,2)}-${d.slice(2,5)}-${d.slice(5)}`:`${d.slice(0,2)}-${d.slice(2)}`; return d.length>6?`${d.slice(0,3)}-${d.slice(3,6)}-${d.slice(6)}`:`${d.slice(0,3)}-${d.slice(3)}`; }
+const fullName = e => `${e.title==='อื่น ๆ'?'':(e.title||'')}${e.first_name||''} ${e.last_name||''}`.trim();
+const shortName = e => `${e.first_name||''} ${e.last_name||''}`.trim();
 const initial = e => (e.nickname||e.first_name||'?').trim().charAt(0);
-function starsHTML(v, lg=false){
-  let h=`<span class="stars${lg?' lg':''}" title="${v} ดาว" aria-label="${v} จาก 5 ดาว">`;
-  for(let i=1;i<=5;i++){
-    const fill = v>=i ? 1 : (v>=i-0.5 ? 0.5 : 0);
-    const id='g'+Math.random().toString(36).slice(2,8);
-    h+=`<svg viewBox="0 0 24 24"><defs><linearGradient id="${id}"><stop offset="${fill*100}%" stop-color="var(--safety)"/><stop offset="${fill*100}%" stop-color="var(--line)"/></linearGradient></defs><path fill="url(#${id})" d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z"/></svg>`;
-  }
-  return h+'</span>';
+const posName = id => S.positions.find(p=>p.id===id)?.name || '-';
+function starBadge(v){ v=Number(v); return `<span class="star ${v<=3?'low':''}"><svg viewBox="0 0 24 24" aria-hidden="true">${STAR_PATH}</svg>${v.toFixed(1)}</span>`; }
+function stars5(v){ v=Number(v); let h=`<span class="stars5" role="img" aria-label="${v} จาก 5 ดาว">`; for(let i=1;i<=5;i++){ const f=v>=i?100:(v>=i-0.5?50:0); const id='s'+Math.random().toString(36).slice(2,8); h+=`<svg viewBox="0 0 24 24"><defs><linearGradient id="${id}"><stop offset="${f}%" stop-color="#F2B705"/><stop offset="${f}%" stop-color="rgba(255,255,255,.28)"/></linearGradient></defs><path fill="url(#${id})" d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z"/></svg>`; } return h+'</span>'; }
+function addrText(e, pre='addr'){
+  const g=k=>e[`${pre}_${k}`]; const bkk=(g('province')||'').includes('กรุงเทพ');
+  return [g('no'), g('moo')&&`หมู่ ${g('moo')}`, g('soi')&&`ซ.${g('soi')}`, g('road')&&`ถ.${g('road')}`,
+    g('subdistrict')&&`${bkk?'แขวง':'ต.'}${g('subdistrict')}`, g('district')&&`${bkk?'เขต':'อ.'}${g('district')}`,
+    g('province')&&(bkk?g('province'):`จ.${g('province')}`), g('zip')].filter(Boolean).join(' ') || '-';
 }
+function toast(msg, bad=false){ const t=document.createElement('div'); t.className='toast'+(bad?' bad':''); t.setAttribute('role','status'); t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(), bad?5200:2600); }
 const errText = e => {
-  const m = (e && (e.message||e.error_description)) || String(e);
-  const map = {
-    'Invalid login credentials':'อีเมลหรือรหัสผ่านไม่ถูกต้อง',
-    'User already registered':'อีเมลนี้สมัครไว้แล้ว ลองเข้าสู่ระบบ หรือกดลืมรหัสผ่าน',
-    'Email not confirmed':'ยังไม่ได้ยืนยันอีเมล กรุณาเปิดลิงก์ยืนยันในอีเมลก่อน',
-    'Password should be at least 6 characters.':'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'
-  };
+  const m=(e&&(e.message||e.error_description))||String(e);
+  const map={'Invalid login credentials':'อีเมลหรือรหัสผ่านไม่ถูกต้อง','User already registered':'อีเมลนี้สมัครไว้แล้ว ลองเข้าสู่ระบบ หรือกดลืมรหัสผ่าน','Email not confirmed':'ยังไม่ได้ยืนยันอีเมล กรุณาเปิดลิงก์ยืนยันในอีเมลก่อน','Password should be at least 6 characters.':'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'};
   if(map[m]) return map[m];
   if(/duplicate key.*national_id/.test(m)) return 'เลขบัตรประชาชนนี้มีในระบบแล้ว';
-  if(/Failed to fetch|NetworkError/i.test(m)) return 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ต';
+  if(/blood_needs_consent/.test(m)) return 'บันทึกหมู่เลือดได้เมื่อพนักงานยินยอมแล้วเท่านั้น';
+  if(/Failed to fetch|NetworkError|Load failed/i.test(m)) return 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ต';
+  if(/column .* does not exist/.test(m)) return 'ฐานข้อมูลยังไม่ได้อัปเดต กรุณารันไฟล์ 02_profile_update.sql ใน Supabase';
   return m;
 };
-function busy(btn, on, label){
-  if(!btn) return;
-  if(on){ btn.dataset.l=btn.textContent; btn.disabled=true; btn.textContent=label||'กำลังบันทึก...'; }
-  else { btn.disabled=false; if(btn.dataset.l) btn.textContent=btn.dataset.l; }
+function busy(btn,on,label){ if(!btn) return; if(on){ btn.dataset.l=btn.innerHTML; btn.disabled=true; btn.textContent=label||'กำลังบันทึก...'; } else { btn.disabled=false; if(btn.dataset.l) btn.innerHTML=btn.dataset.l; } }
+
+/* ---------- photos ---------- */
+function avatar(e, cls='', style=''){ return `<div class="av ${cls}" ${style?`style="${style}"`:''}>${e.photo_path?`<img data-ph="${esc(e.photo_path)}" alt="">`:''}<span>${esc(initial(e))}</span></div>`; }
+async function hydratePhotos(root=document){
+  const imgs=$$('img[data-ph]',root); if(!imgs.length) return;
+  const need=[...new Set(imgs.map(i=>i.dataset.ph).filter(p=>!S.photoUrl[p]))];
+  if(need.length){
+    const {data}=await sb.storage.from(PHOTO_BUCKET).createSignedUrls(need, 3600);
+    (data||[]).forEach(r=>{ if(r.signedUrl) S.photoUrl[r.path]=r.signedUrl; });
+  }
+  imgs.forEach(i=>{ const u=S.photoUrl[i.dataset.ph]; if(u){ i.onload=()=>i.parentElement.classList.add('has-img'); i.src=u; } });
+}
+async function resizeImage(file, max=720){
+  const url=URL.createObjectURL(file);
+  const img=await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=url; });
+  const r=Math.min(1, max/Math.max(img.width,img.height));
+  const c=document.createElement('canvas'); c.width=Math.round(img.width*r); c.height=Math.round(img.height*r);
+  c.getContext('2d').drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url);
+  return await new Promise(res=>c.toBlob(res,'image/jpeg',0.85));
 }
 
-/* date picker: วัน / เดือน / ปี พ.ศ. */
-function dateField(name, iso, label, hint=''){
-  const p=parseISO(iso)||{};
-  let days='<option value="">วัน</option>'; for(let i=1;i<=31;i++) days+=`<option ${p.d===i?'selected':''}>${i}</option>`;
-  let mons='<option value="">เดือน</option>'; TH_MONTHS.forEach((m,i)=> mons+=`<option value="${i+1}" ${p.m===i+1?'selected':''}>${m}</option>`);
-  return `<div class="field"><label>${label}</label>
-    <div class="date3" data-date="${name}">
-      <select data-p="d" aria-label="วัน">${days}</select>
-      <select data-p="m" aria-label="เดือน">${mons}</select>
-      <input type="number" data-p="y" placeholder="พ.ศ." inputmode="numeric" min="2440" max="2700" value="${p.y?p.y+543:''}" aria-label="ปี พ.ศ.">
-    </div><span class="hint" data-hint="${name}">${hint}</span></div>`;
+/* ---------- date field: วัน / เดือน / ปี พ.ศ. ---------- */
+function dateParts(F, key){ if(F._dp?.[key]) return F._dp[key]; const p=parseISO(F[key]); return p?{d:p.d,m:p.m,y:p.y+543}:{d:'',m:'',y:''}; }
+function dateField(F, key, label, hint=''){
+  const p=dateParts(F,key);
+  let days='<option value="">วัน</option>'; for(let i=1;i<=31;i++) days+=`<option ${+p.d===i?'selected':''}>${i}</option>`;
+  let mons='<option value="">เดือน</option>'; TH_MONTHS.forEach((m,i)=>mons+=`<option value="${i+1}" ${+p.m===i+1?'selected':''}>${m}</option>`);
+  return `<div class="field"><label>${label}</label><div class="g3" data-date="${key}">
+    <select class="in" data-p="d" aria-label="${label} วัน">${days}</select>
+    <select class="in" data-p="m" aria-label="${label} เดือน">${mons}</select>
+    <input class="in num" type="number" inputmode="numeric" data-p="y" placeholder="พ.ศ." value="${esc(p.y)}" aria-label="${label} ปี พ.ศ."></div>
+    <span class="hint" data-hint="${key}">${hint}</span></div>`;
 }
-function readDate(root, name){
-  const w=$(`[data-date="${name}"]`, root);
-  const d=+$('[data-p=d]',w).value, m=+$('[data-p=m]',w).value, yb=+$('[data-p=y]',w).value;
-  if(!d && !m && !yb) return {ok:true, value:null};
-  if(!d || !m || !yb) return {ok:false, msg:'กรอกวัน เดือน และปี พ.ศ. ให้ครบ'};
-  const y=yb-543;
-  const dt=new Date(y, m-1, d);
-  if(dt.getMonth()!==m-1 || y<1900 || y>2200) return {ok:false, msg:'วันที่ไม่ถูกต้อง'};
-  return {ok:true, value:`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`};
+function readParts(p){
+  const d=+p.d, m=+p.m, yb=+p.y;
+  if(!d && !m && !yb) return {ok:true,value:null};
+  if(!d||!m||!yb) return {ok:false,msg:'กรอกวัน เดือน และปี พ.ศ. ให้ครบ'};
+  const y=yb-543, dt=new Date(y,m-1,d);
+  if(dt.getMonth()!==m-1 || y<1900 || y>2200) return {ok:false,msg:'วันที่ไม่ถูกต้อง (ตรวจปี พ.ศ.)'};
+  return {ok:true,value:`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`};
 }
 
-/* modal */
-function openModal(html, cls=''){
-  const bg=document.createElement('div'); bg.className='modal-bg';
-  bg.innerHTML=`<div class="modal ${cls}" role="dialog" aria-modal="true">${html}</div>`;
-  document.body.appendChild(bg);
-  const close=()=>bg.remove();
-  bg.addEventListener('click',e=>{ if(e.target===bg) close(); });
-  bg.querySelectorAll('[data-close]').forEach(b=>b.onclick=close);
-  const esck=e=>{ if(e.key==='Escape'){ close(); document.removeEventListener('keydown',esck);} };
-  document.addEventListener('keydown',esck);
-  setTimeout(()=>{ const f=bg.querySelector('input,select,textarea'); if(f) f.focus(); },50);
+/* ---------- overlay helpers ---------- */
+function overlay(html, center=true, dismiss=true){
+  const bg=document.createElement('div'); bg.className='sheet-bg'+(center?' center':''); bg.innerHTML=html; document.body.appendChild(bg);
+  document.body.style.overflow='hidden';
+  const close=()=>{ bg.remove(); if(!$('.sheet-bg')) document.body.style.overflow=''; document.removeEventListener('keydown',k); };
+  const k=e=>{ if(e.key==='Escape'&&dismiss&&bg===[...document.querySelectorAll('.sheet-bg')].pop()) close(); }; document.addEventListener('keydown',k);
+  if(dismiss) bg.addEventListener('click',e=>{ if(e.target===bg) close(); });
   return {el:bg, close};
 }
-function confirmBox(msg, okText='ยืนยัน', danger=false){
+function confirmBox(msg, ok='ยืนยัน', danger=false){
   return new Promise(res=>{
-    const m=openModal(`<div class="modal-head"><h3>ยืนยัน</h3><button data-close aria-label="ปิด">×</button></div>
-      <div class="modal-body">${esc(msg)}</div>
-      <div class="modal-foot"><button class="btn" data-close>ยกเลิก</button><button class="btn ${danger?'btn-danger':'btn-primary'}" id="cOk">${esc(okText)}</button></div>`,'modal-sm');
-    m.el.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>res(false)));
-    $('#cOk',m.el).onclick=()=>{ m.close(); res(true); };
+    const m=overlay(`<div class="modal" role="dialog" aria-modal="true"><h3 class="h2" style="font-size:18px">ยืนยัน</h3><p style="margin:0">${esc(msg)}</p>
+      <div class="row"><button class="btn grow" data-x>ยกเลิก</button><button class="btn grow ${danger?'btn-bad':'btn-p'}" data-ok>${esc(ok)}</button></div></div>`);
+    $('[data-x]',m.el).onclick=()=>{m.close();res(false);}; $('[data-ok]',m.el).onclick=()=>{m.close();res(true);};
+  });
+}
+function promptBox(title, value='', ok='บันทึก'){
+  return new Promise(res=>{
+    const m=overlay(`<div class="modal" role="dialog" aria-modal="true"><h3 class="h2" style="font-size:18px">${esc(title)}</h3><input class="in" value="${esc(value)}">
+      <div class="row"><button class="btn grow" data-x>ยกเลิก</button><button class="btn grow btn-p" data-ok>${esc(ok)}</button></div></div>`);
+    const i=$('input',m.el); setTimeout(()=>i.focus(),50);
+    $('[data-x]',m.el).onclick=()=>{m.close();res(null);}; $('[data-ok]',m.el).onclick=()=>{m.close();res(i.value.trim());};
   });
 }
 
 /* =====================================================================
    เริ่มระบบ
    ===================================================================== */
-function watchOnline(){
-  const upd=()=>$('#offline').classList.toggle('hidden', navigator.onLine);
-  window.addEventListener('online',upd); window.addEventListener('offline',upd); upd();
+function applyTheme(v){
+  try{ if(v==='light'||v==='dark'){ localStorage.setItem('kty-theme',v); document.documentElement.dataset.theme=v; } else { localStorage.removeItem('kty-theme'); delete document.documentElement.dataset.theme; } }catch(e){}
+  const dark = document.documentElement.dataset.theme==='dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+  $('meta[name=theme-color]').content = dark ? '#1A2227' : '#22313A';
 }
+const curTheme = () => { try{ return localStorage.getItem('kty-theme')||'auto'; }catch(e){ return 'auto'; } };
+function watchOnline(){ const u=()=>$('#offline').classList.toggle('hidden',navigator.onLine); addEventListener('online',u); addEventListener('offline',u); u(); }
 
 async function boot(){
-  watchOnline();
+  applyTheme(curTheme()); watchOnline();
   if(SUPABASE_URL.includes('YOUR-PROJECT')){
-    $('#app').innerHTML=`<div class="auth"><div class="auth-box panel"><h3 style="margin-top:0">ยังไม่ได้ตั้งค่าการเชื่อมต่อ</h3><p>เปิดไฟล์ index.html แล้วใส่ค่า <b>SUPABASE_URL</b> และ <b>SUPABASE_ANON_KEY</b> ตามคู่มือติดตั้ง</p></div></div>`;
+    $('#app').innerHTML=`<div class="auth"><div class="auth-top"><div class="brand"><div class="mark"><span>KTY</span></div><b style="font-size:20px">KTY1994</b></div></div>
+      <div class="card auth-card"><h3 class="h2">ยังไม่ได้ตั้งค่าการเชื่อมต่อ</h3><p class="muted" style="margin:0">เปิดไฟล์ index.html แล้วใส่ SUPABASE_URL และ SUPABASE_ANON_KEY ตามคู่มือติดตั้ง</p></div></div>`;
     return;
   }
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  sb.auth.onAuthStateChange((event, session)=>{
-    if(event==='PASSWORD_RECOVERY'){ S.session=session; renderNewPassword(); return; }
-    if(event==='SIGNED_OUT'){ S.session=null; S.profile=null; renderAuth(); }
+  sb.auth.onAuthStateChange((ev, session)=>{
+    if(ev==='PASSWORD_RECOVERY'){ S.session=session; renderNewPassword(); }
+    if(ev==='SIGNED_OUT'){ S.session=null; S.profile=null; renderAuth(); }
   });
-  const { data } = await sb.auth.getSession();
-  S.session = data.session;
-  if(location.hash.includes('type=recovery')) return; // รอ event PASSWORD_RECOVERY
+  const {data}=await sb.auth.getSession(); S.session=data.session;
+  if(location.hash.includes('type=recovery')) return;
   if(S.session) await enter(); else renderAuth();
 }
-
 async function enter(){
   if(/access_token|type=/.test(location.hash)) history.replaceState(null,'',location.pathname);
-  const { data, error } = await sb.from('profiles').select('*').eq('id', S.session.user.id).single();
-  if(error){ toast(errText(error), true); renderAuth(); return; }
-  S.profile = data;
-  if(data.role==='pending' || !data.is_active){ renderPending(); return; }
+  const {data,error}=await sb.from('profiles').select('*').eq('id',S.session.user.id).single();
+  if(error){ toast(errText(error),true); renderAuth(); return; }
+  S.profile=data;
+  if(data.role==='pending'||!data.is_active){ renderPending(); return; }
   await loadRefs();
-  window.onhashchange = route;
-  route();
+  window.onhashchange=route; route();
 }
-
 async function loadRefs(){
-  const [p, s] = await Promise.all([
-    sb.from('positions').select('*').order('sort_order').order('name'),
-    sb.from('sites').select('*').order('status').order('name')
-  ]);
-  S.positions = p.data||[]; S.sites = s.data||[];
+  const [p,s]=await Promise.all([ sb.from('positions').select('*').order('sort_order').order('name'), sb.from('sites').select('*').order('status').order('name') ]);
+  S.positions=p.data||[]; S.sites=s.data||[];
 }
-const isAdmin = () => S.profile?.role==='admin';
-const isManager = () => ['admin','executive'].includes(S.profile?.role);
+const isAdmin=()=>S.profile?.role==='admin';
+const isManager=()=>['admin','executive'].includes(S.profile?.role);
 
 /* =====================================================================
-   หน้า login / สมัคร / รหัสผ่าน
+   เข้าสู่ระบบ / สมัคร / รอนุมัติ / ตั้งรหัสผ่าน
    ===================================================================== */
-function brandHTML(sub='ระบบเช็คชื่อพนักงาน'){
-  return `<div class="brand"><div class="brand-mark"><span>KTY</span></div><div><h1>KTY1994</h1><p class="muted">${sub}</p></div></div>`;
-}
+function authTop(title, sub, lead=''){ return `<div class="auth-top"><div><div class="brand"><div class="mark" style="width:58px;height:58px;font-size:17px"><span>KTY</span></div><div><div style="font-size:24px;font-weight:700;line-height:1.2">${title}</div><div style="color:var(--barInk2);font-size:14px">${sub}</div></div></div>${lead?`<p>${lead}</p>`:''}</div></div>`; }
+function pwField(id, auto){ return `<div class="inwrap"><input class="in" id="${id}" type="password" autocomplete="${auto}" minlength="6"><button type="button" class="eye" aria-label="แสดงรหัสผ่าน" data-eye="${id}">${IC.eye}</button></div>`; }
+function bindEyes(root){ $$('[data-eye]',root).forEach(b=>b.onclick=()=>{ const i=$('#'+b.dataset.eye); i.type=i.type==='password'?'text':'password'; }); }
+
 function renderAuth(mode='login'){
-  $('#app').innerHTML=`<div class="auth"><div class="auth-box">${brandHTML()}
-    <div class="panel">
-      <div class="tabs" role="tablist">
-        <button class="${mode==='login'?'on':''}" data-m="login">เข้าสู่ระบบ</button>
-        <button class="${mode==='signup'?'on':''}" data-m="signup">สมัครใช้งาน</button>
-      </div>
-      <form id="authForm" novalidate>
-        ${mode==='signup'?`
-        <div class="field"><label for="dn">ชื่อ-นามสกุล</label><input id="dn" type="text" required autocomplete="name"></div>
-        <div class="field"><label for="ph">เบอร์โทร</label><input id="ph" type="tel" autocomplete="tel"></div>`:''}
-        <div class="field"><label for="em">อีเมล</label><input id="em" type="email" required autocomplete="email"></div>
-        <div class="field"><label for="pw">รหัสผ่าน</label><input id="pw" type="password" required minlength="6" autocomplete="${mode==='login'?'current-password':'new-password'}">
-          ${mode==='signup'?'<span class="hint">อย่างน้อย 6 ตัวอักษร</span>':''}</div>
-        <button class="btn btn-primary btn-block" id="authBtn">${mode==='login'?'เข้าสู่ระบบ':'สมัครใช้งาน'}</button>
-        ${mode==='login'?'<p style="margin:12px 0 0;text-align:center"><button type="button" class="linkbtn" id="forgot">ลืมรหัสผ่าน</button></p>':
-          '<p class="muted" style="font-size:13px;margin:12px 0 0">หลังสมัคร แอดมินต้องอนุมัติและกำหนดสิทธิ์ก่อน จึงจะใช้งานได้</p>'}
-      </form>
-    </div></div></div>`;
-  document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>renderAuth(b.dataset.m));
-  $('#authForm').onsubmit = async ev=>{
+  const login=mode==='login';
+  $('#app').innerHTML=`<div class="auth">${authTop('KTY1994','ระบบเช็คชื่อพนักงาน', login?'ยินดีต้อนรับกลับ<br>เข้าสู่ระบบเพื่อเริ่มงานวันนี้':'สมัครใช้งานสำหรับพนักงาน<br>หจก.กิตติยาก่อสร้าง 1994')}
+    <form class="card auth-card" id="af" novalidate>
+      <div class="seg" role="tablist"><button type="button" class="${login?'on':''}" data-m="login">เข้าสู่ระบบ</button><button type="button" class="${login?'':'on'}" data-m="signup">สมัครใช้งาน</button></div>
+      ${login?'':`<div class="field"><label for="dn">ชื่อ-นามสกุล</label><input class="in" id="dn" autocomplete="name"></div>
+      <div class="field"><label for="ph">เบอร์มือถือ</label><input class="in num" id="ph" type="tel" inputmode="tel" autocomplete="tel" placeholder="08x-xxx-xxxx"></div>`}
+      <div class="field"><label for="em">อีเมล</label><input class="in" id="em" type="email" autocomplete="email" inputmode="email"></div>
+      <div class="field"><label for="pw">${login?'รหัสผ่าน':'ตั้งรหัสผ่าน'}</label>${pwField('pw', login?'current-password':'new-password')}${login?'':'<span class="hint" id="pwh">อย่างน้อย 6 ตัวอักษร</span>'}</div>
+      ${login?'':`<div class="note n-info">${IC.lock}<span>หลังสมัคร แอดมินจะตรวจสอบและกำหนดสิทธิ์ให้ก่อนใช้งาน ข้อมูลใช้เพื่อการบริหารงานบุคคลของบริษัทเท่านั้น</span></div>`}
+      <button class="btn btn-p btn-block" id="ab" style="min-height:54px;font-size:16px">${login?'เข้าสู่ระบบ':'สมัครใช้งาน'}</button>
+      ${login?'<button type="button" class="linkbtn" id="forgot" style="align-self:center">ลืมรหัสผ่าน</button>':''}
+    </form>
+    <div class="auth-foot xs muted">${COMPANY}<br>ใช้งานได้เฉพาะเมื่อเชื่อมต่ออินเทอร์เน็ต</div></div>`;
+  $$('[data-m]').forEach(b=>b.onclick=()=>renderAuth(b.dataset.m));
+  bindEyes($('#app'));
+  const ph=$('#ph'); if(ph) ph.addEventListener('input',()=>{ ph.value=fmtPhone(ph.value); });
+  const pwh=$('#pwh'); if(pwh) $('#pw').addEventListener('input',e=>{ const v=e.target.value; const sc=(v.length>=6)+(v.length>=10)+(/\d/.test(v)&&/[a-zA-Zก-๙]/.test(v)); pwh.className='hint '+(sc>=2?'ok':''); pwh.textContent=v.length<6?'อย่างน้อย 6 ตัวอักษร':['ใช้ได้','ค่อนข้างแข็งแรง','แข็งแรง'][sc-1]||'ใช้ได้'; });
+  $('#af').onsubmit=async ev=>{
     ev.preventDefault();
-    const email=$('#em').value.trim(), password=$('#pw').value, btn=$('#authBtn');
-    if(!email || !password) return toast('กรอกอีเมลและรหัสผ่าน', true);
+    const email=$('#em').value.trim(), password=$('#pw').value, btn=$('#ab');
+    if(!email||!password) return toast('กรอกอีเมลและรหัสผ่าน',true);
     busy(btn,true,'กำลังดำเนินการ...');
     try{
-      if(mode==='login'){
-        const {data,error}=await sb.auth.signInWithPassword({email,password});
-        if(error) throw error;
-        S.session=data.session; await enter();
-      }else{
-        const display_name=$('#dn').value.trim();
-        if(!display_name){ busy(btn,false); return toast('กรอกชื่อ-นามสกุล', true); }
-        const {data,error}=await sb.auth.signUp({email,password,options:{data:{display_name, phone:$('#ph').value.trim()}}});
-        if(error) throw error;
-        if(data.session){ S.session=data.session; await enter(); }
-        else { renderAuth('login'); toast('สมัครแล้ว กรุณายืนยันอีเมลจากกล่องจดหมาย แล้วเข้าสู่ระบบ'); }
+      if(login){ const {data,error}=await sb.auth.signInWithPassword({email,password}); if(error) throw error; S.session=data.session; await enter(); }
+      else{
+        const display_name=$('#dn').value.trim(); if(!display_name){ busy(btn,false); return toast('กรอกชื่อ-นามสกุล',true); }
+        const {data,error}=await sb.auth.signUp({email,password,options:{data:{display_name,phone:$('#ph').value.trim()}}}); if(error) throw error;
+        if(data.session){ S.session=data.session; await enter(); } else { renderAuth('login'); toast('สมัครแล้ว กรุณายืนยันอีเมลจากกล่องจดหมาย แล้วเข้าสู่ระบบ'); }
       }
-    }catch(e){ toast(errText(e), true); busy(btn,false); }
+    }catch(e){ toast(errText(e),true); busy(btn,false); }
   };
-  const f=$('#forgot');
-  if(f) f.onclick=async()=>{
-    const email=$('#em').value.trim();
-    if(!email) return toast('กรอกอีเมลก่อน แล้วกดลืมรหัสผ่าน', true);
-    const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo: location.origin+location.pathname});
-    if(error) return toast(errText(error), true);
-    toast('ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่อีเมลแล้ว');
+  const f=$('#forgot'); if(f) f.onclick=async()=>{
+    const email=$('#em').value.trim(); if(!email) return toast('กรอกอีเมลก่อน แล้วกดลืมรหัสผ่าน',true);
+    const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});
+    if(error) return toast(errText(error),true); toast('ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่อีเมลแล้ว');
   };
 }
-
 function renderNewPassword(){
-  $('#app').innerHTML=`<div class="auth"><div class="auth-box">${brandHTML()}<div class="panel">
-    <h3 style="margin-top:0">ตั้งรหัสผ่านใหม่</h3>
-    <div class="field"><label for="np">รหัสผ่านใหม่</label><input id="np" type="password" minlength="6" autocomplete="new-password"></div>
-    <button class="btn btn-primary btn-block" id="npBtn">บันทึกรหัสผ่าน</button></div></div></div>`;
-  $('#npBtn').onclick=async()=>{
-    const password=$('#np').value;
-    if(password.length<6) return toast('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', true);
-    const {error}=await sb.auth.updateUser({password});
-    if(error) return toast(errText(error), true);
-    history.replaceState(null,'',location.pathname);
-    toast('บันทึกรหัสผ่านแล้ว'); await enter();
-  };
+  $('#app').innerHTML=`<div class="auth">${authTop('ตั้งรหัสผ่านใหม่','KTY1994')}<div class="card auth-card">
+    <div class="field"><label for="np">รหัสผ่านใหม่</label>${pwField('np','new-password')}</div><button class="btn btn-p btn-block" id="nb">บันทึกรหัสผ่าน</button></div></div>`;
+  bindEyes($('#app'));
+  $('#nb').onclick=async()=>{ const password=$('#np').value; if(password.length<6) return toast('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร',true);
+    const {error}=await sb.auth.updateUser({password}); if(error) return toast(errText(error),true);
+    history.replaceState(null,'',location.pathname); toast('บันทึกรหัสผ่านแล้ว'); await enter(); };
 }
-
 function renderPending(){
-  const inactive = S.profile && !S.profile.is_active && S.profile.role!=='pending';
-  $('#app').innerHTML=`<div class="auth"><div class="auth-box">${brandHTML()}<div class="panel">
-    <h3 style="margin-top:0">${inactive?'บัญชีนี้ถูกระงับ':'รอแอดมินอนุมัติ'}</h3>
-    <p>${inactive?'ติดต่อแอดมินของบริษัทเพื่อเปิดใช้งานอีกครั้ง':'สมัครเรียบร้อยแล้ว เมื่อแอดมินอนุมัติและกำหนดสิทธิ์ให้ กดปุ่มด้านล่างเพื่อเข้าใช้งาน'}</p>
-    <p class="muted" style="font-size:13px">${esc(S.profile?.display_name)} · ${esc(S.profile?.email)}</p>
-    <div class="row row-2"><button class="btn" id="rf">ตรวจสอบอีกครั้ง</button><button class="btn" id="lo">ออกจากระบบ</button></div>
-  </div></div></div>`;
-  $('#rf').onclick=enter;
-  $('#lo').onclick=()=>sb.auth.signOut();
+  const p=S.profile, blocked=!p.is_active;
+  $('#app').innerHTML=`<div class="auth"><div style="padding:48px 24px 24px;display:flex;flex-direction:column;gap:22px;max-width:460px;margin:0 auto;width:100%;flex:1">
+    <div class="brand"><div class="mark"><span>KTY</span></div><div><b>KTY1994</b><div class="sm muted">ระบบเช็คชื่อพนักงาน</div></div></div>
+    <div style="width:96px;height:96px;border-radius:28px;background:${blocked?'var(--badBg)':'var(--warnBg)'};color:${blocked?'var(--bad)':'var(--warn)'};display:grid;place-items:center;margin-top:12px">${blocked?svg('<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>','style="width:46px;height:46px"'):svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>','style="width:46px;height:46px"')}</div>
+    <div><h2 style="margin:0;font-size:26px;line-height:1.3">${blocked?'บัญชีนี้ถูกระงับ':'รอแอดมินอนุมัติ'}</h2><p class="muted" style="margin:8px 0 0">${blocked?'ติดต่อแอดมินของบริษัทเพื่อเปิดใช้งานอีกครั้ง':'สมัครเรียบร้อยแล้ว เมื่อแอดมินกำหนดสิทธิ์ให้ คุณจะเข้าใช้งานได้ทันที'}</p></div>
+    ${blocked?'':`<div class="card timeline" style="padding:18px 18px 2px">
+      <div class="row"><span class="dot done">${svg('<path d="M5 12l5 5 9-10"/>','style="width:14px;height:14px;stroke-width:3"')}</span><div><b>สมัครใช้งาน</b><div class="sm muted">${thaiDate(localISO(new Date(p.created_at)))}</div></div></div>
+      <div class="row"><span class="dot now"></span><div><b>แอดมินตรวจสอบและกำหนดสิทธิ์</b><div class="sm muted">กำลังรอ</div></div></div>
+      <div class="row" style="opacity:.6"><span class="dot"></span><div><b>เริ่มใช้งาน</b><div class="sm muted">ตามสิทธิ์ที่ได้รับ</div></div></div></div>`}
+    <div class="note n-info"><span>บัญชี <b style="color:var(--ink)">${esc(p.display_name)}</b><br>${esc(p.email)}</span></div>
+    <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px"><button class="btn btn-p" id="rf">ตรวจสอบอีกครั้ง</button><button class="btn" id="lo">ออกจากระบบ</button></div>
+  </div></div>`;
+  $('#rf').onclick=enter; $('#lo').onclick=()=>sb.auth.signOut();
 }
 
 /* =====================================================================
-   โครงหน้าหลัก + เมนูตามสิทธิ์
+   โครงหน้าหลัก
    ===================================================================== */
 function menu(){
-  const m=[{k:'home',t:'หน้าแรก',i:ICON.home}];
-  if(isManager()) m.push({k:'employees',t:'พนักงาน',i:ICON.people});
-  if(isAdmin()) m.push({k:'users',t:'ผู้ใช้ระบบ',i:ICON.key});
-  if(isManager()) m.push({k:'settings',t:'ตั้งค่า',i:ICON.gear});
-  m.push({k:'me',t:'ข้อมูลของฉัน',i:ICON.me});
+  const m=[{k:'home',t:'หน้าแรก',i:IC.home}];
+  if(isManager()) m.push({k:'employees',t:'พนักงาน',i:IC.people});
+  if(isAdmin()) m.push({k:'users',t:'ผู้ใช้',tl:'ผู้ใช้ระบบ',i:IC.key});
+  if(isManager()) m.push({k:'settings',t:'ตั้งค่า',i:IC.gear});
+  m.push({k:'me',t:'ฉัน',tl:'ข้อมูลของฉัน',i:IC.me});
   return m;
 }
 function route(){
-  const k=(location.hash.replace('#','')||'home');
-  const allowed=menu().map(x=>x.k);
-  S.route = allowed.includes(k)?k:'home';
-  renderShell();
-  ({home:pageHome, employees:pageEmployees, users:pageUsers, settings:pageSettings, me:pageMe})[S.route]();
+  const [k,id]=(location.hash.replace('#','')||'home').split('/');
+  const allowed=menu().map(x=>x.k); if(isManager()) allowed.push('emp');
+  const key=allowed.includes(k)?k:'home';
+  const active = key==='emp' ? 'employees' : key;
+  renderShell(active);
+  ({home:pageHome, employees:pageEmployees, emp:()=>pageProfile(id), users:pageUsers, settings:pageSettings, me:pageMe})[key]();
+  scrollTo(0,0);
 }
-function renderShell(){
+function renderShell(active){
   const items=menu();
-  const link=(x,cls='')=>`<a href="#${x.k}" class="${S.route===x.k?'on':''} ${cls}">${x.i}<span>${x.t}</span></a>`;
-  $('#app').innerHTML=`<div class="shell">
-    <aside class="side">${brandHTML(COMPANY)}<nav class="nav">${items.map(x=>link(x)).join('')}</nav>
-      <div class="side-foot"><div class="who">${esc(S.profile.display_name)}</div><div style="color:#AFC0C4">${ROLES[S.profile.role]}</div>
-      <button id="lo1">ออกจากระบบ</button></div></aside>
-    <div>
-      <header class="topbar">${brandHTML(ROLES[S.profile.role])}<button id="lo2">ออกจากระบบ</button></header>
-      <main class="main" id="page"><div class="loading"><div><div class="spin"></div>กำลังโหลด</div></div></main>
-    </div></div>
-    <nav class="bottomnav">${items.map(x=>link(x)).join('')}</nav>`;
-  const lo=async()=>{ if(await confirmBox('ออกจากระบบตอนนี้?','ออกจากระบบ')) sb.auth.signOut(); };
-  $('#lo1').onclick=lo; $('#lo2').onclick=lo;
+  $('#app').innerHTML=`<div class="app">
+    <aside class="side"><div class="brand" style="margin:0 6px 24px"><div class="mark"><span>KTY</span></div><div><b style="color:#fff">KTY1994</b><div class="xs" style="color:#AFC0C4">${COMPANY}</div></div></div>
+      ${items.map(x=>`<a href="#${x.k}" class="navl ${active===x.k?'on':''}">${x.i}<span>${x.tl||x.t}</span>${x.k==='users'?'<span class="tag t-acc hidden" data-pend style="margin-left:auto;height:20px"></span>':''}</a>`).join('')}
+      <div class="side-foot"><b style="color:#fff">${esc(S.profile.display_name)}</b><div class="xs" style="color:#AFC0C4">${ROLES[S.profile.role]}</div><button id="lo1">ออกจากระบบ</button></div></aside>
+    <div class="appwrap"><div id="page"><div class="loading"><div><div class="spin"></div>กำลังโหลด</div></div></div></div>
+    <nav class="bnav" aria-label="เมนูหลัก">${items.map(x=>`<a href="#${x.k}" class="${active===x.k?'on':''}"><span class="pill">${x.i}</span>${x.t}</a>`).join('')}</nav></div>`;
+  $('#lo1').onclick=logout;
 }
-const setPage = html => { $('#page').innerHTML = html; };
+async function logout(){ if(await confirmBox('ออกจากระบบตอนนี้?','ออกจากระบบ')) sb.auth.signOut(); }
+function head(title, sub='', o={}){
+  return `<header class="appbar stripe">${o.back?`<a href="${o.back}" class="ibtn" aria-label="ย้อนกลับ">${IC.back}</a>`:''}${o.lead||''}<h1>${title}${sub?`<small>${sub}</small>`:''}</h1>${o.mActions||''}</header>
+    <div class="main">${o.noDesk?'':`<div class="phead"><div>${o.back?`<a href="${o.back}" class="linkbtn" style="text-decoration:none">‹ ย้อนกลับ</a>`:''}<h1>${title}</h1>${sub?`<p>${sub}</p>`:''}</div><div class="row">${o.dActions||''}</div></div>`}`;
+}
+const setPage = html => { $('#page').innerHTML = html + '</div>'; };
 
 /* =====================================================================
    หน้าแรก
    ===================================================================== */
 async function pageHome(){
+  const p=S.profile;
+  const lead=`<div class="mark" style="width:40px;height:40px"><span>KTY</span></div>`;
   if(!isManager()){
-    setPage(`<div class="page-head"><div><h2>สวัสดี ${esc(S.profile.display_name)}</h2><p>${ROLES[S.profile.role]} · ${COMPANY}</p></div></div>
-      <div class="card card-pad"><p style="margin-top:0">${S.profile.role==='foreman'
-        ?'หน้าส่งรายชื่อช่างเข้าหน้างานจะเปิดใช้ในระบบช่วงที่ 2'
-        :'ดูข้อมูลส่วนตัวของคุณได้ที่เมนู "ข้อมูลของฉัน"'}</p>
-      ${S.profile.role==='foreman'?`<p class="muted" style="margin-bottom:0">ไซต์ที่คุณรับผิดชอบ: <span id="mySites">กำลังโหลด</span></p>`:''}</div>`);
-    if(S.profile.role==='foreman'){
-      const {data}=await sb.from('site_assignments').select('site_id').eq('user_id',S.profile.id);
-      const names=(data||[]).map(a=>S.sites.find(s=>s.id===a.site_id)?.name).filter(Boolean);
-      $('#mySites').textContent = names.length?names.join(', '):'ยังไม่ได้กำหนด (ติดต่อแอดมิน)';
+    setPage(head(`สวัสดี คุณ${esc((p.display_name||'').split(' ')[0])}`, todayLong(), {lead, mActions:`<span class="tag t-acc">${ROLES[p.role]}</span>`}) + `<div id="hb"><div class="loading"><div class="spin"></div></div></div>`);
+    let html='';
+    if(p.role==='foreman'){
+      const {data}=await sb.from('site_assignments').select('site_id').eq('user_id',p.id);
+      const mine=(data||[]).map(a=>S.sites.find(s=>s.id===a.site_id)).filter(s=>s&&s.status==='active');
+      html+=`<h2 class="h2">ไซต์ที่รับผิดชอบ</h2>`;
+      html+= mine.length? `<div class="lgrid">${mine.map(s=>`<div class="card col"><div class="row"><div class="av" style="background:var(--okBg);color:var(--ok);border:0">${IC.site}</div><div class="grow"><b>${esc(s.name)}</b><div class="sm muted">${esc(s.location||'')}</div></div></div><button class="btn btn-p" disabled>ส่งรายชื่อช่างเข้างาน</button></div>`).join('')}</div>`
+        : `<div class="card empty"><b>ยังไม่ได้กำหนดไซต์</b>ติดต่อแอดมินเพื่อกำหนดไซต์ที่คุณรับผิดชอบ</div>`;
+      html+=`<div class="note n-info">${IC.info}<span>หน้าส่งรายชื่อช่างจะเปิดใช้ในระบบช่วงที่ 2</span></div>`;
+    } else {
+      html+=`<div class="card col"><b>ยินดีต้อนรับ</b><span class="muted">ดูข้อมูลส่วนตัว ดาวความประพฤติ และตั้งค่ารูปแบบสีได้ที่เมนู "ฉัน"</span><a href="#me" class="btn">ไปที่ข้อมูลของฉัน</a></div>`;
     }
+    $('#hb').outerHTML=`<div class="col">${html}</div>`;
     return;
   }
-  const [emp, prof] = await Promise.all([
-    sb.from('employees').select('id,position_id,status,stars,wage_type,wage_rate'),
-    isAdmin()? sb.from('profiles').select('id,role') : Promise.resolve({data:[]})
+  setPage(head(`สวัสดี คุณ${esc((p.display_name||'').split(' ')[0])}`, todayLong(), {lead, mActions:`<span class="tag t-acc">${ROLES[p.role]}</span>`, dActions:`<a href="#employees" class="btn">${IC.people}รายชื่อพนักงาน</a>`}) + `<div id="hb"><div class="loading"><div class="spin"></div></div></div>`);
+  const [emp,prof]=await Promise.all([
+    sb.from('employees').select('id,first_name,last_name,nickname,position_id,status,stars,id_expiry_date,employment_type,probation_end'),
+    isAdmin()?sb.from('profiles').select('id,role,is_active'):Promise.resolve({data:[]})
   ]);
+  if(emp.error){ $('#hb').innerHTML=`<div class="note n-bad">${esc(errText(emp.error))}</div>`; return; }
   const list=(emp.data||[]).filter(e=>e.status==='active');
-  const pending=(prof.data||[]).filter(p=>p.role==='pending').length;
-  const byPos={}; list.forEach(e=>{ const n=S.positions.find(p=>p.id===e.position_id)?.name||'ไม่ระบุตำแหน่ง'; byPos[n]=(byPos[n]||0)+1; });
-  const rows=Object.entries(byPos).sort((a,b)=>b[1]-a[1]);
-  const max=Math.max(1,...rows.map(r=>r[1]));
-  const low=list.filter(e=>Number(e.stars)<=3).length;
-  const activeSites=S.sites.filter(s=>s.status==='active').length;
-  setPage(`<div class="page-head"><div><h2>ภาพรวมบริษัท</h2><p>ข้อมูล ณ ${thaiDate(localISO(), false)}</p></div></div>
-    ${pending?`<div class="notice" style="margin-bottom:16px">มีผู้สมัครรออนุมัติ ${pending} คน <a href="#users">ไปที่หน้าผู้ใช้ระบบ</a></div>`:''}
-    <div class="stat-strip">
-      <div class="stat"><b>${list.length}</b><span>พนักงานที่ทำงานอยู่</span></div>
-      <div class="stat"><b>${activeSites}</b><span>ไซต์งานที่เปิดอยู่</span></div>
-      <div class="stat"><b>${rows.length}</b><span>ตำแหน่งที่มีคน</span></div>
-      <div class="stat"><b>${low}</b><span>พนักงานดาวต่ำกว่า 3.5</span></div>
+  const pending=(prof.data||[]).filter(x=>x.role==='pending'&&x.is_active).length;
+  const expiring=list.filter(e=>{ const d=daysUntil(e.id_expiry_date); return d!==null&&d<=60; });
+  const probation=list.filter(e=>{ const d=daysUntil(e.probation_end); return e.employment_type==='probation'&&d!==null&&d<=30; });
+  const low=list.filter(e=>Number(e.stars)<=3);
+  const byPos={}; list.forEach(e=>{ const n=e.position_id?posName(e.position_id):'ไม่ระบุตำแหน่ง'; byPos[n]=(byPos[n]||0)+1; });
+  const rows=Object.entries(byPos).sort((a,b)=>b[1]-a[1]); const max=Math.max(1,...rows.map(r=>r[1]));
+  const alerts=[
+    ...expiring.map(e=>{ const d=daysUntil(e.id_expiry_date); return `<a href="#emp/${e.id}" class="li"><span class="tag ${d<0?'t-bad':'t-warn'}">บัตร</span><span class="grow sm">บัตรประชาชน <b style="display:inline">${esc(shortName(e))}</b> ${d<0?'หมดอายุแล้ว':'หมดอายุ'} ${thaiDate(e.id_expiry_date)}</span></a>`; }),
+    ...probation.map(e=>`<a href="#emp/${e.id}" class="li"><span class="tag">ทดลองงาน</span><span class="grow sm"><b style="display:inline">${esc(shortName(e))}</b> ครบทดลองงาน ${thaiDate(e.probation_end)}</span></a>`)
+  ];
+  $('#hb').outerHTML=`<div class="col" style="gap:14px">
+    ${pending?`<a href="#users" class="note n-warn" style="align-items:center">${svg('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5"/><path d="M17 13v6M14 16h6"/>','style="color:var(--warn)"')}<span class="grow"><b>ผู้สมัครรออนุมัติ ${pending} คน</b><br><span class="sm muted">แตะเพื่อกำหนดสิทธิ์</span></span>${IC.chev}</a>`:''}
+    <div class="statg">
+      <div class="stat"><b>${list.length}</b><span class="sm muted">พนักงานที่ทำงานอยู่</span></div>
+      <div class="stat"><b>${S.sites.filter(s=>s.status==='active').length}</b><span class="sm muted">ไซต์งานที่เปิดอยู่</span></div>
+      <div class="stat"><b style="${expiring.length?'color:var(--warn)':''}">${expiring.length}</b><span class="sm muted">บัตรใกล้หมดอายุ</span></div>
+      <div class="stat"><b style="${low.length?'color:var(--bad)':''}">${low.length}</b><span class="sm muted">ดาวต่ำกว่า 3.5</span></div>
     </div>
-    <div class="grid-2">
-      <div class="card card-pad"><h3 class="section-title">พนักงานแยกตามตำแหน่ง</h3>
-        ${rows.length?`<div class="bars">${rows.map(([n,c])=>`<div class="bar"><span>${esc(n)}</span><div class="bar-track"><div class="bar-fill" style="width:${c/max*100}%"></div></div><b class="num">${c}</b></div>`).join('')}</div>`
-          :`<div class="empty"><b>ยังไม่มีพนักงาน</b><a href="#employees">เพิ่มพนักงานคนแรก</a></div>`}
-      </div>
-      <div class="card card-pad"><h3 class="section-title">ระบบที่จะเปิดในช่วงถัดไป</h3>
-        <p class="muted" style="margin:0">ช่วงที่ 2 การเช็คชื่อรายวัน คนงานหน้างาน และระบบดาว · ช่วงที่ 3 เงินเดือนและสลิป · ช่วงที่ 4 Dashboard กราฟ ประวัติย้อนหลัง และส่งออก Google Sheet</p>
-      </div>
-    </div>`);
+    <div class="lgrid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px">
+      <div class="card col" style="gap:10px"><div class="row" style="justify-content:space-between"><h3 class="h2">พนักงานแยกตามตำแหน่ง</h3><span class="xs muted">${list.length} คน</span></div>
+        ${rows.length?rows.map(([n,c],i)=>`<div class="bar"><span>${esc(n)}</span><div class="track"><i class="${i===0?'a':''}" style="width:${c/max*100}%"></i></div><b class="num">${c}</b></div>`).join('')
+          :`<div class="empty"><b>ยังไม่มีพนักงาน</b><a href="#employees">เพิ่มพนักงานคนแรก</a></div>`}</div>
+      <div class="card ${alerts.length?'card-l':'col'}">${alerts.length?alerts.join(''):`<h3 class="h2">การแจ้งเตือน</h3><span class="muted sm">ไม่มีบัตรใกล้หมดอายุหรือพนักงานใกล้ครบทดลองงาน</span>`}</div>
+    </div></div>`;
+  const pd=$('[data-pend]'); if(pd&&pending){ pd.textContent=pending; pd.classList.remove('hidden'); }
 }
 
 /* =====================================================================
-   พนักงาน
+   รายชื่อพนักงาน
    ===================================================================== */
+let listFilter={q:'',pos:'',st:'active'};
 async function pageEmployees(){
-  setPage(`<div class="page-head"><div><h2>พนักงาน</h2><p id="empCount">กำลังโหลด</p></div>
-      <button class="btn btn-primary" id="addEmp">+ เพิ่มพนักงาน</button></div>
-    <div class="toolbar">
-      <input type="text" id="q" placeholder="ค้นหาชื่อ ชื่อเล่น รหัส หรือเลขบัตร" aria-label="ค้นหา">
-      <select id="fPos" aria-label="ตำแหน่ง"><option value="">ทุกตำแหน่ง</option>${S.positions.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
-      <select id="fSt" aria-label="สถานะ"><option value="active">ทำงานอยู่</option><option value="resigned">ลาออกแล้ว</option><option value="">ทั้งหมด</option></select>
-    </div>
-    <div class="card scroll-x" id="empList"></div>`);
-  $('#addEmp').onclick=()=>employeeForm(null);
-  ['q','fPos','fSt'].forEach(id=>$('#'+id).addEventListener('input',drawEmployees));
-  await reloadEmployees();
-}
-async function reloadEmployees(){
+  setPage(head('พนักงาน','<span id="cnt">กำลังโหลด</span>',{dActions:`<button class="btn btn-p" data-add>${IC.plus}เพิ่มพนักงาน</button>`}) +
+    `<div class="row" style="gap:10px"><label class="grow" style="position:relative;display:block"><span style="position:absolute;left:14px;top:13px;color:var(--ink2)">${IC.search}</span><input class="in" id="q" placeholder="ค้นหาชื่อ ชื่อเล่น รหัส หรือเลขบัตร" style="padding-left:46px" value="${esc(listFilter.q)}" aria-label="ค้นหา"></label>
+      <select class="in" id="st" style="width:auto;flex:none" aria-label="สถานะ"><option value="active">ทำงานอยู่</option><option value="resigned">ลาออกแล้ว</option><option value="">ทั้งหมด</option></select></div>
+    <div class="chips scroll" id="pc"></div><div id="el"><div class="loading"><div class="spin"></div></div></div>` +
+    `<button class="fab" data-add>${IC.plus}เพิ่มพนักงาน</button>`);
+  $('#st').value=listFilter.st;
+  $$('[data-add]').forEach(b=>b.onclick=()=>openWizard(null));
+  $('#q').addEventListener('input',e=>{ listFilter.q=e.target.value; drawList(); });
+  $('#st').addEventListener('change',e=>{ listFilter.st=e.target.value; drawList(); });
   const {data,error}=await sb.from('employees').select('*').order('first_name');
-  if(error){ toast(errText(error),true); return; }
-  S.employees=data||[]; drawEmployees();
+  if(error){ $('#el').innerHTML=`<div class="note n-bad">${esc(errText(error))}</div>`; return; }
+  S.employees=data||[]; drawList();
 }
-function drawEmployees(){
-  const q=$('#q').value.trim().toLowerCase(), fp=$('#fPos').value, fs=$('#fSt').value;
-  const rows=S.employees.filter(e=>
-    (!fs || e.status===fs) && (!fp || String(e.position_id)===fp) &&
-    (!q || [e.first_name,e.last_name,e.nickname,e.emp_code,e.national_id].some(v=>(v||'').toLowerCase().includes(q))));
-  $('#empCount').textContent=`แสดง ${rows.length} จาก ${S.employees.length} คน`;
-  if(!S.employees.length){
-    $('#empList').innerHTML=`<div class="empty"><b>ยังไม่มีพนักงานในระบบ</b>กด "เพิ่มพนักงาน" เพื่อบันทึกคนแรก</div>`; return;
-  }
-  if(!rows.length){ $('#empList').innerHTML=`<div class="empty"><b>ไม่พบพนักงานตามเงื่อนไข</b>ลองเปลี่ยนคำค้นหรือตัวกรอง</div>`; return; }
-  $('#empList').innerHTML=`<table class="list"><thead><tr><th>พนักงาน</th><th>ตำแหน่ง</th><th>อายุ</th><th>ค่าแรง</th><th>OT/ชม.</th><th>ดาว</th></tr></thead><tbody>
-    ${rows.map(e=>`<tr data-id="${e.id}">
-      <td><div class="person"><div class="avatar">${esc(initial(e))}</div><div>${esc(fullName(e))}${e.nickname?` (${esc(e.nickname)})`:''}<small>${esc(e.emp_code)}${e.status==='resigned'?' · <span class="tag tag-bad">ลาออก</span>':''}</small></div></div></td>
-      <td data-l="ตำแหน่ง:">${esc(S.positions.find(p=>p.id===e.position_id)?.name||'-')}</td>
-      <td data-l="อายุ:" class="num">${ageText(e.birth_date)}</td>
-      <td data-l="ค่าแรง:" class="num">${money(e.wage_rate)} <span class="muted">/${e.wage_type==='daily'?'วัน':'เดือน'}</span></td>
-      <td data-l="OT:" class="num">${money(e.ot_rate)}</td>
-      <td>${starsHTML(Number(e.stars))}</td></tr>`).join('')}
-    </tbody></table>`;
-  document.querySelectorAll('#empList tr[data-id]').forEach(tr=>tr.onclick=()=>employeeCard(S.employees.find(e=>e.id===tr.dataset.id)));
+function drawList(){
+  const {q,pos,st}=listFilter; const ql=q.trim().toLowerCase();
+  const base=S.employees.filter(e=>!st||e.status===st);
+  const counts={}; base.forEach(e=>{ if(e.position_id) counts[e.position_id]=(counts[e.position_id]||0)+1; });
+  $('#pc').innerHTML=`<button class="chip ${!pos?'on':''}" data-pos="">ทั้งหมด ${base.length}</button>`+
+    Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([id,c])=>`<button class="chip ${pos==id?'on':''}" data-pos="${id}">${esc(posName(+id))} ${c}</button>`).join('');
+  $$('[data-pos]').forEach(b=>b.onclick=()=>{ listFilter.pos=b.dataset.pos; drawList(); });
+  const rows=base.filter(e=>(!pos||String(e.position_id)===pos)&&(!ql||[e.first_name,e.last_name,e.nickname,e.emp_code,e.national_id,e.first_name_en,e.last_name_en].some(v=>(v||'').toLowerCase().includes(ql))));
+  $('#cnt').textContent=`แสดง ${rows.length} จาก ${S.employees.length} คน`;
+  if(!S.employees.length){ $('#el').innerHTML=`<div class="card empty"><b>ยังไม่มีพนักงานในระบบ</b>กด "เพิ่มพนักงาน" เพื่อบันทึกคนแรก</div>`; return; }
+  if(!rows.length){ $('#el').innerHTML=`<div class="card empty"><b>ไม่พบพนักงานตามเงื่อนไข</b>ลองเปลี่ยนคำค้นหรือตัวกรอง</div>`; return; }
+  $('#el').innerHTML=`<div class="lgrid">${rows.map(e=>{
+    const exp=daysUntil(e.id_expiry_date);
+    const tags=[e.status==='resigned'?'<span class="tag t-bad">ลาออก</span>':'', e.employment_type==='probation'?'<span class="tag">ทดลองงาน</span>':'', exp!==null&&exp<=60?`<span class="tag ${exp<0?'t-bad':'t-warn'}">บัตร${exp<0?'หมดอายุ':'ใกล้หมด'}</span>`:''].join(' ');
+    return `<a href="#emp/${e.id}" class="lcard">${avatar(e)}<div class="grow"><b>${esc(shortName(e))}${e.nickname?` <span class="muted" style="font-weight:400">(${esc(e.nickname)})</span>`:''}</b>
+      <div class="sm muted">${esc(posName(e.position_id))}${e.birth_date?` อายุ ${diffYM(e.birth_date).y} ปี`:''}</div>${tags.trim()?`<div class="row" style="gap:6px;margin-top:4px;flex-wrap:wrap">${tags}</div>`:''}</div>${starBadge(e.stars)}</a>`; }).join('')}</div>`;
+  hydratePhotos($('#el'));
 }
 
-function employeeCard(e, readonly=false){
-  const pos=S.positions.find(p=>p.id===e.position_id)?.name||'-';
-  const m=openModal(`<div class="modal-head"><h3>ข้อมูลพนักงาน</h3><button data-close aria-label="ปิด">×</button></div>
-    <div class="modal-body">
-      <div class="idcard">
-        <div class="idcard-top"><div class="co">${COMPANY}</div><span class="code">${esc(e.emp_code)}</span>
-          <div class="nm">${esc(fullName(e))}</div><div class="nn">${e.nickname?`ชื่อเล่น ${esc(e.nickname)} · `:''}${esc(pos)}</div></div>
-        <dl class="idcard-body" style="margin:0">
-          <div><dt>วันเกิด</dt><dd>${thaiDate(e.birth_date,false)}</dd></div>
-          <div><dt>อายุ</dt><dd class="num">${ageText(e.birth_date)}</dd></div>
-          <div><dt>เลขบัตรประชาชน</dt><dd class="num">${fmtId(e.national_id)}</dd></div>
-          <div><dt>เลขประกันสังคม</dt><dd class="num">${esc(e.social_security_no||'-')}</dd></div>
-          <div class="wide"><dt>ที่อยู่ตามบัตรประชาชน</dt><dd>${esc(e.id_address||'-')}</dd></div>
-          <div><dt>เบอร์โทร</dt><dd>${esc(e.phone||'-')}</dd></div>
-          <div><dt>สถานะ</dt><dd>${e.status==='active'?'<span class="tag tag-ok">ทำงานอยู่</span>':'<span class="tag tag-bad">ลาออกแล้ว</span>'}</dd></div>
-          <div><dt>วันเริ่มงาน</dt><dd>${thaiDate(e.start_date,false)}</dd></div>
-          <div><dt>อายุงาน</dt><dd>${serviceText(e.start_date)}</dd></div>
-          <div><dt>อัตราค่าแรง</dt><dd class="num">${money(e.wage_rate)} บาท/${e.wage_type==='daily'?'วัน':'เดือน'}</dd></div>
-          <div><dt>อัตรา OT</dt><dd class="num">${money(e.ot_rate)} บาท/ชม.</dd></div>
-          <div class="wide"><dt>คะแนนความประพฤติ</dt><dd>${starsHTML(Number(e.stars),true)} <span class="num" style="margin-left:6px">${Number(e.stars).toFixed(1)} / 5</span></dd></div>
-        </dl>
-      </div>
-      ${readonly?'':'<p class="muted" style="font-size:13px;margin:12px 0 0"><button class="linkbtn" id="hist">ดูประวัติการแก้ไขข้อมูลคนนี้</button></p><div id="histBox"></div>'}
-    </div>
-    ${readonly?'':`<div class="modal-foot">${isAdmin()?'<button class="btn btn-danger" id="delEmp" style="margin-right:auto">ลบ</button>':''}<button class="btn" data-close>ปิด</button><button class="btn btn-primary" id="editEmp">แก้ไขข้อมูล</button></div>`}`);
-  if(readonly) return;
-  $('#editEmp',m.el).onclick=()=>{ m.close(); employeeForm(e); };
-  $('#hist',m.el).onclick=()=>showHistory(e.id, $('#histBox',m.el));
-  const d=$('#delEmp',m.el);
-  if(d) d.onclick=async()=>{
-    if(!await confirmBox(`ลบ ${fullName(e)} ออกจากระบบถาวร? ถ้าพนักงานลาออก แนะนำให้เปลี่ยนสถานะเป็น "ลาออกแล้ว" แทน เพื่อเก็บประวัติไว้`,'ลบถาวร',true)) return;
-    const {error}=await sb.from('employees').delete().eq('id',e.id);
-    if(error) return toast(errText(error),true);
-    m.close(); toast('ลบแล้ว'); reloadEmployees();
+/* =====================================================================
+   บัตรพนักงาน (รายละเอียด)
+   ===================================================================== */
+let profTab='personal';
+async function pageProfile(id, readonly=false, preload=null){
+  if(!readonly) setPage(head('ข้อมูลพนักงาน','',{back:'#employees', mActions:`<button class="btn btn-sm btn-acc" data-edit>แก้ไข</button>`, dActions:`<button class="btn btn-p" data-edit>แก้ไขข้อมูล</button>`}) + `<div id="pb"><div class="loading"><div class="spin"></div></div></div>`);
+  let e=preload;
+  if(!e){ const {data,error}=await sb.from('employees').select('*').eq('id',id).single(); if(error){ $('#pb').innerHTML=`<div class="card empty"><b>ไม่พบข้อมูลพนักงาน</b>${esc(errText(error))}</div>`; return; } e=data; }
+  const tabs=[['personal','ส่วนตัว'],['card','บัตร'],['addr','ที่อยู่'],['contact','ติดต่อ'],['job','งาน']]; if(!readonly) tabs.push(['hist','ประวัติ']);
+  const kv=(a,b)=>`<div class="kv"><span>${a}</span><span>${b||'-'}</span></div>`;
+  const body={
+    personal:()=>kv('ชื่อ (อังกฤษ)',esc([e.first_name_en,e.last_name_en].filter(Boolean).join(' ')))+kv('ชื่อเล่น',esc(e.nickname))+kv('เพศ',GENDER[e.gender])+kv('วันเกิด',e.birth_date?thaiDate(e.birth_date,false):'')+kv('อายุ',e.birth_date?ageText(e.birth_date):'')+kv('สัญชาติ',esc(e.nationality))+kv('สถานภาพ',MARITAL[e.marital_status])+(e.gender==='male'?kv('สถานะทางทหาร',MILITARY[e.military_status]):'')+kv('หมู่เลือด',e.blood_type?`${e.blood_type} <span class="tag t-ok" style="margin-left:4px">ยินยอม ${thaiDate(localISO(new Date(e.blood_consent_at)))}</span>`:''),
+    card:()=>{ const d=daysUntil(e.id_expiry_date); return kv('เลขบัตรประชาชน',`<span class="num">${esc(fmtId(e.national_id))}</span>`)+kv('วันออกบัตร',e.id_issue_date?thaiDate(e.id_issue_date):'')+kv('วันหมดอายุ',e.id_expiry_date?`${thaiDate(e.id_expiry_date)}${d!==null&&d<=60?` <span class="tag ${d<0?'t-bad':'t-warn'}">${d<0?'หมดอายุแล้ว':`อีก ${d} วัน`}</span>`:''}`:'')+kv('เลขประกันสังคม',`<span class="num">${esc(e.social_security_no&&e.social_security_no.length===13?fmtId(e.social_security_no):e.social_security_no)}</span>`)+kv('โรงพยาบาลตามสิทธิ์',esc(e.sso_hospital)); },
+    addr:()=>`<div class="kv" style="flex-direction:column;gap:2px"><span>ที่อยู่ตามบัตรประชาชน</span><span style="text-align:left">${esc(addrText(e))}</span></div><div class="kv" style="flex-direction:column;gap:2px"><span>ที่อยู่ปัจจุบัน</span><span style="text-align:left">${e.cur_same?'เหมือนที่อยู่ตามบัตรประชาชน':esc(addrText(e,'cur'))}</span></div>`,
+    contact:()=>kv('เบอร์มือถือ',e.phone?`<a href="tel:${digits(e.phone)}">${esc(e.phone)}</a>`:'')+kv('LINE ID',esc(e.line_id))+kv('อีเมล',esc(e.email))+kv('ธนาคาร',esc(e.bank_name))+kv('เลขบัญชี',`<span class="num">${esc(e.bank_account_no)}</span>`)+kv('ชื่อบัญชี',esc(e.bank_account_name)),
+    job:()=>kv('ตำแหน่ง',esc(posName(e.position_id)))+kv('ประเภทการจ้าง',EMPTYPE[e.employment_type])+kv('สถานะ',e.status==='active'?'<span class="tag t-ok">ทำงานอยู่</span>':'<span class="tag t-bad">ลาออกแล้ว</span>')+kv('วันเริ่มงาน',e.start_date?thaiDate(e.start_date):'')+kv('อายุงาน',e.start_date?serviceText(e.start_date):'')+(e.probation_end?kv('ครบทดลองงาน',thaiDate(e.probation_end)):'')+(e.status==='resigned'?kv('วันที่ลาออก',e.resign_date?thaiDate(e.resign_date):'')+kv('เหตุผล',esc(e.resign_reason)):'')+kv('ค่าแรง',`<span class="num">${money(e.wage_rate)} บาท/${e.wage_type==='daily'?'วัน':'เดือน'}</span>`)+kv('ค่า OT',`<span class="num">${money(e.ot_rate)} บาท/ชม.</span>`),
+    hist:()=>'<div id="hl" style="padding:12px 0"><div class="spin"></div></div>'
   };
-}
-
-const FIELD_TH = {title:'คำนำหน้า',first_name:'ชื่อ',last_name:'นามสกุล',nickname:'ชื่อเล่น',birth_date:'วันเกิด',national_id:'เลขบัตร',id_address:'ที่อยู่',social_security_no:'เลขประกันสังคม',phone:'เบอร์โทร',position_id:'ตำแหน่ง',wage_type:'รูปแบบค่าจ้าง',wage_rate:'ค่าแรง',ot_rate:'อัตรา OT',start_date:'วันเริ่มงาน',status:'สถานะ',stars:'ดาว'};
-async function showHistory(id, box){
-  box.innerHTML='<p class="muted">กำลังโหลด</p>';
-  const {data,error}=await sb.from('audit_log').select('*').eq('table_name','employees').eq('record_id',id).order('changed_at',{ascending:false}).limit(30);
-  if(error){ box.innerHTML=''; return toast(errText(error),true); }
-  if(!data.length){ box.innerHTML='<p class="muted">ยังไม่มีประวัติ</p>'; return; }
-  const fmtv=(k,v)=> v==null||v===''?'-': k==='position_id'?(S.positions.find(p=>p.id===v)?.name||v): /date/.test(k)?thaiDate(v):v;
-  box.innerHTML=`<ul class="slist">${data.map(a=>{
-    const dt=new Date(a.changed_at);
-    const when=`${thaiDate(localISO(dt))} ${dt.toTimeString().slice(0,5)}`;
-    let what='';
-    if(a.action==='INSERT') what='เพิ่มเข้าระบบ';
-    else if(a.action==='UPDATE'){
-      const ch=Object.keys(FIELD_TH).filter(k=>JSON.stringify(a.old_data?.[k])!==JSON.stringify(a.new_data?.[k]));
-      what=ch.map(k=>`${FIELD_TH[k]}: ${esc(fmtv(k,a.old_data[k]))} → ${esc(fmtv(k,a.new_data[k]))}`).join('<br>')||'แก้ไข';
-    } else what='ลบ';
-    return `<li style="display:block;font-size:13px"><b>${when}</b> <span class="muted">โดย ${esc(a.changed_by_name||'ระบบ')}</span><br>${what}${a.reason?`<br><span class="muted">เหตุผล: ${esc(a.reason)}</span>`:''}</li>`;
-  }).join('')}</ul>`;
-}
-
-function employeeForm(e){
-  const isNew=!e; e=e||{title:'นาย',wage_type:'daily',wage_rate:0,ot_rate:0,status:'active',stars:5};
-  const m=openModal(`<div class="modal-head"><h3>${isNew?'เพิ่มพนักงาน':'แก้ไขข้อมูล '+esc(e.first_name)}</h3><button data-close aria-label="ปิด">×</button></div>
-    <form id="ef" novalidate><div class="modal-body">
-      <fieldset class="fieldset"><legend>ข้อมูลส่วนตัว</legend>
-        <div class="row row-3">
-          <div class="field"><label>คำนำหน้า</label><select name="title">${TITLES.map(t=>`<option ${e.title===t?'selected':''}>${t}</option>`).join('')}</select></div>
-          <div class="field"><label>ชื่อจริง *</label><input type="text" name="first_name" value="${esc(e.first_name)}" required></div>
-          <div class="field"><label>นามสกุลจริง *</label><input type="text" name="last_name" value="${esc(e.last_name)}" required></div>
-        </div>
-        <div class="row row-2">
-          <div class="field"><label>ชื่อเล่น</label><input type="text" name="nickname" value="${esc(e.nickname)}"></div>
-          <div class="field"><label>เบอร์โทร</label><input type="tel" name="phone" value="${esc(e.phone)}"></div>
-        </div>
-        ${dateField('birth_date', e.birth_date, 'วัน/เดือน/ปีเกิด', e.birth_date?'อายุ '+ageText(e.birth_date):'อายุจะคำนวณอัตโนมัติ')}
-      </fieldset>
-      <fieldset class="fieldset"><legend>บัตรประชาชนและประกันสังคม</legend>
-        <div class="row row-2">
-          <div class="field"><label>เลขบัตรประชาชน (13 หลัก)</label><input type="text" name="national_id" inputmode="numeric" maxlength="17" value="${esc(e.national_id)}"><span class="err" id="idErr"></span></div>
-          <div class="field"><label>เลขประกันสังคม</label><input type="text" name="social_security_no" inputmode="numeric" value="${esc(e.social_security_no)}"><span class="hint"><button type="button" class="linkbtn" id="sameId">ใช้เลขเดียวกับบัตรประชาชน</button></span></div>
-        </div>
-        <div class="field"><label>ที่อยู่ตามบัตรประชาชน</label><textarea name="id_address">${esc(e.id_address)}</textarea></div>
-      </fieldset>
-      <fieldset class="fieldset"><legend>การจ้างงาน</legend>
-        <div class="row row-2">
-          <div class="field"><label>ตำแหน่ง</label><select name="position_id"><option value="">ไม่ระบุ</option>${S.positions.map(p=>`<option value="${p.id}" ${e.position_id===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div>
-          <div class="field"><label>สถานะ</label><select name="status"><option value="active" ${e.status==='active'?'selected':''}>ทำงานอยู่</option><option value="resigned" ${e.status==='resigned'?'selected':''}>ลาออกแล้ว</option></select></div>
-        </div>
-        ${dateField('start_date', e.start_date, 'วันเริ่มงาน', e.start_date?'อายุงาน '+serviceText(e.start_date):'')}
-        <div class="row row-3">
-          <div class="field"><label>รูปแบบค่าจ้าง</label><select name="wage_type"><option value="daily" ${e.wage_type==='daily'?'selected':''}>รายวัน</option><option value="monthly" ${e.wage_type==='monthly'?'selected':''}>รายเดือน</option></select></div>
-          <div class="field"><label id="wageLbl">ค่าแรง (บาท/${e.wage_type==='monthly'?'เดือน':'วัน'})</label><input type="number" name="wage_rate" min="0" step="0.01" inputmode="decimal" value="${e.wage_rate}"></div>
-          <div class="field"><label>ค่า OT (บาท/ชม.)</label><input type="number" name="ot_rate" min="0" step="0.01" inputmode="decimal" value="${e.ot_rate}"></div>
-        </div>
-        <div class="reason-box hidden" id="reasonBox"><div class="field" style="margin:0"><label>เหตุผลที่แก้ไขค่าแรง/OT *</label><input type="text" name="change_reason" placeholder="เช่น ปรับค่าแรงประจำปี"><span class="hint">บันทึกไว้ในประวัติการแก้ไข</span></div></div>
-      </fieldset>
-    </div>
-    <div class="modal-foot"><button type="button" class="btn" data-close>ยกเลิก</button><button class="btn btn-primary" id="saveEmp">${isNew?'เพิ่มพนักงาน':'บันทึกการแก้ไข'}</button></div></form>`);
-  const f=$('#ef',m.el), F=f.elements;
-  const wageChanged=()=> !isNew && (Number(F.wage_rate.value)!==Number(e.wage_rate) || Number(F.ot_rate.value)!==Number(e.ot_rate) || F.wage_type.value!==e.wage_type);
-  const toggleReason=()=>$('#reasonBox',m.el).classList.toggle('hidden', !wageChanged());
-  ['wage_rate','ot_rate','wage_type'].forEach(n=>f[n].addEventListener('input',toggleReason));
-  F.wage_type.addEventListener('change',()=>{ $('#wageLbl',m.el).textContent=`ค่าแรง (บาท/${F.wage_type.value==='monthly'?'เดือน':'วัน'})`; toggleReason(); });
-  // คำนวณอายุสด
-  const liveAge=(name, fn, prefix)=>$(`[data-date="${name}"]`,m.el).addEventListener('input',()=>{
-    const r=readDate(m.el,name); $(`[data-hint="${name}"]`,m.el).textContent = r.ok&&r.value ? prefix+fn(r.value) : (r.ok?'':r.msg);
-  });
-  liveAge('birth_date', ageText, 'อายุ '); liveAge('start_date', serviceText, 'อายุงาน ');
-  const idCheck=()=>{ const v=F.national_id.value.replace(/\D/g,''); $('#idErr',m.el).textContent = v && !validThaiId(v) ? (v.length!==13?`กรอกแล้ว ${v.length} หลัก ต้องมี 13 หลัก`:'เลขบัตรไม่ถูกต้อง (ตรวจหลักสุดท้ายไม่ผ่าน)') : ''; };
-  F.national_id.addEventListener('input',idCheck);
-  $('#sameId',m.el).onclick=()=>{ F.social_security_no.value=F.national_id.value.replace(/\D/g,''); };
-
-  f.onsubmit=async ev=>{
-    ev.preventDefault();
-    const btn=$('#saveEmp',m.el);
-    const bd=readDate(m.el,'birth_date'), sd=readDate(m.el,'start_date');
-    if(!F.first_name.value.trim() || !F.last_name.value.trim()) return toast('กรอกชื่อและนามสกุล',true);
-    if(!bd.ok) return toast('วันเกิด: '+bd.msg,true);
-    if(!sd.ok) return toast('วันเริ่มงาน: '+sd.msg,true);
-    const nid=F.national_id.value.replace(/\D/g,'');
-    if(nid && !validThaiId(nid)) return toast('เลขบัตรประชาชนไม่ถูกต้อง',true);
-    const reason=F.change_reason.value.trim();
-    if(wageChanged() && !reason) return toast('ระบุเหตุผลที่แก้ไขค่าแรง/OT',true);
-    const row={
-      title:F.title.value, first_name:F.first_name.value.trim(), last_name:F.last_name.value.trim(),
-      nickname:F.nickname.value.trim()||null, phone:F.phone.value.trim()||null,
-      birth_date:bd.value, national_id:nid||null, social_security_no:F.social_security_no.value.replace(/\s/g,'')||null,
-      id_address:F.id_address.value.trim()||null, position_id:F.position_id.value?Number(F.position_id.value):null,
-      status:F.status.value, start_date:sd.value, wage_type:F.wage_type.value,
-      wage_rate:Number(F.wage_rate.value||0), ot_rate:Number(F.ot_rate.value||0),
-      change_reason: isNew ? 'เพิ่มพนักงานใหม่' : (reason||null)
+  const stepOf={personal:0,card:1,addr:2,contact:3,job:4,hist:0};
+  const draw=()=>{
+    const target = readonly ? $('#ro') : $('#pb');
+    target.innerHTML=`<div class="col" style="gap:12px;max-width:760px">
+      <div class="idc"><div class="row" style="justify-content:space-between;margin-bottom:12px"><span class="xs" style="color:#C2D0D3">${COMPANY}</span><span class="xs" style="background:rgba(255,255,255,.14);padding:2px 8px;border-radius:6px;font-weight:600">${esc(e.emp_code)}</span></div>
+        <div class="row" style="align-items:flex-start;gap:14px"><div class="photo">${e.photo_path?`<img data-ph="${esc(e.photo_path)}" alt="รูปถ่าย ${esc(shortName(e))}">`:''}<span>ยังไม่มี<br>รูปถ่าย</span></div>
+          <div class="grow"><div style="font-size:20px;font-weight:700;line-height:1.3">${esc(fullName(e))}</div>${e.first_name_en?`<div class="sm" style="color:#C9D6D9">${esc(e.first_name_en)} ${esc(e.last_name_en||'')}</div>`:''}
+          <div class="sm" style="margin-top:6px">${[GENDER[e.gender],posName(e.position_id)].filter(x=>x&&x!=='-').join(' · ')}</div>
+          <div class="row" style="gap:8px;margin-top:8px">${stars5(e.stars)}<b class="sm">${Number(e.stars).toFixed(1)}</b></div></div></div></div>
+      <div class="chips scroll" style="margin:0">${tabs.map(([k,t])=>`<button class="chip ${profTab===k?'on':''}" data-tab="${k}">${t}</button>`).join('')}</div>
+      <div class="card card-l">${(body[profTab]||body.personal)()}</div>
+      ${e.emergency_name?`<div class="card row" style="padding:12px 14px"><div class="grow"><div class="xs muted">ผู้ติดต่อกรณีฉุกเฉิน</div><b>${esc(e.emergency_name)}${e.emergency_relation?` (${esc(e.emergency_relation)})`:''}</b><div class="sm muted num">${esc(e.emergency_phone||'')}</div></div>
+        ${e.emergency_phone?`<a href="tel:${digits(e.emergency_phone)}" class="ibtn" style="background:var(--okBg);color:var(--ok)" aria-label="โทรหาผู้ติดต่อฉุกเฉิน">${IC.phone}</a>`:''}</div>`:''}
+      ${!readonly&&isAdmin()?`<button class="btn btn-bad btn-sm" data-del style="align-self:flex-start">ลบพนักงานออกจากระบบ</button>`:''}
+    </div>`;
+    $$('[data-tab]',target).forEach(b=>b.onclick=()=>{ profTab=b.dataset.tab; draw(); });
+    hydratePhotos(target);
+    if(profTab==='hist'&&!readonly) showHistory(e.id, $('#hl'));
+    const d=$('[data-del]',target); if(d) d.onclick=async()=>{
+      if(!await confirmBox(`ลบ ${fullName(e)} ถาวร? ถ้าพนักงานลาออก แนะนำให้เปลี่ยนสถานะเป็น "ลาออกแล้ว" แทน เพื่อเก็บประวัติไว้`,'ลบถาวร',true)) return;
+      const {error}=await sb.from('employees').delete().eq('id',e.id); if(error) return toast(errText(error),true);
+      if(e.photo_path) await sb.storage.from(PHOTO_BUCKET).remove([e.photo_path]);
+      toast('ลบแล้ว'); location.hash='#employees';
     };
-    busy(btn,true);
-    const q = isNew ? sb.from('employees').insert(row) : sb.from('employees').update(row).eq('id',e.id);
-    const {error}=await q;
-    if(error){ busy(btn,false); return toast(errText(error),true); }
-    m.close(); toast(isNew?'เพิ่มพนักงานแล้ว':'บันทึกการแก้ไขแล้ว'); reloadEmployees();
   };
+  if(!readonly) $$('[data-edit]').forEach(b=>b.onclick=()=>openWizard(e, stepOf[profTab]||0, saved=>pageProfile(saved.id)));
+  draw();
+}
+function readOnlyCard(e){
+  const m=overlay(`<div class="sheet"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>บัตรพนักงานของฉัน</h1></header><div class="sheet-body" id="ro"></div></div>`, false);
+  $('[data-x]',m.el).onclick=m.close; profTab='personal'; pageProfile(e.id, true, e);
+}
+const FIELD_TH={title:'คำนำหน้า',first_name:'ชื่อ',last_name:'นามสกุล',first_name_en:'ชื่ออังกฤษ',last_name_en:'นามสกุลอังกฤษ',nickname:'ชื่อเล่น',gender:'เพศ',birth_date:'วันเกิด',nationality:'สัญชาติ',marital_status:'สถานภาพ',military_status:'สถานะทหาร',blood_type:'หมู่เลือด',national_id:'เลขบัตร',id_issue_date:'วันออกบัตร',id_expiry_date:'วันหมดอายุบัตร',social_security_no:'เลขประกันสังคม',sso_hospital:'โรงพยาบาลประกันสังคม',addr_no:'บ้านเลขที่',addr_subdistrict:'ตำบล',addr_district:'อำเภอ',addr_province:'จังหวัด',addr_zip:'รหัสไปรษณีย์',cur_same:'ที่อยู่ปัจจุบันเหมือนบัตร',phone:'เบอร์มือถือ',line_id:'LINE ID',email:'อีเมล',emergency_name:'ผู้ติดต่อฉุกเฉิน',emergency_phone:'เบอร์ฉุกเฉิน',bank_name:'ธนาคาร',bank_account_no:'เลขบัญชี',bank_account_name:'ชื่อบัญชี',position_id:'ตำแหน่ง',employment_type:'ประเภทการจ้าง',start_date:'วันเริ่มงาน',probation_end:'ครบทดลองงาน',status:'สถานะ',resign_date:'วันลาออก',wage_type:'รูปแบบค่าจ้าง',wage_rate:'ค่าแรง',ot_rate:'อัตรา OT',stars:'ดาว',photo_path:'รูปถ่าย'};
+async function showHistory(id, box){
+  const {data,error}=await sb.from('audit_log').select('*').eq('table_name','employees').eq('record_id',id).order('changed_at',{ascending:false}).limit(40);
+  if(error){ box.innerHTML=`<span class="hint bad">${esc(errText(error))}</span>`; return; }
+  if(!data.length){ box.innerHTML='<span class="muted">ยังไม่มีประวัติ</span>'; return; }
+  const fv=(k,v)=> v==null||v===''?'-': k==='position_id'?posName(v): k==='photo_path'?'อัปโหลดรูป': /date/.test(k)?thaiDate(v): k==='gender'?GENDER[v]: k==='employment_type'?EMPTYPE[v]: k==='marital_status'?MARITAL[v]: k==='cur_same'?(v?'ใช่':'ไม่ใช่'): v;
+  box.innerHTML=data.map(a=>{ const dt=new Date(a.changed_at);
+    let what=a.action==='INSERT'?'เพิ่มเข้าระบบ':a.action==='DELETE'?'ลบ':(Object.keys(FIELD_TH).filter(k=>JSON.stringify(a.old_data?.[k])!==JSON.stringify(a.new_data?.[k])).map(k=>`${FIELD_TH[k]}: ${esc(fv(k,a.old_data[k]))} → ${esc(fv(k,a.new_data[k]))}`).join('<br>')||'แก้ไขข้อมูลอื่น');
+    return `<div style="padding:10px 0;border-bottom:1px solid var(--line);font-size:13.5px"><b>${thaiDate(localISO(dt))} ${dt.toTimeString().slice(0,5)}</b> <span class="muted">โดย ${esc(a.changed_by_name||'ระบบ')}</span><div style="margin-top:2px">${what}</div>${a.reason?`<div class="muted">เหตุผล: ${esc(a.reason)}</div>`:''}</div>`; }).join('');
+}
+
+/* =====================================================================
+   ทะเบียนประวัติ 5 ขั้น (เพิ่ม/แก้ไข)
+   ===================================================================== */
+const EMP_FIELDS=['title','first_name','last_name','first_name_en','last_name_en','nickname','gender','birth_date','nationality','marital_status','military_status','blood_type','blood_consent_at',
+  'national_id','id_issue_date','id_expiry_date','social_security_no','sso_hospital',
+  'addr_no','addr_moo','addr_soi','addr_road','addr_subdistrict','addr_district','addr_province','addr_zip',
+  'cur_same','cur_no','cur_moo','cur_soi','cur_road','cur_subdistrict','cur_district','cur_province','cur_zip',
+  'phone','line_id','email','emergency_name','emergency_relation','emergency_phone','bank_name','bank_account_no','bank_account_name',
+  'position_id','employment_type','start_date','probation_end','status','resign_date','resign_reason','wage_type','wage_rate','ot_rate','photo_path'];
+
+async function loadAddr(){
+  if(ADDR) return ADDR;
+  const r=await fetch('thai-address.json'); const j=await r.json();
+  ADDR=j.d.map(([d,ai,z])=>({d, a:j.a[ai][0], p:j.p[j.a[ai][1]], z:String(z)}));
+  return ADDR;
+}
+function searchAddr(q){
+  q=q.trim(); if(!q||!ADDR) return [];
+  if(/^\d{3,5}$/.test(q)) return ADDR.filter(x=>x.z.startsWith(q)).slice(0,8);
+  const a=ADDR.filter(x=>x.d.startsWith(q)), b=ADDR.filter(x=>!x.d.startsWith(q)&&x.d.includes(q));
+  return [...a,...b].slice(0,8);
+}
+
+function openWizard(e, startStep=0, onSaved){
+  const isNew=!e;
+  const F = isNew ? {title:'นาย',gender:'male',nationality:'ไทย',cur_same:true,employment_type:'permanent',status:'active',wage_type:'daily',wage_rate:0,ot_rate:0,_dp:{}} : {...e,_dp:{}};
+  const orig=e?{...e}:null;
+  let step=startStep, photoBlob=null, photoPreview=null;
+  const m=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="${isNew?'เพิ่มพนักงาน':'แก้ไขข้อมูลพนักงาน'}"></div>`, false, false);
+  const sheet=$('.sheet',m.el);
+  const wageChanged=()=>!isNew&&(Number(F.wage_rate)!==Number(orig.wage_rate)||Number(F.ot_rate)!==Number(orig.ot_rate)||F.wage_type!==orig.wage_type);
+  const v=k=>esc(F[k]??'');
+  const inp=(k,label,o={})=>`<div class="field ${o.cls||''}"><label for="f_${k}">${label}</label><input class="in ${o.num?'num':''}" id="f_${k}" data-f="${k}" ${o.fmt?`data-fmt="${o.fmt}"`:''} type="${o.type||'text'}" ${o.mode?`inputmode="${o.mode}"`:''} value="${o.val!==undefined?esc(o.val):v(k)}" ${o.ph?`placeholder="${o.ph}"`:''} ${o.ro?'readonly':''} ${o.auto?`autocomplete="${o.auto}"`:'autocomplete="off"'}>${o.hint!==undefined?`<span class="hint ${o.hcls||''}" data-h="${k}">${o.hint}</span>`:''}</div>`;
+  const sel=(k,label,opts,o={})=>`<div class="field"><label for="f_${k}">${label}</label><select class="in" id="f_${k}" data-f="${k}" ${o.re?'data-re':''}><option value="">${o.empty||'เลือก'}</option>${opts.map(([val,t])=>`<option value="${esc(val)}" ${String(F[k]??'')===String(val)?'selected':''}>${esc(t)}</option>`).join('')}</select></div>`;
+  const seg=(k,opts)=>`<div class="seg" role="radiogroup">${opts.map(([val,t])=>`<button type="button" role="radio" aria-checked="${F[k]===val}" class="${F[k]===val?'on':''}" data-seg="${k}" data-v="${esc(val)}">${t}</button>`).join('')}</div>`;
+  const addrBlock=(pre)=>`<div class="g2">${inp(pre+'_no','บ้านเลขที่')}${inp(pre+'_moo','หมู่ที่',{mode:'numeric'})}</div>
+    <div class="g2">${inp(pre+'_soi','ซอย',{ph:'ไม่มี'})}${inp(pre+'_road','ถนน',{ph:'ไม่มี'})}</div>
+    <div class="field" style="position:relative"><label for="f_${pre}_subdistrict">ตำบล/แขวง (พิมพ์แล้วเลือก หรือพิมพ์รหัสไปรษณีย์)</label><input class="in" id="f_${pre}_subdistrict" data-f="${pre}_subdistrict" data-addr="${pre}" value="${v(pre+'_subdistrict')}" autocomplete="off"><div data-dd="${pre}"></div></div>
+    <div class="g2">${inp(pre+'_district','อำเภอ/เขต')}${inp(pre+'_province','จังหวัด')}</div>
+    <div class="g2">${inp(pre+'_zip','รหัสไปรษณีย์',{num:true,mode:'numeric'})}<div class="hint" style="align-self:end;padding-bottom:14px">เลือกตำบลแล้วเติมให้อัตโนมัติ</div></div>`;
+
+  const stepsHTML=[
+    ()=>`<div class="photo-pick"><div class="pv">${photoPreview?`<img src="${photoPreview}" alt="">`:(F.photo_path?`<img data-ph="${esc(F.photo_path)}" alt="" style="display:block">`:svg('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>','style="width:30px;height:30px"'))}</div>
+        <div class="col" style="gap:8px"><b>รูปถ่ายพนักงาน</b><div class="row" style="gap:8px;flex-wrap:wrap"><label class="btn btn-sm">${IC.camera}ถ่ายรูป<input type="file" accept="image/*" capture="user" data-photo hidden></label><label class="btn btn-sm">เลือกรูป<input type="file" accept="image/*" data-photo hidden></label></div></div></div>
+      <div class="field"><label>คำนำหน้า</label>${seg('title',TITLES.map(t=>[t,t]))}</div>
+      <div class="g2">${inp('first_name','ชื่อ *',{auto:'given-name'})}${inp('last_name','นามสกุล *',{auto:'family-name'})}</div>
+      <div class="g2">${inp('first_name_en','ชื่อ (อังกฤษ)',{ph:'ไม่บังคับ'})}${inp('last_name_en','นามสกุล (อังกฤษ)',{ph:'ไม่บังคับ'})}</div>
+      <div class="g2">${inp('nickname','ชื่อเล่น')}<div class="field"><label>เพศ</label>${seg('gender',[['male','ชาย'],['female','หญิง']])}</div></div>
+      ${dateField(F,'birth_date','วันเกิด', F.birth_date?`อายุ ${ageText(F.birth_date)}`:'อายุคำนวณอัตโนมัติ')}
+      <div class="g2">${inp('nationality','สัญชาติ')}${sel('marital_status','สถานภาพ',Object.entries(MARITAL))}</div>
+      <div class="g2">${F.gender==='male'?sel('military_status','สถานะทางทหาร',Object.entries(MILITARY)):'<div></div>'}<div class="field"><label for="f_blood_type">หมู่เลือด</label><select class="in" id="f_blood_type" data-f="blood_type" ${F.blood_consent_at?'':'disabled'}><option value="">ไม่ระบุ</option>${['A','B','AB','O'].map(b=>`<option ${F.blood_type===b?'selected':''}>${b}</option>`).join('')}</select></div></div>
+      <label class="chk"><input type="checkbox" data-consent ${F.blood_consent_at?'checked':''}><span>พนักงานยินยอมให้เก็บหมู่เลือด เพื่อใช้กรณีเกิดอุบัติเหตุ <span class="muted">(บันทึกวันที่ยินยอมอัตโนมัติ ยกเลิกได้ทุกเมื่อ)</span></span></label>`,
+    ()=>{ const id=digits(F.national_id); const d=daysUntil(F.id_expiry_date);
+      return `<div class="note n-info" style="align-items:center">${IC.lock}<span>ข้อมูลส่วนนี้เห็นได้เฉพาะผู้บริหารและแอดมิน</span></div>
+      <div class="sec">บัตรประจำตัวประชาชน</div>
+      ${inp('national_id','เลขบัตรประชาชน 13 หลัก',{num:true,mode:'numeric',fmt:'id',val:fmtId(id),ph:'x-xxxx-xxxxx-xx-x',hint:id?(validThaiId(id)?'ตรวจสอบเลขบัตรถูกต้อง':(id.length<13?`กรอกแล้ว ${id.length} จาก 13 หลัก`:'เลขบัตรไม่ถูกต้อง')):'',hcls:id&&validThaiId(id)?'ok':(id.length===13?'bad':'')})}
+      <div class="g2d">${dateField(F,'id_issue_date','วันออกบัตร')}${dateField(F,'id_expiry_date','วันหมดอายุ', d===null?'':(d<0?'บัตรหมดอายุแล้ว':(d<=60?`หมดอายุในอีก ${d} วัน`:`ใช้ได้อีก ${untilText(F.id_expiry_date)}`)))}</div>
+      <div class="sec">ประกันสังคม</div>
+      ${inp('social_security_no','เลขประกันสังคม',{num:true,mode:'numeric'})}
+      <div><button type="button" class="chip ${F.social_security_no&&digits(F.social_security_no)===id&&id?'on':''}" data-sameid>${IC.check}ใช้เลขเดียวกับบัตรประชาชน</button></div>
+      ${inp('sso_hospital','โรงพยาบาลตามสิทธิ์ประกันสังคม',{ph:'เช่น โรงพยาบาลสิงห์บุรี'})}`; },
+    ()=>`<div class="sec">ที่อยู่ตามบัตรประชาชน</div>${addrBlock('addr')}
+      <div class="card row" style="padding:14px"><div class="grow"><b>ที่อยู่ปัจจุบัน</b><div class="sm muted">เหมือนที่อยู่ตามบัตรประชาชน</div></div><button type="button" class="sw ${F.cur_same?'on':''}" data-cursame role="switch" aria-checked="${!!F.cur_same}" aria-label="ที่อยู่ปัจจุบันเหมือนที่อยู่ตามบัตร"></button></div>
+      ${F.cur_same?'':`<div class="sec">ที่อยู่ปัจจุบัน</div>${addrBlock('cur')}`}`,
+    ()=>`<div class="sec">ช่องทางติดต่อ</div>
+      <div class="g2">${inp('phone','เบอร์มือถือ',{num:true,type:'tel',mode:'tel',fmt:'phone',ph:'08x-xxx-xxxx'})}${inp('line_id','LINE ID')}</div>
+      ${inp('email','อีเมล',{type:'email',mode:'email'})}
+      <div class="sec">ผู้ติดต่อกรณีฉุกเฉิน</div>
+      ${inp('emergency_name','ชื่อ-นามสกุล')}
+      <div class="field"><label>ความสัมพันธ์</label><div class="chips">${RELATIONS.map(r=>`<button type="button" class="chip ${F.emergency_relation===r?'on':''}" data-seg="emergency_relation" data-v="${r}">${r}</button>`).join('')}</div></div>
+      ${inp('emergency_phone','เบอร์โทร',{num:true,type:'tel',mode:'tel',fmt:'phone'})}
+      <div class="sec">บัญชีรับเงินเดือน</div>
+      ${sel('bank_name','ธนาคาร',BANKS.map(b=>[b,b]))}
+      <div class="g2">${inp('bank_account_no','เลขบัญชี',{num:true,mode:'numeric'})}${inp('bank_account_name','ชื่อบัญชี')}</div>`,
+    ()=>{ const pd=daysUntil(F.probation_end);
+      return `<div class="g2">${sel('position_id','ตำแหน่ง',S.positions.map(p=>[p.id,p.name]),{empty:'ไม่ระบุ'})}<div class="field"><label for="f_status">สถานะ</label><select class="in" id="f_status" data-f="status" data-re><option value="active" ${F.status==='active'?'selected':''}>ทำงานอยู่</option><option value="resigned" ${F.status==='resigned'?'selected':''}>ลาออกแล้ว</option></select></div></div>
+      ${F.status==='resigned'?`<div class="g2d">${dateField(F,'resign_date','วันที่ลาออก')}${inp('resign_reason','เหตุผลที่ลาออก')}</div>`:''}
+      <div class="field"><label>ประเภทการจ้าง</label>${seg('employment_type',Object.entries(EMPTYPE))}</div>
+      <div class="g2d">${dateField(F,'start_date','วันเริ่มงาน',F.start_date?`อายุงาน ${serviceText(F.start_date)}`:'')}${dateField(F,'probation_end','ครบทดลองงาน',pd===null?'':(pd<0?'ผ่านแล้ว':`อีก ${pd} วัน`))}</div>
+      <div class="sec">ค่าจ้าง</div>
+      ${seg('wage_type',[['daily','รายวัน'],['monthly','รายเดือน']])}
+      <div class="g2">${inp('wage_rate',`ค่าแรง (บาท/${F.wage_type==='monthly'?'เดือน':'วัน'})`,{num:true,type:'number',mode:'decimal',hint:!isNew&&Number(F.wage_rate)!==Number(orig.wage_rate)?`เดิม ${money(orig.wage_rate)}`:'',hcls:'warn'})}${inp('ot_rate','ค่า OT (บาท/ชม.)',{num:true,type:'number',mode:'decimal',hint:!isNew&&Number(F.ot_rate)!==Number(orig.ot_rate)?`เดิม ${money(orig.ot_rate)}`:'',hcls:'warn'})}</div>
+      <div class="note n-warn ${wageChanged()?'':'hidden'}" data-reason style="flex-direction:column;gap:8px"><label for="f_change_reason"><b class="sm">เหตุผลที่แก้ไขค่าแรง/OT *</b></label><input class="in" id="f_change_reason" data-f="change_reason" value="${esc(F.change_reason||'')}" placeholder="เช่น ปรับค่าแรงประจำปี" style="background:var(--surface)"><span class="xs muted">บันทึกลงประวัติการแก้ไข พร้อมชื่อผู้แก้และเวลา</span></div>`; }
+  ];
+
+  function validate(s){
+    if(s===0){ if(!String(F.first_name||'').trim()||!String(F.last_name||'').trim()) return 'กรอกชื่อและนามสกุล'; }
+    const dateKeys=[['birth_date','วันเกิด'],['id_issue_date','วันออกบัตร'],['id_expiry_date','วันหมดอายุบัตร'],['start_date','วันเริ่มงาน'],['probation_end','วันครบทดลองงาน'],['resign_date','วันที่ลาออก']];
+    for(const [k,t] of dateKeys){ if(F._dp[k]){ const r=readParts(F._dp[k]); if(!r.ok) return `${t}: ${r.msg}`; } }
+    if(s===1){ const id=digits(F.national_id); if(id&&!validThaiId(id)) return 'เลขบัตรประชาชนไม่ถูกต้อง'; }
+    if(s===4){ if(Number(F.wage_rate)<0||Number(F.ot_rate)<0) return 'ค่าแรงต้องไม่ติดลบ'; if(wageChanged()&&!String(F.change_reason||'').trim()) return 'ระบุเหตุผลที่แก้ไขค่าแรง/OT'; }
+    return '';
+  }
+
+  function render(){
+    const scroll=$('.sheet-body',sheet)?.scrollTop||0, keepScroll=render._same;
+    sheet.innerHTML=`<header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>${isNew?'เพิ่มพนักงาน':'แก้ไขข้อมูล '+esc(orig.first_name)}<small>ขั้นที่ ${step+1} จาก 5 ${STEPS[step]}</small></h1></header>
+      <nav class="sheet-steps" aria-label="ขั้นตอน">${STEPS.map((t,i)=>`<button type="button" class="sstep ${i<step?'done':''} ${i===step?'on':''}" data-step="${i}" aria-current="${i===step?'step':'false'}"><i></i><span>${t}</span></button>`).join('')}</nav>
+      <div class="sheet-body">${stepsHTML[step]()}</div>
+      <div class="sheet-foot"><button class="btn" data-prev ${step===0?'disabled':''}>ย้อนกลับ</button>${step<4?'<button class="btn btn-p" data-next>ถัดไป</button>':`<button class="btn btn-p" data-save>${isNew?'บันทึกพนักงาน':'บันทึกการแก้ไข'}</button>`}</div>`;
+    if(keepScroll) $('.sheet-body',sheet).scrollTop=scroll;
+    render._same=false;
+    bind(); hydratePhotos(sheet);
+  }
+  const rerender=()=>{ render._same=true; render(); };
+  const go=n=>{ const err=validate(step); if(err&&n>step) return toast(err,true); step=n; render(); };
+
+  function bind(){
+    $('[data-x]',sheet).onclick=async()=>{ if(await confirmBox('ปิดโดยไม่บันทึก? ข้อมูลที่กรอกจะหายไป','ปิด',true)) m.close(); };
+    $$('[data-step]',sheet).forEach(b=>b.onclick=()=>go(+b.dataset.step));
+    const pv=$('[data-prev]',sheet); if(pv) pv.onclick=()=>{ step--; render(); };
+    const nx=$('[data-next]',sheet); if(nx) nx.onclick=()=>go(step+1);
+    const sv=$('[data-save]',sheet); if(sv) sv.onclick=()=>save(sv);
+    $$('[data-f]',sheet).forEach(el=>{
+      const k=el.dataset.f;
+      el.addEventListener(el.tagName==='SELECT'?'change':'input',()=>{
+        if(el.dataset.fmt==='id'){ const p=el.selectionStart, before=el.value.length; el.value=fmtId(el.value); F[k]=digits(el.value); try{ el.setSelectionRange(p+(el.value.length-before),p+(el.value.length-before)); }catch(_){} const id=F[k]; const h=$('[data-h="national_id"]',sheet); h.className='hint '+(id&&validThaiId(id)?'ok':(id.length===13?'bad':'')); h.textContent=id?(validThaiId(id)?'ตรวจสอบเลขบัตรถูกต้อง':(id.length<13?`กรอกแล้ว ${id.length} จาก 13 หลัก`:'เลขบัตรไม่ถูกต้อง')):''; return; }
+        if(el.dataset.fmt==='phone'){ el.value=fmtPhone(el.value); }
+        F[k]=el.value;
+        if(k==='position_id') F[k]=el.value?Number(el.value):null;
+        if(el.hasAttribute('data-re')) rerender();
+        if(['wage_rate','ot_rate'].includes(k)){ const r=$('[data-reason]',sheet); if(r) r.classList.toggle('hidden',!wageChanged()); const h=$(`[data-h="${k}"]`,sheet); if(h) h.textContent=Number(F[k])!==Number(orig?.[k])&&!isNew?`เดิม ${money(orig[k])}`:''; }
+      });
+    });
+    $$('[data-seg]',sheet).forEach(b=>b.onclick=()=>{ const k=b.dataset.seg; F[k]=(k==='emergency_relation'&&F[k]===b.dataset.v)?null:b.dataset.v; if(k==='gender'&&F.gender!=='male') F.military_status=null; rerender(); });
+    $$('[data-date]',sheet).forEach(w=>{ const k=w.dataset.date; w.addEventListener('input',()=>{
+      const p={d:$('[data-p=d]',w).value,m:$('[data-p=m]',w).value,y:$('[data-p=y]',w).value}; F._dp[k]=p; const r=readParts(p);
+      const h=$(`[data-hint="${k}"]`,sheet);
+      if(r.ok){ F[k]=r.value; if(h){ h.className='hint ok';
+        h.textContent = !r.value?'': k==='birth_date'?`อายุ ${ageText(r.value)}`: k==='start_date'?`อายุงาน ${serviceText(r.value)}`: k==='id_expiry_date'?(daysUntil(r.value)<0?'บัตรหมดอายุแล้ว':`ใช้ได้อีก ${untilText(r.value)||daysUntil(r.value)+' วัน'}`): k==='probation_end'?(daysUntil(r.value)<0?'ผ่านแล้ว':`อีก ${daysUntil(r.value)} วัน`):''; if(k==='id_expiry_date'&&daysUntil(r.value)<=60) h.className='hint warn'; } }
+      else if(h){ h.className='hint bad'; h.textContent=r.msg; }
+    }); });
+    $$('[data-photo]',sheet).forEach(inpEl=>inpEl.onchange=async()=>{ const f=inpEl.files[0]; if(!f) return; try{ photoBlob=await resizeImage(f); if(photoPreview) URL.revokeObjectURL(photoPreview); photoPreview=URL.createObjectURL(photoBlob); rerender(); }catch(_){ toast('อ่านไฟล์รูปไม่ได้ ลองเลือกรูปอื่น',true); } });
+    const cs=$('[data-consent]',sheet); if(cs) cs.onchange=()=>{ if(cs.checked) F.blood_consent_at=orig?.blood_consent_at||new Date().toISOString(); else { F.blood_consent_at=null; F.blood_type=null; } rerender(); };
+    const si=$('[data-sameid]',sheet); if(si) si.onclick=()=>{ const id=digits(F.national_id); if(!id) return toast('กรอกเลขบัตรประชาชนก่อน',true); F.social_security_no=id; rerender(); };
+    const cu=$('[data-cursame]',sheet); if(cu) cu.onclick=()=>{ F.cur_same=!F.cur_same; rerender(); };
+    $$('[data-addr]',sheet).forEach(el=>{ const pre=el.dataset.addr, box=$(`[data-dd="${pre}"]`,sheet);
+      el.addEventListener('input',async()=>{ F[pre+'_subdistrict']=el.value; if(!ADDR){ box.innerHTML='<div class="hint">กำลังโหลดรายชื่อตำบล...</div>'; try{ await loadAddr(); }catch(_){ box.innerHTML='<div class="hint bad">โหลดรายชื่อตำบลไม่ได้ กรอกเองได้</div>'; return; } }
+        const res=searchAddr(el.value);
+        box.innerHTML=res.length?`<div class="dd" role="listbox">${res.map((x,i)=>`<button type="button" role="option" data-pick="${i}"><b>${esc(x.d)}</b> <span class="muted">› ${esc(x.a)} › ${esc(x.p)} ${x.z}</span></button>`).join('')}</div>`:'';
+        $$('[data-pick]',box).forEach(b=>b.onclick=()=>{ const x=res[+b.dataset.pick]; F[pre+'_subdistrict']=x.d; F[pre+'_district']=x.a; F[pre+'_province']=x.p; F[pre+'_zip']=x.z; rerender(); });
+      });
+      el.addEventListener('focus',()=>{ loadAddr().catch(()=>{}); });
+    });
+  }
+
+  async function save(btn){
+    for(let s=0;s<5;s++){ const err=validate(s); if(err){ step=s; render(); return toast(err,true); } }
+    const row={}; EMP_FIELDS.forEach(k=>{ let x=F[k]; if(typeof x==='string'){ x=x.trim(); if(x==='') x=null; } row[k]=x===undefined?null:x; });
+    row.title=row.title||'นาย'; row.wage_rate=Number(F.wage_rate||0); row.ot_rate=Number(F.ot_rate||0); row.cur_same=!!F.cur_same;
+    row.employment_type=row.employment_type||'permanent'; row.status=row.status||'active'; row.wage_type=row.wage_type||'daily';
+    row.national_id=digits(F.national_id)||null;
+    if(row.gender!=='male') row.military_status=null;
+    if(!row.blood_consent_at) row.blood_type=null;
+    if(row.status!=='resigned'){ row.resign_date=null; row.resign_reason=null; }
+    if(row.cur_same) ['no','moo','soi','road','subdistrict','district','province','zip'].forEach(k=>row['cur_'+k]=null);
+    row.id_address = row.addr_no ? addrText(row,'addr') : null;
+    row.change_reason = isNew ? 'เพิ่มพนักงานใหม่' : (wageChanged() ? String(F.change_reason).trim() : null);
+    busy(btn,true);
+    try{
+      const id = isNew ? (crypto.randomUUID ? crypto.randomUUID() : null) : orig.id;
+      if(photoBlob){
+        if(!id) throw new Error('อุปกรณ์นี้ไม่รองรับการอัปโหลดรูป');
+        const path=`emp/${id}.jpg`;
+        const up=await sb.storage.from(PHOTO_BUCKET).upload(path, photoBlob, {upsert:true, contentType:'image/jpeg'});
+        if(up.error) throw up.error;
+        row.photo_path=path; delete S.photoUrl[path];
+        if(!isNew&&orig.photo_path===path&&!row.change_reason) row.change_reason='อัปเดตรูปถ่าย';
+      }
+      let res;
+      if(isNew){ if(id) row.id=id; res=await sb.from('employees').insert(row).select('*').single(); }
+      else res=await sb.from('employees').update(row).eq('id',orig.id).select('*').single();
+      if(res.error) throw res.error;
+      if(photoPreview) URL.revokeObjectURL(photoPreview);
+      m.close(); toast(isNew?'บันทึกพนักงานแล้ว':'บันทึกการแก้ไขแล้ว');
+      if(onSaved) onSaved(res.data); else if(location.hash.startsWith('#employees')) pageEmployees(); else location.hash='#emp/'+res.data.id;
+    }catch(err){ busy(btn,false); toast(errText(err),true); }
+  }
+  render();
 }
 
 /* =====================================================================
    ผู้ใช้ระบบ (แอดมิน)
    ===================================================================== */
+let userTab='pending';
 async function pageUsers(){
-  setPage(`<div class="page-head"><div><h2>ผู้ใช้ระบบ</h2><p>อนุมัติผู้สมัคร กำหนดสิทธิ์ ผูกกับข้อมูลพนักงาน และไซต์ที่รับผิดชอบ</p></div></div><div class="card" id="uList"><div class="loading" style="min-height:120px"><div class="spin"></div></div></div>`);
-  const [u, e, a] = await Promise.all([
-    sb.from('profiles').select('*').order('created_at',{ascending:false}),
-    sb.from('employees').select('id,title,first_name,last_name,nickname,status').order('first_name'),
-    sb.from('site_assignments').select('*')
-  ]);
-  if(u.error) return toast(errText(u.error),true);
-  const users=(u.data||[]).sort((x,y)=>(x.role==='pending'?0:1)-(y.role==='pending'?0:1));
-  const emps=e.data||[], assigns=a.data||[];
-  const activeSites=S.sites.filter(s=>s.status==='active');
-  $('#uList').innerHTML = users.map(p=>{
-    const mine=assigns.filter(x=>x.user_id===p.id).map(x=>x.site_id);
-    const me=p.id===S.profile.id;
-    return `<div class="urow ${p.role==='pending'?'pending':''}" data-id="${p.id}">
-      <div><b>${esc(p.display_name)}</b>${me?' <span class="tag">คุณ</span>':''}${p.role==='pending'?' <span class="tag tag-warn">รออนุมัติ</span>':''}${!p.is_active?' <span class="tag tag-bad">ระงับ</span>':''}
-        <div class="muted" style="font-size:13px">${esc(p.email)}${p.phone?' · '+esc(p.phone):''}</div>
-        <div class="muted" style="font-size:12px">สมัคร ${thaiDate(localISO(new Date(p.created_at)))}</div></div>
-      <div class="field" style="margin:0"><label>สิทธิ์</label><select data-k="role">${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${p.role===k?'selected':''}>${v}</option>`).join('')}</select></div>
-      <div class="field" style="margin:0"><label>ผูกกับพนักงาน</label><select data-k="employee_id"><option value="">ไม่ผูก</option>${emps.map(x=>`<option value="${x.id}" ${p.employee_id===x.id?'selected':''}>${esc(x.first_name+' '+x.last_name)}${x.nickname?' ('+esc(x.nickname)+')':''}</option>`).join('')}</select></div>
-      <div style="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap">
-        <label class="chip"><input type="checkbox" data-k="is_active" ${p.is_active?'checked':''}> ใช้งาน</label>
-        <button class="btn btn-primary btn-sm" data-save>บันทึก</button></div>
-      <div class="sites ${p.role==='foreman'?'':'hidden'}" style="grid-column:1/-1">
-        <span class="muted" style="font-size:13px">ไซต์ที่รับผิดชอบ</span>
-        <div class="chips">${activeSites.length?activeSites.map(s=>`<label class="chip"><input type="checkbox" data-site="${s.id}" ${mine.includes(s.id)?'checked':''}> ${esc(s.name)}</label>`).join(''):'<span class="muted" style="font-size:13px">ยังไม่มีไซต์ เพิ่มได้ที่หน้าตั้งค่า</span>'}</div></div>
-    </div>`;
-  }).join('') || '<div class="empty"><b>ยังไม่มีผู้ใช้</b></div>';
-
-  document.querySelectorAll('.urow').forEach(row=>{
-    const id=row.dataset.id;
-    $('[data-k=role]',row).addEventListener('change',ev=>$('.sites',row).classList.toggle('hidden', ev.target.value!=='foreman'));
-    $('[data-save]',row).onclick=async ev=>{
-      const btn=ev.target;
-      const upd={ role:$('[data-k=role]',row).value, employee_id:$('[data-k=employee_id]',row).value||null, is_active:$('[data-k=is_active]',row).checked };
+  setPage(head('ผู้ใช้ระบบ','อนุมัติและกำหนดสิทธิ์') + `<div id="ub"><div class="loading"><div class="spin"></div></div></div>`);
+  const [u,e,a]=await Promise.all([ sb.from('profiles').select('*').order('created_at',{ascending:false}), sb.from('employees').select('id,first_name,last_name,nickname,position_id,status').order('first_name'), sb.from('site_assignments').select('*') ]);
+  if(u.error){ $('#ub').innerHTML=`<div class="note n-bad">${esc(errText(u.error))}</div>`; return; }
+  const users=u.data||[], emps=e.data||[], assigns=a.data||[];
+  const groups={ pending:users.filter(x=>x.role==='pending'&&x.is_active), active:users.filter(x=>x.role!=='pending'&&x.is_active), blocked:users.filter(x=>!x.is_active) };
+  const sites=S.sites.filter(s=>s.status==='active');
+  const list=groups[userTab];
+  $('#ub').outerHTML=`<div class="col" style="max-width:760px">
+    <div class="seg">${[['pending',`รออนุมัติ ${groups.pending.length}`],['active',`ใช้งานอยู่ ${groups.active.length}`],['blocked',`ระงับ ${groups.blocked.length}`]].map(([k,t])=>`<button class="${userTab===k?'on':''}" data-ut="${k}">${t}</button>`).join('')}</div>
+    ${list.length?list.map(p=>{ const mine=assigns.filter(x=>x.user_id===p.id).map(x=>x.site_id); const me=p.id===S.profile.id; const role=p.role==='pending'?'employee':p.role;
+      return `<div class="card col" data-u="${p.id}" data-role="${role}" style="${p.role==='pending'?'border-color:var(--accent)':''}">
+        <div class="row"><div class="av round">${esc((p.display_name||'?').charAt(0))}</div><div class="grow"><b>${esc(p.display_name)}${me?' <span class="tag">คุณ</span>':''}</b><div class="sm muted" style="overflow-wrap:anywhere">${esc(p.email)}${p.phone?` · ${esc(p.phone)}`:''}</div><div class="xs muted">สมัคร ${thaiDate(localISO(new Date(p.created_at)))}</div></div>${p.role==='pending'?'<span class="tag t-warn">ใหม่</span>':`<span class="tag">${ROLES[p.role]}</span>`}</div>
+        <div class="field"><label>สิทธิ์การใช้งาน</label><div class="chips">${['employee','foreman','executive','admin'].map(r=>`<button class="chip ${role===r?'on':''}" data-r="${r}">${ROLES[r]}</button>`).join('')}</div></div>
+        <div class="field ${role==='foreman'?'':'hidden'}" data-sitesbox><label>ไซต์ที่รับผิดชอบ</label><div class="chips">${sites.length?sites.map(s=>`<button class="chip ${mine.includes(s.id)?'on':''}" data-site="${s.id}">${mine.includes(s.id)?IC.check:''}${esc(s.name)}</button>`).join(''):'<span class="hint">ยังไม่มีไซต์ เพิ่มได้ที่หน้าตั้งค่า</span>'}</div></div>
+        <div class="field"><label>ผูกกับทะเบียนพนักงาน</label><select class="in" data-emp><option value="">ไม่ผูก</option>${emps.map(x=>`<option value="${x.id}" ${p.employee_id===x.id?'selected':''}>${esc(shortName(x))}${x.nickname?` (${esc(x.nickname)})`:''} ${esc(posName(x.position_id))}</option>`).join('')}</select></div>
+        <div class="row" style="gap:10px">${userTab==='pending'?`<button class="btn btn-bad grow" data-block>ปฏิเสธ</button><button class="btn btn-p" style="flex:2" data-save>อนุมัติ</button>`
+          :userTab==='active'?`${me?'':'<button class="btn btn-bad grow" data-block>ระงับบัญชี</button>'}<button class="btn btn-p" style="flex:2" data-save>บันทึก</button>`
+          :`<button class="btn btn-p grow" data-unblock>เปิดใช้งานอีกครั้ง</button>`}</div>
+      </div>`; }).join('')
+      :`<div class="card empty"><b>${userTab==='pending'?'ไม่มีผู้สมัครรออนุมัติ':userTab==='active'?'ยังไม่มีผู้ใช้':'ไม่มีบัญชีที่ถูกระงับ'}</b>${userTab==='pending'?'เมื่อมีคนสมัคร รายชื่อจะขึ้นที่นี่':''}</div>`}
+  </div>`;
+  $$('[data-ut]').forEach(b=>b.onclick=()=>{ userTab=b.dataset.ut; pageUsers(); });
+  $$('[data-u]').forEach(card=>{
+    const id=card.dataset.u;
+    $$('[data-r]',card).forEach(b=>b.onclick=()=>{ card.dataset.role=b.dataset.r; $$('[data-r]',card).forEach(x=>x.classList.toggle('on',x===b)); $('[data-sitesbox]',card).classList.toggle('hidden',b.dataset.r!=='foreman'); });
+    $$('[data-site]',card).forEach(b=>b.onclick=()=>{ b.classList.toggle('on'); const name=esc(S.sites.find(s=>s.id==b.dataset.site)?.name||''); b.innerHTML=(b.classList.contains('on')?IC.check:'')+name; });
+    const upd=async(patch, btn, msg)=>{
       busy(btn,true,'...');
-      const {error}=await sb.from('profiles').update(upd).eq('id',id);
+      const {error}=await sb.from('profiles').update(patch).eq('id',id);
       if(error){ busy(btn,false); return toast(errText(error),true); }
-      // ไซต์ที่รับผิดชอบ
-      const want=[...row.querySelectorAll('[data-site]')].filter(c=>c.checked && upd.role==='foreman').map(c=>Number(c.dataset.site));
-      const had=assigns.filter(x=>x.user_id===id).map(x=>x.site_id);
-      const add=want.filter(s=>!had.includes(s)), rem=had.filter(s=>!want.includes(s));
-      if(add.length){ const r=await sb.from('site_assignments').insert(add.map(site_id=>({user_id:id,site_id}))); if(r.error){ busy(btn,false); return toast(errText(r.error),true);} }
-      if(rem.length){ const r=await sb.from('site_assignments').delete().eq('user_id',id).in('site_id',rem); if(r.error){ busy(btn,false); return toast(errText(r.error),true);} }
-      toast('บันทึกสิทธิ์แล้ว');
-      if(id===S.profile.id){ await enter(); } else pageUsers();
+      if(patch.role){
+        const want=patch.role==='foreman'?$$('[data-site].on',card).map(c=>+c.dataset.site):[];
+        const had=assigns.filter(x=>x.user_id===id).map(x=>x.site_id);
+        const add=want.filter(s=>!had.includes(s)), rem=had.filter(s=>!want.includes(s));
+        if(add.length){ const r=await sb.from('site_assignments').insert(add.map(site_id=>({user_id:id,site_id}))); if(r.error){ busy(btn,false); return toast(errText(r.error),true);} }
+        if(rem.length){ const r=await sb.from('site_assignments').delete().eq('user_id',id).in('site_id',rem); if(r.error){ busy(btn,false); return toast(errText(r.error),true);} }
+      }
+      toast(msg); if(id===S.profile.id) await enter(); else pageUsers();
     };
+    const sv=$('[data-save]',card); if(sv) sv.onclick=()=>upd({role:card.dataset.role, employee_id:$('[data-emp]',card).value||null}, sv, userTab==='pending'?'อนุมัติแล้ว':'บันทึกสิทธิ์แล้ว');
+    const bl=$('[data-block]',card); if(bl) bl.onclick=async()=>{ if(await confirmBox(userTab==='pending'?'ปฏิเสธผู้สมัครนี้? บัญชีจะถูกย้ายไปที่ "ระงับ"':'ระงับบัญชีนี้? ผู้ใช้จะเข้าระบบไม่ได้จนกว่าจะเปิดใช้งานอีกครั้ง', userTab==='pending'?'ปฏิเสธ':'ระงับ', true)) upd({is_active:false}, bl, 'ระงับบัญชีแล้ว'); };
+    const ub=$('[data-unblock]',card); if(ub) ub.onclick=()=>upd({is_active:true}, ub, 'เปิดใช้งานแล้ว');
   });
 }
 
 /* =====================================================================
-   ตั้งค่า: ตำแหน่ง / ไซต์งาน
+   ตั้งค่า
    ===================================================================== */
+let setTab='sites';
 function pageSettings(){
-  setPage(`<div class="page-head"><div><h2>ตั้งค่า</h2><p>ตำแหน่งงานและไซต์งานที่ใช้ทั้งระบบ</p></div></div>
-    <div class="grid-2">
-      <div class="card card-pad"><h3 class="section-title">ตำแหน่งงาน</h3>
-        <form id="addPos" class="toolbar" style="margin-bottom:6px"><input type="text" placeholder="ชื่อตำแหน่งใหม่" aria-label="ชื่อตำแหน่งใหม่"><button class="btn btn-primary">เพิ่ม</button></form>
-        <ul class="slist">${S.positions.map(p=>`<li><span>${esc(p.name)}</span><button class="btn btn-sm" data-ren="${p.id}">เปลี่ยนชื่อ</button><button class="btn btn-sm btn-danger" data-delp="${p.id}">ลบ</button></li>`).join('')}</ul></div>
-      <div class="card card-pad"><h3 class="section-title">ไซต์งาน</h3>
-        <form id="addSite" style="margin-bottom:6px"><div class="row row-2"><input type="text" name="n" placeholder="ชื่อไซต์ เช่น บ้านคุณไพศาล" aria-label="ชื่อไซต์"><input type="text" name="l" placeholder="ที่ตั้ง (ไม่บังคับ)" aria-label="ที่ตั้ง"></div><button class="btn btn-primary" style="margin-top:8px">เพิ่มไซต์</button></form>
-        <ul class="slist">${S.sites.map(s=>`<li><span>${esc(s.name)}${s.location?`<br><small class="muted">${esc(s.location)}</small>`:''}</span>${s.status==='active'?'<span class="tag tag-ok">เปิดอยู่</span>':'<span class="tag">ปิดแล้ว</span>'}<button class="btn btn-sm" data-ts="${s.id}">${s.status==='active'?'ปิดไซต์':'เปิดอีกครั้ง'}</button></li>`).join('')||'<li class="muted">ยังไม่มีไซต์งาน</li>'}</ul></div>
-    </div>`);
+  const sitesHTML=`<form class="card col" id="as" style="gap:10px"><b>เพิ่มไซต์งานใหม่</b><input class="in" name="n" placeholder="ชื่อไซต์ เช่น บ้านคุณไพศาล" aria-label="ชื่อไซต์"><input class="in" name="l" placeholder="ที่ตั้ง (ไม่บังคับ)" aria-label="ที่ตั้ง"><button class="btn btn-p btn-sm">เพิ่มไซต์</button></form>
+    <div class="card card-l">${S.sites.length?S.sites.map(s=>`<div class="li" style="${s.status==='active'?'':'opacity:.7'}"><div class="av" style="${s.status==='active'?'background:var(--okBg);color:var(--ok);border:0':''}">${IC.site}</div><div class="grow"><b>${esc(s.name)}</b><span class="sm muted">${esc(s.location||'')}</span></div><button class="btn btn-sm" data-ts="${s.id}">${s.status==='active'?'ปิดไซต์':'เปิดอีกครั้ง'}</button></div>`).join(''):'<div class="empty"><b>ยังไม่มีไซต์งาน</b>เพิ่มไซต์แรกจากฟอร์มด้านบน</div>'}</div>`;
+  const posHTML=`<form class="card row" id="ap" style="gap:10px"><input class="in grow" name="n" placeholder="ชื่อตำแหน่งใหม่" aria-label="ชื่อตำแหน่งใหม่"><button class="btn btn-p btn-sm">เพิ่ม</button></form>
+    <div class="card card-l">${S.positions.map(p=>`<div class="li"><span class="grow">${esc(p.name)}</span><button class="btn btn-sm" data-ren="${p.id}">เปลี่ยนชื่อ</button><button class="btn btn-sm btn-bad" data-delp="${p.id}" aria-label="ลบ ${esc(p.name)}">ลบ</button></div>`).join('')}</div>`;
+  setPage(head('ตั้งค่า','ใช้ร่วมกันทั้งระบบ') + `<div class="col" style="max-width:760px"><div class="seg"><button class="${setTab==='sites'?'on':''}" data-st="sites">ไซต์งาน</button><button class="${setTab==='pos'?'on':''}" data-st="pos">ตำแหน่งงาน</button></div>${setTab==='sites'?sitesHTML:posHTML}</div>`);
+  $$('[data-st]').forEach(b=>b.onclick=()=>{ setTab=b.dataset.st; pageSettings(); });
   const after=async msg=>{ toast(msg); await loadRefs(); pageSettings(); };
-  $('#addPos').onsubmit=async ev=>{
-    ev.preventDefault(); const name=$('input',ev.target).value.trim(); if(!name) return;
-    const {error}=await sb.from('positions').insert({name, sort_order:S.positions.length+1});
-    if(error) return toast(/duplicate/.test(error.message)?'มีตำแหน่งนี้แล้ว':errText(error),true); after('เพิ่มตำแหน่งแล้ว');
-  };
-  document.querySelectorAll('[data-ren]').forEach(b=>b.onclick=async()=>{
-    const p=S.positions.find(x=>x.id==b.dataset.ren); const name=prompt('ชื่อตำแหน่งใหม่',p.name); if(!name||name.trim()===p.name) return;
-    const {error}=await sb.from('positions').update({name:name.trim()}).eq('id',p.id); if(error) return toast(errText(error),true); after('เปลี่ยนชื่อแล้ว');
-  });
-  document.querySelectorAll('[data-delp]').forEach(b=>b.onclick=async()=>{
-    const p=S.positions.find(x=>x.id==b.dataset.delp);
-    if(!await confirmBox(`ลบตำแหน่ง "${p.name}"? พนักงานที่อยู่ตำแหน่งนี้จะกลายเป็น "ไม่ระบุตำแหน่ง"`,'ลบ',true)) return;
-    const {error}=await sb.from('positions').delete().eq('id',p.id); if(error) return toast(errText(error),true); after('ลบตำแหน่งแล้ว');
-  });
-  $('#addSite').onsubmit=async ev=>{
-    ev.preventDefault(); const f=ev.target; const name=f.n.value.trim(); if(!name) return toast('กรอกชื่อไซต์',true);
-    const {error}=await sb.from('sites').insert({name, location:f.l.value.trim()||null}); if(error) return toast(errText(error),true); after('เพิ่มไซต์แล้ว');
-  };
-  document.querySelectorAll('[data-ts]').forEach(b=>b.onclick=async()=>{
-    const s=S.sites.find(x=>x.id==b.dataset.ts);
-    const {error}=await sb.from('sites').update({status:s.status==='active'?'closed':'active'}).eq('id',s.id); if(error) return toast(errText(error),true);
-    after(s.status==='active'?'ปิดไซต์แล้ว':'เปิดไซต์แล้ว');
-  });
+  const as=$('#as'); if(as) as.onsubmit=async ev=>{ ev.preventDefault(); const n=as.n.value.trim(); if(!n) return toast('กรอกชื่อไซต์',true);
+    const {error}=await sb.from('sites').insert({name:n,location:as.l.value.trim()||null}); if(error) return toast(errText(error),true); after('เพิ่มไซต์แล้ว'); };
+  $$('[data-ts]').forEach(b=>b.onclick=async()=>{ const s=S.sites.find(x=>x.id==b.dataset.ts);
+    const {error}=await sb.from('sites').update({status:s.status==='active'?'closed':'active'}).eq('id',s.id); if(error) return toast(errText(error),true); after(s.status==='active'?'ปิดไซต์แล้ว':'เปิดไซต์แล้ว'); });
+  const ap=$('#ap'); if(ap) ap.onsubmit=async ev=>{ ev.preventDefault(); const n=ap.n.value.trim(); if(!n) return;
+    const {error}=await sb.from('positions').insert({name:n,sort_order:S.positions.length+1}); if(error) return toast(/duplicate/.test(error.message)?'มีตำแหน่งนี้แล้ว':errText(error),true); after('เพิ่มตำแหน่งแล้ว'); };
+  $$('[data-ren]').forEach(b=>b.onclick=async()=>{ const p=S.positions.find(x=>x.id==b.dataset.ren); const n=await promptBox('ชื่อตำแหน่งใหม่',p.name); if(!n||n===p.name) return;
+    const {error}=await sb.from('positions').update({name:n}).eq('id',p.id); if(error) return toast(errText(error),true); after('เปลี่ยนชื่อแล้ว'); });
+  $$('[data-delp]').forEach(b=>b.onclick=async()=>{ const p=S.positions.find(x=>x.id==b.dataset.delp);
+    if(!await confirmBox(`ลบตำแหน่ง "${p.name}"? พนักงานในตำแหน่งนี้จะกลายเป็น "ไม่ระบุตำแหน่ง"`,'ลบ',true)) return;
+    const {error}=await sb.from('positions').delete().eq('id',p.id); if(error) return toast(errText(error),true); after('ลบตำแหน่งแล้ว'); });
 }
 
 /* =====================================================================
    ข้อมูลของฉัน
    ===================================================================== */
 async function pageMe(){
-  const p=S.profile;
-  setPage(`<div class="page-head"><div><h2>ข้อมูลของฉัน</h2><p>${ROLES[p.role]}</p></div></div>
-    <div class="grid-2">
-      <div class="card card-pad"><h3 class="section-title">บัญชีผู้ใช้</h3>
-        <form id="meF"><div class="field"><label>อีเมล</label><input type="email" value="${esc(p.email)}" disabled></div>
-        <div class="field"><label>ชื่อที่แสดง</label><input type="text" name="dn" value="${esc(p.display_name)}"></div>
-        <div class="field"><label>เบอร์โทร</label><input type="tel" name="ph" value="${esc(p.phone)}"></div>
-        <button class="btn btn-primary">บันทึก</button></form>
-        <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
-        <form id="pwF"><div class="field"><label>เปลี่ยนรหัสผ่าน</label><input type="password" name="pw" minlength="6" placeholder="รหัสผ่านใหม่ อย่างน้อย 6 ตัว" autocomplete="new-password"></div>
-        <button class="btn">เปลี่ยนรหัสผ่าน</button></form></div>
-      <div id="myEmp"></div>
-    </div>`);
-  $('#meF').onsubmit=async ev=>{
-    ev.preventDefault(); const f=ev.target;
-    const {error}=await sb.from('profiles').update({display_name:f.dn.value.trim(), phone:f.ph.value.trim()||null}).eq('id',p.id);
-    if(error) return toast(errText(error),true);
-    S.profile.display_name=f.dn.value.trim(); S.profile.phone=f.ph.value.trim(); toast('บันทึกแล้ว'); route();
-  };
-  $('#pwF').onsubmit=async ev=>{
-    ev.preventDefault(); const pw=ev.target.pw.value;
-    if(pw.length<6) return toast('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร',true);
-    const {error}=await sb.auth.updateUser({password:pw}); if(error) return toast(errText(error),true);
-    ev.target.reset(); toast('เปลี่ยนรหัสผ่านแล้ว');
-  };
+  const p=S.profile, th=curTheme();
+  setPage(head('ข้อมูลของฉัน',ROLES[p.role]) + `<div class="col" style="max-width:640px">
+    <div id="myEmp"></div>
+    <div class="card col" style="gap:10px"><b>รูปแบบสี</b>
+      <div class="seg">${[['auto','ตามเครื่อง'],['light','สว่าง'],['dark','มืด']].map(([k,t])=>`<button class="${th===k?'on':''}" data-th="${k}">${t}</button>`).join('')}</div>
+      <span class="xs muted">"ตามเครื่อง" จะสลับสว่าง/มืดตามการตั้งค่าของมือถือหรือคอมพิวเตอร์อัตโนมัติ</span></div>
+    <form class="card col" id="meF" style="gap:12px"><b>บัญชีผู้ใช้</b>
+      <div class="field"><label>อีเมล</label><input class="in" value="${esc(p.email)}" readonly></div>
+      <div class="field"><label for="dn">ชื่อที่แสดง</label><input class="in" id="dn" value="${esc(p.display_name)}"></div>
+      <div class="field"><label for="mph">เบอร์โทร</label><input class="in num" id="mph" type="tel" inputmode="tel" value="${esc(p.phone)}"></div>
+      <button class="btn btn-p btn-sm" style="align-self:flex-start">บันทึก</button></form>
+    <form class="card col" id="pwF" style="gap:12px"><b>เปลี่ยนรหัสผ่าน</b>${pwField('npw','new-password')}<button class="btn btn-sm" style="align-self:flex-start">เปลี่ยนรหัสผ่าน</button></form>
+    <button class="btn btn-bad" id="lo3">ออกจากระบบ</button></div>`);
+  bindEyes($('#page'));
+  $('#mph').addEventListener('input',e=>{ e.target.value=fmtPhone(e.target.value); });
+  $$('[data-th]').forEach(b=>b.onclick=()=>{ applyTheme(b.dataset.th); $$('[data-th]').forEach(x=>x.classList.toggle('on',x===b)); });
+  $('#lo3').onclick=logout;
+  $('#meF').onsubmit=async ev=>{ ev.preventDefault(); const dn=$('#dn').value.trim(); if(!dn) return toast('กรอกชื่อที่แสดง',true);
+    const {error}=await sb.from('profiles').update({display_name:dn,phone:$('#mph').value.trim()||null}).eq('id',p.id); if(error) return toast(errText(error),true);
+    S.profile.display_name=dn; S.profile.phone=$('#mph').value.trim(); toast('บันทึกแล้ว'); route(); };
+  $('#pwF').onsubmit=async ev=>{ ev.preventDefault(); const pw=$('#npw').value; if(pw.length<6) return toast('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร',true);
+    const {error}=await sb.auth.updateUser({password:pw}); if(error) return toast(errText(error),true); $('#npw').value=''; toast('เปลี่ยนรหัสผ่านแล้ว'); };
   if(p.employee_id){
-    const {data}=await sb.from('employees').select('*').eq('id',p.employee_id).single();
-    if(data){
-      $('#myEmp').innerHTML=`<div class="card card-pad"><h3 class="section-title">ข้อมูลพนักงาน</h3>
-        <p style="margin:0 0 8px">${esc(fullName(data))}${data.nickname?` (${esc(data.nickname)})`:''}</p>
-        <p class="muted" style="margin:0 0 8px">${esc(S.positions.find(x=>x.id===data.position_id)?.name||'-')} · อายุ ${ageText(data.birth_date)}</p>
-        <p style="margin:0 0 14px">${starsHTML(Number(data.stars),true)} <span class="num">${Number(data.stars).toFixed(1)} / 5</span></p>
-        <button class="btn" id="seeCard">ดูข้อมูลทั้งหมด</button></div>`;
-      $('#seeCard').onclick=()=>employeeCard(data,true);
+    const {data:e}=await sb.from('employees').select('*').eq('id',p.employee_id).single();
+    if(e){
+      $('#myEmp').innerHTML=`<div class="card col" style="gap:12px"><div class="row" style="gap:14px">${avatar(e,'','width:64px;height:64px;font-size:22px;border-radius:18px')}
+        <div class="grow"><b style="font-size:17px">${esc(fullName(e))}</b><div class="sm muted">${esc(posName(e.position_id))} · ${esc(e.emp_code)}</div><div style="margin-top:4px">${starBadge(e.stars)} <span class="sm muted">จาก 5 ดาว</span></div></div></div>
+        <div class="card-l" style="padding:0"><div class="kv"><span>อายุงาน</span><span>${e.start_date?serviceText(e.start_date):'-'}</span></div><div class="kv"><span>บัตรประชาชนหมดอายุ</span><span>${e.id_expiry_date?thaiDate(e.id_expiry_date):'-'}</span></div></div>
+        <button class="btn btn-sm" id="seeCard" style="align-self:flex-start">ดูบัตรพนักงาน</button></div>`;
+      hydratePhotos($('#myEmp'));
+      $('#seeCard').onclick=()=>readOnlyCard(e);
+      return;
     }
-  } else {
-    $('#myEmp').innerHTML=`<div class="card card-pad"><h3 class="section-title">ข้อมูลพนักงาน</h3><p class="muted" style="margin:0">บัญชีนี้ยังไม่ได้ผูกกับข้อมูลพนักงาน แอดมินผูกให้ได้ที่หน้าผู้ใช้ระบบ</p></div>`;
   }
+  $('#myEmp').innerHTML=`<div class="note n-info">${IC.info}<span>บัญชีนี้ยังไม่ได้ผูกกับทะเบียนพนักงาน แอดมินผูกให้ได้ที่หน้าผู้ใช้ระบบ</span></div>`;
 }
 
 boot();
