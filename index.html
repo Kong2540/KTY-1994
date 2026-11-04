@@ -239,6 +239,30 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .loading{display:grid;place-items:center;min-height:50vh;color:var(--ink2);text-align:center}
 .spin{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 10px}
 @keyframes sp{to{transform:rotate(360deg)}}
+.t-leave{background:var(--surface2);color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink2)}
+.stbtn.on{border-width:2px;font-weight:700}
+.stbtn.on.t-ok{border-color:var(--ok)}.stbtn.on.t-warn{border-color:var(--warn)}.stbtn.on.t-bad{border-color:var(--bad)}.stbtn.on.t-leave,.stbtn.on:not(.t-ok):not(.t-warn):not(.t-bad){border-color:var(--ink);box-shadow:none}
+.dotmark{width:8px;height:8px;border-radius:4px;background:var(--accent);flex:none}
+.savebar{position:sticky;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:5;display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:10px 12px 10px 16px;box-shadow:0 8px 24px rgba(0,0,0,.14)}
+@media (min-width:900px){.savebar{bottom:16px}}
+.mgrid-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.mgrid{border-collapse:separate;border-spacing:0;font-size:12px;min-width:100%}
+.mgrid th{background:var(--surface2);color:var(--ink2);font-weight:600;padding:6px 2px;text-align:center;border-bottom:1px solid var(--line);white-space:nowrap}
+.mgrid th small{display:block;font-size:10px;font-weight:400}
+.mgrid th.sun{color:var(--bad)} .mgrid th.today{background:var(--accent);color:var(--accentInk)}
+.mgrid td{padding:2px;border-bottom:1px solid var(--line);text-align:center}
+.mgrid td.num{padding:4px 8px;font-size:13px}.mgrid td.tot{font-weight:700}
+.mgrid .sticky{position:sticky;left:0;z-index:1;background:var(--surface);text-align:left;padding:6px 10px;min-width:130px;border-right:1px solid var(--line)}
+.mgrid th.sticky{background:var(--surface2)}
+.mgrid .sticky a{text-decoration:none}.mgrid .sticky small{display:block;color:var(--ink2);font-size:11px}
+.mc{width:28px;height:30px;border-radius:7px;border:0;background:transparent;font-size:11px;font-weight:700;position:relative;padding:0;color:var(--ink)}
+.mc:not(:disabled):hover{box-shadow:inset 0 0 0 2px var(--ink2)}
+.mc:disabled{opacity:.25;cursor:default}
+.mc i,.lg.ot{position:absolute;bottom:3px;left:50%;margin-left:-3px;width:6px;height:6px;border-radius:3px;background:var(--accent);display:block}
+.lg{width:14px;height:14px;border-radius:4px;display:inline-block;position:relative}
+.s-present{background:var(--okBg)}.s-late{background:var(--warnBg);color:var(--warn)}.s-absent{background:var(--badBg);color:var(--bad)}
+.s-half{background:linear-gradient(135deg,var(--okBg) 50%,var(--surface2) 50%)}
+.s-sick,.s-personal,.s-vacation{background:var(--surface2);box-shadow:inset 0 0 0 1px var(--ink2)}
 .timeline .row{align-items:flex-start;padding-bottom:16px}
 .dot{width:24px;height:24px;border-radius:50%;border:2px solid var(--ink2);flex:none;display:grid;place-items:center}
 .dot.done{background:var(--accent);border-color:var(--accent);color:var(--accentInk)}
@@ -294,6 +318,7 @@ const IC = {
   info: svg('<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 8h.01"/>'),
   userplus: svg('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5"/><path d="M17 13v6M14 16h6"/>'),
   sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
+  cal: svg('<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>'),
   history: svg('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>')
 };
 const STAR_PATH = '<path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z"/>';
@@ -340,6 +365,8 @@ const errText = e => {
   if(/duplicate key.*national_id/.test(m)) return 'เลขบัตรประชาชนนี้มีในระบบแล้ว';
   if(/blood_needs_consent/.test(m)) return 'บันทึกหมู่เลือดได้เมื่อพนักงานยินยอมแล้วเท่านั้น';
   if(/Failed to fetch|NetworkError|Load failed/i.test(m)) return 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ต';
+  if(/relation .*(attendance|site_reports|star_events|app_settings).* does not exist|Could not find the table/.test(m)) return 'ฐานข้อมูลยังไม่ได้อัปเดตช่วงที่ 2 กรุณารันไฟล์ 03_attendance.sql ใน Supabase';
+  if(/row-level security/.test(m)) return 'ไม่มีสิทธิ์ทำรายการนี้ (โฟร์แมนแก้รายงานได้เฉพาะของวันนี้)';
   if(/column .* does not exist/.test(m)) return 'ฐานข้อมูลยังไม่ได้อัปเดต กรุณารันไฟล์ 02_profile_update.sql ใน Supabase';
   return m;
 };
@@ -448,8 +475,11 @@ async function enter(){
   window.onhashchange=route; route();
 }
 async function loadRefs(){
-  const [p,s]=await Promise.all([ sb.from('positions').select('*').order('sort_order').order('name'), sb.from('sites').select('*').order('status').order('name') ]);
+  const [p,s,st]=await Promise.all([ sb.from('positions').select('*').order('sort_order').order('name'), sb.from('sites').select('*').order('status').order('name'), sb.from('app_settings').select('*') ]);
   S.positions=p.data||[]; S.sites=s.data||[];
+  S.settings={ star_rules:{absent:1,late_count:3,late_penalty:0.5,no_notice:0.5}, site_trades:['ช่างปูน','ช่างไฟ','ช่างเหล็ก','ช่างไม้','ช่างประปา','ช่างสี','คนงานทั่วไป'] };
+  (st.data||[]).forEach(r=>{ S.settings[r.key]=r.value; });
+  S.hasPhase2 = !st.error;
 }
 const isAdmin=()=>S.profile?.role==='admin';
 const isManager=()=>['admin','executive'].includes(S.profile?.role);
@@ -527,20 +557,19 @@ function renderPending(){
    โครงหน้าหลัก
    ===================================================================== */
 function menu(){
-  const m=[{k:'home',t:'หน้าแรก',i:IC.home}];
-  if(isManager()) m.push({k:'employees',t:'พนักงาน',i:IC.people});
-  if(isAdmin()) m.push({k:'users',t:'ผู้ใช้',tl:'ผู้ใช้ระบบ',i:IC.key});
-  if(isManager()) m.push({k:'settings',t:'ตั้งค่า',i:IC.gear});
+  const r=S.profile?.role, m=[{k:'home',t:'หน้าแรก',i:IC.home}];
+  if(isManager()) m.push({k:'att',t:'เช็คชื่อ',i:IC.cal},{k:'employees',t:'พนักงาน',i:IC.people},{k:'manage',t:'จัดการ',i:IC.gear});
+  if(r==='foreman') m.push({k:'report',t:'ส่งคนงาน',tl:'ส่งคนงานหน้างาน',i:IC.site});
   m.push({k:'me',t:'ฉัน',tl:'ข้อมูลของฉัน',i:IC.me});
   return m;
 }
 function route(){
-  const [k,id]=(location.hash.replace('#','')||'home').split('/');
+  let [k,id]=(location.hash.replace('#','')||'home').split('/');
+  if(k==='users'){ k='manage'; mgTab='users'; } if(k==='settings'){ k='manage'; }
   const allowed=menu().map(x=>x.k); if(isManager()) allowed.push('emp');
   const key=allowed.includes(k)?k:'home';
-  const active = key==='emp' ? 'employees' : key;
-  renderShell(active);
-  ({home:pageHome, employees:pageEmployees, emp:()=>pageProfile(id), users:pageUsers, settings:pageSettings, me:pageMe})[key]();
+  renderShell(key==='emp'?'employees':key);
+  ({home:pageHome, att:pageAtt, employees:pageEmployees, emp:()=>pageProfile(id), manage:pageManage, report:pageReport, me:pageMe})[key]();
   scrollTo(0,0);
 }
 function renderShell(active){
@@ -573,9 +602,11 @@ async function pageHome(){
       const {data}=await sb.from('site_assignments').select('site_id').eq('user_id',p.id);
       const mine=(data||[]).map(a=>S.sites.find(s=>s.id===a.site_id)).filter(s=>s&&s.status==='active');
       html+=`<h2 class="h2">ไซต์ที่รับผิดชอบ</h2>`;
-      html+= mine.length? `<div class="lgrid">${mine.map(s=>`<div class="card col"><div class="row"><div class="av" style="background:var(--okBg);color:var(--ok);border:0">${IC.site}</div><div class="grow"><b>${esc(s.name)}</b><div class="sm muted">${esc(s.location||'')}</div></div></div><button class="btn btn-p" disabled>ส่งรายชื่อช่างเข้างาน</button></div>`).join('')}</div>`
+      const reps={}; if(S.hasPhase2&&mine.length){ const {data:r}=await sb.from('site_reports').select('site_id,total,updated_at').eq('report_date',localISO()).in('site_id',mine.map(s=>s.id)); (r||[]).forEach(x=>reps[x.site_id]=x); }
+      html+= mine.length? `<div class="lgrid">${mine.map(s=>{ const r=reps[s.id]; return `<div class="card col"><div class="row"><div class="av" style="background:var(--okBg);color:var(--ok);border:0">${IC.site}</div><div class="grow"><b>${esc(s.name)}</b><div class="sm muted">${esc(s.location||'')}</div></div>${r?`<span class="tag t-ok">ส่งแล้ว ${r.total} คน</span>`:''}</div>
+        ${r?'':`<div class="note n-warn" style="align-items:center">${IC.clock}<span>ยังไม่ได้ส่งรายชื่อช่างของวันนี้</span></div>`}<a href="#report" class="btn ${r?'':'btn-p'}" onclick="repSite=${s.id}">${r?'แก้ไขรายงานวันนี้':'ส่งรายชื่อช่างเข้างาน'}</a></div>`; }).join('')}</div>`
         : `<div class="card empty"><b>ยังไม่ได้กำหนดไซต์</b>ติดต่อแอดมินเพื่อกำหนดไซต์ที่คุณรับผิดชอบ</div>`;
-      html+=`<div class="note n-info">${IC.info}<span>หน้าส่งรายชื่อช่างจะเปิดใช้ในระบบช่วงที่ 2</span></div>`;
+      html+=`<div class="note n-info">${IC.info}<span>โฟร์แมนไม่เห็นข้อมูลค่าแรงและข้อมูลส่วนตัวของพนักงาน</span></div>`;
     } else {
       html+=`<div class="card col"><b>ยินดีต้อนรับ</b><span class="muted">ดูข้อมูลส่วนตัว ดาวความประพฤติ และตั้งค่ารูปแบบสีได้ที่เมนู "ฉัน"</span><a href="#me" class="btn">ไปที่ข้อมูลของฉัน</a></div>`;
     }
@@ -583,9 +614,12 @@ async function pageHome(){
     return;
   }
   setPage(head(`สวัสดี คุณ${esc((p.display_name||'').split(' ')[0])}`, todayLong(), {lead, mActions:`<span class="tag t-acc">${ROLES[p.role]}</span>`, dActions:`<a href="#employees" class="btn">${IC.people}รายชื่อพนักงาน</a>`}) + `<div id="hb"><div class="loading"><div class="spin"></div></div></div>`);
-  const [emp,prof]=await Promise.all([
+  const today=localISO();
+  const [emp,prof,attT,repT]=await Promise.all([
     sb.from('employees').select('id,first_name,last_name,nickname,position_id,status,stars,id_expiry_date,employment_type,probation_end'),
-    isAdmin()?sb.from('profiles').select('id,role,is_active'):Promise.resolve({data:[]})
+    isAdmin()?sb.from('profiles').select('id,role,is_active'):Promise.resolve({data:[]}),
+    S.hasPhase2?sb.from('attendance').select('employee_id,status,ot_hours').eq('work_date',today):Promise.resolve({data:null}),
+    S.hasPhase2?sb.from('site_reports').select('site_id,total').eq('report_date',today):Promise.resolve({data:null})
   ]);
   if(emp.error){ $('#hb').innerHTML=`<div class="note n-bad">${esc(errText(emp.error))}</div>`; return; }
   const list=(emp.data||[]).filter(e=>e.status==='active');
@@ -600,20 +634,26 @@ async function pageHome(){
     ...probation.map(e=>`<a href="#emp/${e.id}" class="li"><span class="tag">ทดลองงาน</span><span class="grow sm"><b style="display:inline">${esc(shortName(e))}</b> ครบทดลองงาน ${thaiDate(e.probation_end)}</span></a>`)
   ];
   $('#hb').outerHTML=`<div class="col" style="gap:14px">
-    ${pending?`<a href="#users" class="note n-warn" style="align-items:center">${svg('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5"/><path d="M17 13v6M14 16h6"/>','style="color:var(--warn)"')}<span class="grow"><b>ผู้สมัครรออนุมัติ ${pending} คน</b><br><span class="sm muted">แตะเพื่อกำหนดสิทธิ์</span></span>${IC.chev}</a>`:''}
+    ${pending?`<a href="#manage" onclick="mgTab='users';userTab='pending'" class="note n-warn" style="align-items:center">${svg('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5"/><path d="M17 13v6M14 16h6"/>','style="color:var(--warn)"')}<span class="grow"><b>ผู้สมัครรออนุมัติ ${pending} คน</b><br><span class="sm muted">แตะเพื่อกำหนดสิทธิ์</span></span>${IC.chev}</a>`:''}
     <div class="statg">
       <div class="stat"><b>${list.length}</b><span class="sm muted">พนักงานที่ทำงานอยู่</span></div>
       <div class="stat"><b>${S.sites.filter(s=>s.status==='active').length}</b><span class="sm muted">ไซต์งานที่เปิดอยู่</span></div>
       <div class="stat"><b style="${expiring.length?'color:var(--warn)':''}">${expiring.length}</b><span class="sm muted">บัตรใกล้หมดอายุ</span></div>
       <div class="stat"><b style="${low.length?'color:var(--bad)':''}">${low.length}</b><span class="sm muted">ดาวต่ำกว่า 3.5</span></div>
     </div>
+    ${attT.data?(()=>{ const a=attT.data, sites=S.sites.filter(s=>s.status==='active').length, r=repT.data||[];
+      const c=k=>a.filter(x=>k.includes(x.status)).length;
+      return `<div class="lgrid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px">
+      <a href="#att" class="card col" style="gap:10px;text-decoration:none;${a.length<list.length?'border-color:var(--accent)':''}" data-goatt="day"><div class="row"><h3 class="h2 grow">เช็คชื่อวันนี้</h3><span class="tag ${a.length>=list.length&&list.length?'t-ok':'t-warn'}">${a.length} / ${list.length} คน</span></div>
+        ${a.length?`<div class="row sm" style="gap:14px;flex-wrap:wrap"><span>มา <b>${c(['present','half'])}</b></span><span style="color:var(--warn)">สาย <b>${c(['late'])}</b></span><span>ลา <b>${c(['sick','personal','vacation'])}</b></span><span style="color:var(--bad)">ขาด <b>${c(['absent'])}</b></span><span>OT รวม <b>${a.reduce((t,x)=>t+Number(x.ot_hours||0),0)}</b> ชม.</span></div>`:'<span class="sm muted">ยังไม่ได้เช็คชื่อวันนี้ แตะเพื่อเริ่ม</span>'}</a>
+      <a href="#att" class="card col" style="gap:10px;text-decoration:none" data-goatt="site"><div class="row"><h3 class="h2 grow">คนงานหน้างานวันนี้</h3><span class="tag ${r.length>=sites&&sites?'t-ok':'t-warn'}">ส่งแล้ว ${r.length} / ${sites} ไซต์</span></div><span class="sm muted">รวม <b style="color:var(--ink);font-size:20px">${r.reduce((t,x)=>t+x.total,0)}</b> คน</span></a></div>`; })():''}
     <div class="lgrid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px">
       <div class="card col" style="gap:10px"><div class="row" style="justify-content:space-between"><h3 class="h2">พนักงานแยกตามตำแหน่ง</h3><span class="xs muted">${list.length} คน</span></div>
         ${rows.length?rows.map(([n,c],i)=>`<div class="bar"><span>${esc(n)}</span><div class="track"><i class="${i===0?'a':''}" style="width:${c/max*100}%"></i></div><b class="num">${c}</b></div>`).join('')
           :`<div class="empty"><b>ยังไม่มีพนักงาน</b><a href="#employees">เพิ่มพนักงานคนแรก</a></div>`}</div>
       <div class="card ${alerts.length?'card-l':'col'}">${alerts.length?alerts.join(''):`<h3 class="h2">การแจ้งเตือน</h3><span class="muted sm">ไม่มีบัตรใกล้หมดอายุหรือพนักงานใกล้ครบทดลองงาน</span>`}</div>
     </div></div>`;
-  const pd=$('[data-pend]'); if(pd&&pending){ pd.textContent=pending; pd.classList.remove('hidden'); }
+  $$('[data-goatt]').forEach(a=>a.addEventListener('click',()=>{ attTab=a.dataset.goatt; attDate=localISO(); }));
 }
 
 /* =====================================================================
@@ -661,7 +701,7 @@ async function pageProfile(id, readonly=false, preload=null){
   if(!readonly) setPage(head('ข้อมูลพนักงาน','',{back:'#employees', mActions:`<button class="btn btn-sm btn-acc" data-edit>แก้ไข</button>`, dActions:`<button class="btn btn-p" data-edit>แก้ไขข้อมูล</button>`}) + `<div id="pb"><div class="loading"><div class="spin"></div></div></div>`);
   let e=preload;
   if(!e){ const {data,error}=await sb.from('employees').select('*').eq('id',id).single(); if(error){ $('#pb').innerHTML=`<div class="card empty"><b>ไม่พบข้อมูลพนักงาน</b>${esc(errText(error))}</div>`; return; } e=data; }
-  const tabs=[['personal','ส่วนตัว'],['card','บัตร'],['addr','ที่อยู่'],['contact','ติดต่อ'],['job','งาน']]; if(!readonly) tabs.push(['hist','ประวัติ']);
+  const tabs=[['personal','ส่วนตัว'],['card','บัตร'],['addr','ที่อยู่'],['contact','ติดต่อ'],['job','งาน']]; if(S.hasPhase2) tabs.push(['stars','ดาว']); if(!readonly) tabs.push(['hist','ประวัติ']);
   const kv=(a,b)=>`<div class="kv"><span>${a}</span><span>${b||'-'}</span></div>`;
   const body={
     personal:()=>kv('ชื่อ (อังกฤษ)',esc([e.first_name_en,e.last_name_en].filter(Boolean).join(' ')))+kv('ชื่อเล่น',esc(e.nickname))+kv('เพศ',GENDER[e.gender])+kv('วันเกิด',e.birth_date?thaiDate(e.birth_date,false):'')+kv('อายุ',e.birth_date?ageText(e.birth_date):'')+kv('สัญชาติ',esc(e.nationality))+kv('สถานภาพ',MARITAL[e.marital_status])+(e.gender==='male'?kv('สถานะทางทหาร',MILITARY[e.military_status]):'')+kv('หมู่เลือด',e.blood_type?`${e.blood_type} <span class="tag t-ok" style="margin-left:4px">ยินยอม ${thaiDate(localISO(new Date(e.blood_consent_at)))}</span>`:''),
@@ -669,9 +709,10 @@ async function pageProfile(id, readonly=false, preload=null){
     addr:()=>`<div class="kv" style="flex-direction:column;gap:2px"><span>ที่อยู่ตามบัตรประชาชน</span><span style="text-align:left">${esc(addrText(e))}</span></div><div class="kv" style="flex-direction:column;gap:2px"><span>ที่อยู่ปัจจุบัน</span><span style="text-align:left">${e.cur_same?'เหมือนที่อยู่ตามบัตรประชาชน':esc(addrText(e,'cur'))}</span></div>`,
     contact:()=>kv('เบอร์มือถือ',e.phone?`<a href="tel:${digits(e.phone)}">${esc(e.phone)}</a>`:'')+kv('LINE ID',esc(e.line_id))+kv('อีเมล',esc(e.email))+kv('ธนาคาร',esc(e.bank_name))+kv('เลขบัญชี',`<span class="num">${esc(e.bank_account_no)}</span>`)+kv('ชื่อบัญชี',esc(e.bank_account_name)),
     job:()=>kv('ตำแหน่ง',esc(posName(e.position_id)))+kv('ประเภทการจ้าง',EMPTYPE[e.employment_type])+kv('สถานะ',e.status==='active'?'<span class="tag t-ok">ทำงานอยู่</span>':'<span class="tag t-bad">ลาออกแล้ว</span>')+kv('วันเริ่มงาน',e.start_date?thaiDate(e.start_date):'')+kv('อายุงาน',e.start_date?serviceText(e.start_date):'')+(e.probation_end?kv('ครบทดลองงาน',thaiDate(e.probation_end)):'')+(e.status==='resigned'?kv('วันที่ลาออก',e.resign_date?thaiDate(e.resign_date):'')+kv('เหตุผล',esc(e.resign_reason)):'')+kv('ค่าแรง',`<span class="num">${money(e.wage_rate)} บาท/${e.wage_type==='daily'?'วัน':'เดือน'}</span>`)+kv('ค่า OT',`<span class="num">${money(e.ot_rate)} บาท/ชม.</span>`),
-    hist:()=>'<div id="hl" style="padding:12px 0"><div class="spin"></div></div>'
+    hist:()=>'<div id="hl" style="padding:12px 0"><div class="spin"></div></div>',
+    stars:()=>'<div id="sh"><div class="spin" style="margin:16px auto"></div></div>'
   };
-  const stepOf={personal:0,card:1,addr:2,contact:3,job:4,hist:0};
+  const stepOf={personal:0,card:1,addr:2,contact:3,job:4,hist:0,stars:4};
   const draw=()=>{
     const target = readonly ? $('#ro') : $('#pb');
     target.innerHTML=`<div class="col" style="gap:12px;max-width:760px">
@@ -689,6 +730,8 @@ async function pageProfile(id, readonly=false, preload=null){
     $$('[data-tab]',target).forEach(b=>b.onclick=()=>{ profTab=b.dataset.tab; draw(); });
     hydratePhotos(target);
     if(profTab==='hist'&&!readonly) showHistory(e.id, $('#hl'));
+    if(profTab==='stars'){ const card=$('#sh',target).parentElement; if(!readonly&&isManager()){ card.insertAdjacentHTML('beforebegin',starAdjustHTML()); bindStarAdjust($('#adj',target), e.id, async()=>{ const {data}=await sb.from('employees').select('*').eq('id',e.id).single(); e=data||e; draw(); }); }
+      starHistoryHTML(e.id).then(h=>{ const el=$('#sh',target); if(el) el.outerHTML=h; }); }
     const d=$('[data-del]',target); if(d) d.onclick=async()=>{
       if(!await confirmBox(`ลบ ${fullName(e)} ถาวร? ถ้าพนักงานลาออก แนะนำให้เปลี่ยนสถานะเป็น "ลาออกแล้ว" แทน เพื่อเก็บประวัติไว้`,'ลบถาวร',true)) return;
       const {error}=await sb.from('employees').delete().eq('id',e.id); if(error) return toast(errText(error),true);
@@ -896,36 +939,286 @@ function openWizard(e, startStep=0, onSaved){
 }
 
 /* =====================================================================
-   ผู้ใช้ระบบ (แอดมิน)
+   ช่วงที่ 2: ค่าคงที่การเช็คชื่อ
    ===================================================================== */
+const ATT = {
+  present:{t:'มา',c:'t-ok',s:''}, late:{t:'สาย',c:'t-warn',s:'ส'}, half:{t:'ครึ่งวัน',c:'',s:'½'},
+  sick:{t:'ลาป่วย',c:'t-leave',s:'ป'}, personal:{t:'ลากิจ',c:'t-leave',s:'ก'}, vacation:{t:'ลาพักร้อน',c:'t-leave',s:'พ'}, absent:{t:'ขาด',c:'t-bad',s:'ข'}
+};
+const ATT_ORDER=['present','late','half','absent','sick','personal','vacation'];
+const addDays=(iso,n)=>{ const p=parseISO(iso); return localISO(new Date(p.y,p.m-1,p.d+n)); };
+const monthRange=iso=>{ const p=parseISO(iso); return [localISO(new Date(p.y,p.m-1,1)), localISO(new Date(p.y,p.m,0))]; };
+const dayLong=iso=>{ const p=parseISO(iso); const d=new Date(p.y,p.m-1,p.d); return `วัน${TH_DAYS[d.getDay()]}ที่ ${p.d} ${TH_MONTHS_S[p.m-1]} ${p.y+543}`; };
+const siteName=id=>S.sites.find(s=>s.id===id)?.name||'';
+const need03=()=>`<div class="card empty"><b>ยังไม่ได้อัปเดตฐานข้อมูลช่วงที่ 2</b>รันไฟล์ 03_attendance.sql ใน Supabase SQL Editor แล้วโหลดหน้านี้ใหม่</div>`;
+const workValue=st=>st==='present'||st==='late'?1:st==='half'?0.5:0;
+
+/* =====================================================================
+   เช็คชื่อ (ผู้บริหาร/แอดมิน): รายวัน / รายเดือน / หน้างาน
+   ===================================================================== */
+let attTab='day', attDate=localISO(), attMonth=localISO().slice(0,7);
+async function pageAtt(){
+  const tabs=[['day','พนักงานประจำ'],['month','รายเดือน'],['site','คนงานหน้างาน']];
+  const isDay=attTab!=='month';
+  const title=isDay?dayLong(attDate):`${TH_MONTHS[+attMonth.slice(5)-1]} ${+attMonth.slice(0,4)+543}`;
+  const nextDisabled=isDay?attDate>=localISO():attMonth>=localISO().slice(0,7);
+  setPage(head('เช็คชื่อ',title,{
+      lead:`<button class="ibtn" data-nav="-1" aria-label="ก่อนหน้า">${IC.back}</button>`,
+      mActions:`<button class="ibtn" data-nav="1" aria-label="ถัดไป" ${nextDisabled?'disabled style="opacity:.35"':''}>${IC.chev}</button>`,
+      dActions:`<button class="btn btn-sm" data-nav="-1" aria-label="ก่อนหน้า">‹</button><input class="in" type="${isDay?'date':'month'}" id="attPick" value="${isDay?attDate:attMonth}" max="${isDay?localISO():localISO().slice(0,7)}" style="width:auto"><button class="btn btn-sm" data-nav="1" aria-label="ถัดไป" ${nextDisabled?'disabled':''}>›</button>`}) +
+    `<div class="seg">${tabs.map(([k,t])=>`<button class="${attTab===k?'on':''}" data-at="${k}">${t}</button>`).join('')}</div><div id="ab"><div class="loading"><div class="spin"></div></div></div>`);
+  $$('[data-at]').forEach(b=>b.onclick=()=>{ attTab=b.dataset.at; pageAtt(); });
+  $$('[data-nav]').forEach(b=>b.onclick=()=>{ if(b.disabled) return; const n=+b.dataset.nav;
+    if(isDay){ const d=addDays(attDate,n); if(d<=localISO()) attDate=d; }
+    else { const p=parseISO(attMonth+'-01'); const d=localISO(new Date(p.y,p.m-1+n,1)).slice(0,7); if(d<=localISO().slice(0,7)) attMonth=d; }
+    pageAtt(); });
+  const pk=$('#attPick'); if(pk) pk.onchange=()=>{ if(!pk.value) return; if(isDay) attDate=pk.value>localISO()?localISO():pk.value; else attMonth=pk.value; pageAtt(); };
+  if(!S.hasPhase2){ $('#ab').outerHTML=need03(); return; }
+  if(attTab==='day') attDay(); else if(attTab==='month') attMonthView(); else attSites();
+}
+
+async function loadAttBase(from, to){
+  const [e,a]=await Promise.all([
+    sb.from('employees').select('id,first_name,last_name,nickname,photo_path,position_id,status,resign_date,start_date').order('first_name'),
+    sb.from('attendance').select('*').gte('work_date',from).lte('work_date',to)
+  ]);
+  if(e.error||a.error) throw (e.error||a.error);
+  const att=a.data||[];
+  const has=new Set(att.map(x=>x.employee_id));
+  const emps=(e.data||[]).filter(x=>(x.status==='active'&&(!x.start_date||x.start_date<=to))||has.has(x.id)||(x.resign_date&&x.resign_date>=from));
+  return {emps, att};
+}
+
+async function attDay(){
+  const date=attDate, [m0,m1]=monthRange(date);
+  let base, yday;
+  try{ base=await loadAttBase(m0, m1); }catch(err){ $('#ab').outerHTML=`<div class="note n-bad">${esc(errText(err))}</div>`; return; }
+  const emps=base.emps.filter(x=>base.att.some(a=>a.employee_id===x.id&&a.work_date===date)||(x.status==='active'&&(!x.start_date||x.start_date<=date)));
+  const rec={}; base.att.filter(a=>a.work_date===date).forEach(a=>rec[a.employee_id]=a);
+  const L={};
+  const val=id=>L[id]||rec[id]||{status:'present',ot_hours:0,site_id:null,no_notice:false,note:null};
+  const lateCount=(id)=>base.att.filter(a=>a.employee_id===id&&a.status==='late'&&a.work_date!==date&&a.work_date<date).length;
+  const host=document.createElement('div'); host.className='col'; host.style.gap='12px'; $('#ab').replaceWith(host);
+  function draw(){
+    const cnt={ok:0,late:0,leave:0,absent:0};
+    emps.forEach(e=>{ const s=val(e.id).status; if(s==='present'||s==='half') cnt.ok++; else if(s==='late') cnt.late++; else if(s==='absent') cnt.absent++; else cnt.leave++; });
+    const dirty=emps.filter(e=>L[e.id]||!rec[e.id]).length;
+    host.innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">
+        <div class="stat" style="padding:10px;align-items:center"><b style="font-size:22px;color:var(--ok)">${cnt.ok}</b><span class="xs muted">มา</span></div>
+        <div class="stat" style="padding:10px;align-items:center"><b style="font-size:22px;color:var(--warn)">${cnt.late}</b><span class="xs muted">สาย</span></div>
+        <div class="stat" style="padding:10px;align-items:center"><b style="font-size:22px">${cnt.leave}</b><span class="xs muted">ลา</span></div>
+        <div class="stat" style="padding:10px;align-items:center"><b style="font-size:22px;color:var(--bad)">${cnt.absent}</b><span class="xs muted">ขาด</span></div></div>
+      <div class="row" style="gap:8px;flex-wrap:wrap"><button class="chip" data-allin>${IC.check}ทุกคนมา</button><button class="chip" data-ysite>ไซต์ตามเมื่อวาน</button><span class="grow"></span><span class="xs muted">${emps.length} คน</span></div>
+      ${emps.length?`<div class="card card-l">${emps.map(e=>{ const v=val(e.id), a=ATT[v.status]; const unsaved=!rec[e.id]&&!L[e.id];
+        return `<button class="li" data-emp="${e.id}">${avatar(e,'','width:42px;height:42px')}<div class="grow"><b>${esc(shortName(e))}${e.nickname?` <span class="muted" style="font-weight:400">(${esc(e.nickname)})</span>`:''}</b><span class="xs muted">${unsaved?'ยังไม่บันทึก':(esc(siteName(v.site_id))||esc(v.note||''))}</span></div>
+          <span class="tag ${unsaved?'':a.c}" ${unsaved?'style="border:1px dashed var(--ink2);background:transparent"':''}>${a.t}</span>${Number(v.ot_hours)>0?`<span class="tag t-acc">OT ${Number(v.ot_hours)}</span>`:''}${L[e.id]?'<span class="dotmark" title="ยังไม่บันทึก"></span>':''}</button>`; }).join('')}</div>`
+        :`<div class="card empty"><b>ไม่มีพนักงานที่ต้องเช็คชื่อวันนี้</b>เพิ่มพนักงานได้ที่เมนูพนักงาน</div>`}
+      <div class="savebar"><div class="grow"><b class="sm">${dirty?`รอบันทึก ${dirty} คน`:'บันทึกครบแล้ว'}</b><div class="xs muted">แตะชื่อเพื่อเปลี่ยนสถานะหรือใส่ OT</div></div><button class="btn btn-p" data-save ${dirty?'':'disabled'}>บันทึก</button></div>`;
+    hydratePhotos(host);
+    $$('[data-emp]',host).forEach(b=>b.onclick=()=>{ const e=emps.find(x=>x.id===b.dataset.emp);
+      statusSheet(e, date, val(e.id), lateCount(e.id), v=>{ L[e.id]=v; draw(); }); });
+    $('[data-allin]',host).onclick=()=>{ emps.forEach(e=>{ L[e.id]={...val(e.id),status:'present',no_notice:false}; }); draw(); };
+    $('[data-ysite]',host).onclick=async()=>{
+      if(!yday){ const {data}=await sb.from('attendance').select('employee_id,site_id').eq('work_date',addDays(date,-1)); yday=data||[]; }
+      let n=0; yday.forEach(y=>{ if(y.site_id&&emps.some(e=>e.id===y.employee_id)){ L[y.employee_id]={...val(y.employee_id),site_id:y.site_id}; n++; } });
+      toast(n?`คัดลอกไซต์ของ ${n} คนจากเมื่อวาน`:'เมื่อวานยังไม่มีการบันทึกไซต์'); draw(); };
+    const sv=$('[data-save]',host); if(sv) sv.onclick=async()=>{
+      const rows=emps.filter(e=>L[e.id]||!rec[e.id]).map(e=>{ const v=val(e.id); return {employee_id:e.id,work_date:date,status:v.status,ot_hours:Number(v.ot_hours)||0,site_id:v.site_id||null,no_notice:!!v.no_notice,note:v.note||null}; });
+      busy(sv,true);
+      const {error}=await sb.from('attendance').upsert(rows,{onConflict:'employee_id,work_date'});
+      if(error){ busy(sv,false); return toast(errText(error),true); }
+      toast(`บันทึกการเช็คชื่อ ${rows.length} คนแล้ว`); pageAtt();
+    };
+  }
+  draw();
+}
+
+function statusSheet(e, date, cur, lateBefore, onDone){
+  const v={status:cur.status,ot_hours:Number(cur.ot_hours)||0,site_id:cur.site_id||null,no_notice:!!cur.no_notice,note:cur.note||''};
+  const R=S.settings.star_rules||{}, N=Math.max(1,+R.late_count||3);
+  const m=overlay(`<div class="modal" role="dialog" aria-modal="true" aria-label="สถานะ ${esc(shortName(e))}" style="max-width:520px"></div>`);
+  const box=$('.modal',m.el);
+  function info(){
+    if(v.status==='absent') return `<div class="note n-bad">${IC.info}<span>ขาดงานไม่แจ้ง ระบบหัก ${R.absent??1} ดาว</span></div>`;
+    if(v.status==='late'){ const k=lateBefore+1; const left=N-(k%N||N); return `<div class="note n-warn">${IC.clock}<span>สายครั้งที่ ${k} ของเดือนนี้ ${k%N===0?`ครบ ${N} ครั้ง ระบบหัก ${R.late_penalty??0.5} ดาว`:`อีก ${left} ครั้งจะถูกหัก ${R.late_penalty??0.5} ดาว`}</span></div>`; }
+    if((v.status==='personal'||v.status==='vacation')) return `<label class="chk"><input type="checkbox" data-nn ${v.no_notice?'checked':''}><span>ไม่ได้แจ้งล่วงหน้า <span class="muted">(ระบบหัก ${R.no_notice??0.5} ดาว)</span></span></label>`;
+    return '';
+  }
+  function draw(){
+    box.innerHTML=`<div class="row">${avatar(e)}<div class="grow"><b style="font-size:17px">${esc(shortName(e))}</b><div class="sm muted">${esc(posName(e.position_id))} · ${dayLong(date)}</div></div><button class="ibtn" data-x aria-label="ปิด" style="background:var(--surface2);color:var(--ink)">${IC.close}</button></div>
+      <div class="field"><label>สถานะ</label><div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">${ATT_ORDER.map(k=>`<button class="btn btn-sm stbtn ${v.status===k?'on '+ATT[k].c:''}" data-st="${k}" style="padding:0 4px${k==='vacation'?';grid-column:span 2':''}">${ATT[k].t}</button>`).join('')}</div></div>
+      ${info()}
+      <div class="g2d"><div class="field"><label>OT (ชั่วโมง)</label><div class="row" style="gap:6px"><button class="btn btn-sm" data-ot="-0.5" aria-label="ลด OT" style="width:44px;padding:0">−</button><input class="in num" data-otv value="${v.ot_hours}" inputmode="decimal" style="text-align:center;font-weight:700" aria-label="ชั่วโมง OT"><button class="btn btn-sm" data-ot="0.5" aria-label="เพิ่ม OT" style="width:44px;padding:0">+</button></div></div>
+        <div class="field"><label for="ss_site">ไซต์ที่ทำงาน</label><select class="in" id="ss_site"><option value="">ไม่ระบุ</option>${S.sites.filter(s=>s.status==='active'||s.id===v.site_id).map(s=>`<option value="${s.id}" ${v.site_id===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div></div>
+      <div class="field"><label for="ss_note">หมายเหตุ</label><input class="in" id="ss_note" value="${esc(v.note)}" placeholder="เช่น รถเสียระหว่างทาง"></div>
+      <button class="btn btn-p" data-ok style="min-height:52px">ตกลง</button>`;
+    hydratePhotos(box);
+    $('[data-x]',box).onclick=m.close;
+    $$('[data-st]',box).forEach(b=>b.onclick=()=>{ keep(); v.status=b.dataset.st; if(!['personal','vacation'].includes(v.status)) v.no_notice=false; draw(); });
+    $$('[data-ot]',box).forEach(b=>b.onclick=()=>{ keep(); v.ot_hours=Math.max(0,Math.min(24,(Number(v.ot_hours)||0)+Number(b.dataset.ot))); draw(); });
+    const nn=$('[data-nn]',box); if(nn) nn.onchange=()=>{ v.no_notice=nn.checked; };
+    $('[data-ok]',box).onclick=()=>{ keep(); const ot=Number(v.ot_hours); if(isNaN(ot)||ot<0||ot>24||ot*2!==Math.floor(ot*2)) return toast('OT ใส่ได้ทีละ 0.5 ชั่วโมง ไม่เกิน 24',true); m.close(); onDone({...v,ot_hours:ot}); };
+  }
+  function keep(){ const o=$('[data-otv]',box); if(o) v.ot_hours=o.value.replace(',','.'); const s=$('#ss_site',box); if(s) v.site_id=s.value?Number(s.value):null; const n=$('#ss_note',box); if(n) v.note=n.value.trim(); }
+  draw();
+}
+
+async function attMonthView(){
+  const [m0,m1]=monthRange(attMonth+'-01'), today=localISO();
+  let base; try{ base=await loadAttBase(m0,m1); }catch(err){ $('#ab').outerHTML=`<div class="note n-bad">${esc(errText(err))}</div>`; return; }
+  const days=[]; for(let d=m0; d<=m1; d=addDays(d,1)) days.push(d);
+  const map={}; base.att.forEach(a=>map[a.employee_id+'|'+a.work_date]=a);
+  const host=document.createElement('div'); host.className='col'; host.style.gap='12px'; $('#ab').replaceWith(host);
+  const tot=id=>{ let w=0,ot=0,late=0,leave=0,ab=0; base.att.filter(a=>a.employee_id===id).forEach(a=>{ w+=workValue(a.status); ot+=Number(a.ot_hours)||0; if(a.status==='late') late++; if(['sick','personal','vacation'].includes(a.status)) leave++; if(a.status==='absent') ab++; }); return {w,ot,late,leave,ab}; };
+  host.innerHTML=base.emps.length?`<div class="card" style="padding:0;overflow:hidden"><div class="mgrid-wrap"><table class="mgrid"><thead><tr><th class="sticky">พนักงาน</th>${days.map(d=>{ const p=parseISO(d), wd=new Date(p.y,p.m-1,p.d).getDay(); return `<th class="${wd===0?'sun':''} ${d===today?'today':''}">${p.d}<small>${TH_DAYS[wd].slice(0,2)}</small></th>`; }).join('')}<th>วัน</th><th>OT</th><th>สาย</th><th>ลา</th><th>ขาด</th></tr></thead><tbody>
+    ${base.emps.map(e=>{ const t=tot(e.id); return `<tr><td class="sticky"><a href="#emp/${e.id}"><b>${esc(shortName(e))}</b></a><small>${esc(posName(e.position_id))}</small></td>${days.map(d=>{ const a=map[e.id+'|'+d]; const fut=d>today;
+      return `<td><button class="mc ${a?'s-'+a.status:''}" data-c="${e.id}|${d}" ${fut?'disabled':''} aria-label="${esc(shortName(e))} ${d} ${a?ATT[a.status].t:'ยังไม่บันทึก'}">${a?ATT[a.status].s:''}${a&&Number(a.ot_hours)>0?'<i></i>':''}</button></td>`; }).join('')}
+      <td class="num tot">${t.w}</td><td class="num">${t.ot}</td><td class="num">${t.late||''}</td><td class="num">${t.leave||''}</td><td class="num">${t.ab||''}</td></tr>`; }).join('')}
+    </tbody></table></div></div>
+    <div class="row xs muted" style="gap:14px;flex-wrap:wrap"><span class="row" style="gap:6px"><i class="lg s-present"></i>มา</span><span><b style="color:var(--warn)">ส</b> สาย</span><span><b>½</b> ครึ่งวัน</span><span><b>ป</b> ลาป่วย</span><span><b>ก</b> ลากิจ</span><span><b>พ</b> ลาพักร้อน</span><span><b style="color:var(--bad)">ข</b> ขาด</span><span class="row" style="gap:6px"><i class="lg ot"></i>มี OT</span><span>แตะช่องเพื่อแก้ไขวันนั้น</span></div>`
+    :`<div class="card empty"><b>ยังไม่มีพนักงาน</b></div>`;
+  $$('[data-c]',host).forEach(b=>b.onclick=()=>{ const [id,d]=b.dataset.c.split('|'); const e=base.emps.find(x=>x.id===id); const cur=map[b.dataset.c]||{status:'present',ot_hours:0};
+    const lateBefore=base.att.filter(a=>a.employee_id===id&&a.status==='late'&&a.work_date<d).length;
+    statusSheet(e,d,cur,lateBefore,async v=>{ const {error}=await sb.from('attendance').upsert({employee_id:id,work_date:d,status:v.status,ot_hours:v.ot_hours,site_id:v.site_id||null,no_notice:!!v.no_notice,note:v.note||null},{onConflict:'employee_id,work_date'});
+      if(error) return toast(errText(error),true); toast('บันทึกแล้ว'); pageAtt(); }); });
+}
+
+async function attSites(){
+  const date=attDate;
+  const {data,error}=await sb.from('site_reports').select('*').eq('report_date',date);
+  if(error){ $('#ab').outerHTML=`<div class="note n-bad">${esc(errText(error))}</div>`; return; }
+  const reps={}; (data||[]).forEach(r=>reps[r.site_id]=r);
+  const sites=S.sites.filter(s=>s.status==='active'||reps[s.id]);
+  const total=(data||[]).reduce((a,r)=>a+r.total,0);
+  const host=document.createElement('div'); host.className='col'; host.style.gap='12px'; $('#ab').replaceWith(host);
+  host.innerHTML=`<div class="statg" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div class="stat"><b>${total}</b><span class="sm muted">คนงานหน้างาน</span></div><div class="stat"><b>${Object.keys(reps).length}<span class="muted" style="font-size:16px"> / ${sites.length}</span></b><span class="sm muted">ไซต์ที่ส่งรายงานแล้ว</span></div></div>
+    ${sites.length?`<div class="lgrid">${sites.map(s=>{ const r=reps[s.id]; return `<button class="card col" data-site="${s.id}" style="gap:10px;text-align:left;${r?'':'border-color:var(--warn)'}">
+      <div class="row"><div class="av" style="width:42px;height:42px;border:0;${r?'background:var(--okBg);color:var(--ok)':'background:var(--warnBg);color:var(--warn)'}">${IC.site}</div><div class="grow"><b>${esc(s.name)}</b><div class="xs muted">${r?`ส่งโดย ${esc(r.submitted_name||'')} ${new Date(r.updated_at).toTimeString().slice(0,5)}`:esc(s.location||'')}</div></div>${r?`<div style="text-align:right"><b class="num" style="font-size:20px">${r.total}</b><div class="xs muted">คน</div></div>`:'<span class="tag t-warn">ยังไม่ส่ง</span>'}</div>
+      ${r&&Object.keys(r.counts||{}).length?`<div class="row" style="gap:6px;flex-wrap:wrap">${Object.entries(r.counts).filter(([,n])=>n>0).map(([k,n])=>`<span class="tag">${esc(k)} ${n}</span>`).join('')}</div>`:''}${r?.note?`<div class="sm muted">${esc(r.note)}</div>`:''}</button>`; }).join('')}</div>`
+      :`<div class="card empty"><b>ยังไม่มีไซต์งานที่เปิดอยู่</b>เพิ่มไซต์ได้ที่เมนูจัดการ</div>`}
+    <span class="xs muted">ผู้บริหารแตะการ์ดเพื่อบันทึกหรือแก้รายงานแทนโฟร์แมนได้</span>`;
+  $$('[data-site]',host).forEach(b=>b.onclick=()=>{ const s=S.sites.find(x=>x.id==b.dataset.site);
+    const m=overlay(`<div class="modal" style="max-width:520px" role="dialog" aria-modal="true"><div class="row"><div class="grow"><b style="font-size:17px">${esc(s.name)}</b><div class="sm muted">${dayLong(date)}</div></div><button class="ibtn" data-x aria-label="ปิด" style="background:var(--surface2);color:var(--ink)">${IC.close}</button></div><div id="re"></div></div>`);
+    $('[data-x]',m.el).onclick=m.close;
+    reportEditor($('#re',m.el), s, date, reps[s.id], ()=>{ m.close(); pageAtt(); }); });
+}
+
+/* =====================================================================
+   รายงานคนงานหน้างาน (ตัวแก้ไขใช้ร่วมกัน)
+   ===================================================================== */
+function reportEditor(box, site, date, existing, onSaved, canEdit=true){
+  const counts={}; (S.settings.site_trades||[]).forEach(t=>counts[t]=0);
+  Object.entries(existing?.counts||{}).forEach(([k,n])=>counts[k]=n);
+  let note=existing?.note||'';
+  function draw(){
+    const total=Object.values(counts).reduce((a,b)=>a+(+b||0),0);
+    box.innerHTML=`${existing?`<div class="note n-info" style="margin-bottom:12px">${IC.check}<span>ส่งแล้วโดย ${esc(existing.submitted_name||'')} เวลา ${new Date(existing.updated_at).toTimeString().slice(0,5)}${canEdit?' แก้ไขได้ถึงเที่ยงคืน':''}</span></div>`:''}
+      <div class="card card-l">${Object.keys(counts).map(t=>`<div class="li"><span class="grow" style="font-weight:600">${esc(t)}</span>${canEdit?`<button class="btn btn-sm" data-dec="${esc(t)}" aria-label="ลด ${esc(t)}" style="width:44px;padding:0">−</button>`:''}<b class="num" style="width:40px;text-align:center;font-size:18px;${counts[t]?'':'color:var(--ink2)'}">${counts[t]}</b>${canEdit?`<button class="btn btn-sm ${counts[t]?'btn-p':''}" data-inc="${esc(t)}" aria-label="เพิ่ม ${esc(t)}" style="width:44px;padding:0">+</button>`:''}</div>`).join('')}</div>
+      ${canEdit?`<div class="field" style="margin-top:12px"><label for="rn">หมายเหตุ</label><textarea class="in" id="rn" placeholder="เช่น ทีมช่างปูนของช่างสมหมาย เทพื้นชั้น 2">${esc(note)}</textarea></div>`:(note?`<p class="sm muted">${esc(note)}</p>`:'')}
+      <div class="row" style="margin-top:12px"><div class="grow"><div class="xs muted">รวมทั้งหมด</div><b class="num" style="font-size:24px;line-height:1.1">${total} คน</b></div>${canEdit?`<button class="btn btn-p" data-send style="min-width:150px">${existing?'บันทึกการแก้ไข':'ส่งรายงาน'}</button>`:''}</div>`;
+    const rn=$('#rn',box); if(rn) rn.oninput=()=>{ note=rn.value; };
+    $$('[data-inc]',box).forEach(b=>b.onclick=()=>{ counts[b.dataset.inc]=(+counts[b.dataset.inc]||0)+1; draw(); });
+    $$('[data-dec]',box).forEach(b=>b.onclick=()=>{ counts[b.dataset.dec]=Math.max(0,(+counts[b.dataset.dec]||0)-1); draw(); });
+    const sd=$('[data-send]',box); if(sd) sd.onclick=async()=>{
+      const clean={}; Object.entries(counts).forEach(([k,n])=>{ if(+n>0) clean[k]=+n; });
+      if(!Object.keys(clean).length&&!(await confirmBox('ยังไม่มีคนงานเลย ส่งรายงานว่าวันนี้ไม่มีคนงานใช่ไหม','ส่งรายงาน'))) return;
+      busy(sd,true,'กำลังส่ง...');
+      const {data,error}=await sb.from('site_reports').upsert({site_id:site.id,report_date:date,counts:clean,note:note.trim()||null},{onConflict:'site_id,report_date'}).select('*').single();
+      if(error){ busy(sd,false); return toast(errText(error),true); }
+      toast(existing?'บันทึกการแก้ไขแล้ว':'ส่งรายงานแล้ว'); onSaved&&onSaved(data);
+    };
+  }
+  draw();
+}
+
+let repSite=null;
+async function pageReport(){
+  const today=localISO();
+  setPage(head('ส่งคนงานหน้างาน',dayLong(today)) + `<div id="rb"><div class="loading"><div class="spin"></div></div></div>`);
+  if(!S.hasPhase2){ $('#rb').outerHTML=need03(); return; }
+  const {data:asg}=await sb.from('site_assignments').select('site_id').eq('user_id',S.profile.id);
+  const mine=(asg||[]).map(a=>S.sites.find(s=>s.id===a.site_id)).filter(s=>s&&s.status==='active');
+  if(!mine.length){ $('#rb').outerHTML=`<div class="card empty"><b>ยังไม่ได้กำหนดไซต์ที่รับผิดชอบ</b>ติดต่อแอดมินเพื่อกำหนดไซต์ให้</div>`; return; }
+  if(!repSite||!mine.some(s=>s.id===repSite)) repSite=mine[0].id;
+  const {data:reps}=await sb.from('site_reports').select('*').in('site_id',mine.map(s=>s.id)).gte('report_date',addDays(today,-7)).order('report_date',{ascending:false});
+  const todayRep={}; (reps||[]).filter(r=>r.report_date===today).forEach(r=>todayRep[r.site_id]=r);
+  const site=mine.find(s=>s.id===repSite);
+  const host=document.createElement('div'); host.className='col'; host.style.cssText='gap:12px;max-width:640px'; $('#rb').replaceWith(host);
+  const hist=(reps||[]).filter(r=>r.site_id===repSite&&r.report_date!==today);
+  host.innerHTML=`<div class="chips">${mine.map(s=>`<button class="chip ${s.id===repSite?'on':''}" data-rs="${s.id}">${esc(s.name)}${todayRep[s.id]?' <span class="tag t-ok" style="height:20px">ส่งแล้ว</span>':''}</button>`).join('')}</div>
+    <div id="re"></div>
+    ${hist.length?`<h3 class="h2" style="margin-top:8px">ย้อนหลัง 7 วัน</h3><div class="card card-l">${hist.map(r=>`<div class="li"><div class="grow"><b>${dayLong(r.report_date)}</b><span class="xs muted">${Object.entries(r.counts||{}).map(([k,n])=>`${esc(k)} ${n}`).join(' · ')||'ไม่มีคนงาน'}</span></div><b class="num">${r.total} คน</b></div>`).join('')}</div>`:''}`;
+  $$('[data-rs]',host).forEach(b=>b.onclick=()=>{ repSite=+b.dataset.rs; pageReport(); });
+  reportEditor($('#re',host), site, today, todayRep[repSite], ()=>pageReport());
+}
+
+/* =====================================================================
+   ดาว: ประวัติและปรับดาว
+   ===================================================================== */
+async function starHistoryHTML(empId){
+  const {data,error}=await sb.from('star_events').select('*').eq('employee_id',empId).order('created_at',{ascending:false}).limit(60);
+  if(error) return `<span class="hint bad">${esc(errText(error))}</span>`;
+  if(!data.length) return '<div class="empty" style="padding:20px"><b>ยังไม่มีประวัติดาว</b>เริ่มต้นที่ 5 ดาว</div>';
+  return data.map(s=>{ const neg=Number(s.delta)<0, rs=s.source==='reset';
+    return `<div class="li" style="align-items:flex-start;${s.voided_at?'opacity:.55':''}"><b class="num" style="width:48px;font-size:16px;color:${rs?'var(--ink)':neg?'var(--bad)':'var(--ok)'};${s.voided_at?'text-decoration:line-through':''}">${rs?'= 5':(neg?'':'+')+Number(s.delta)}</b>
+      <div class="grow"><b style="font-size:14.5px;${s.voided_at?'text-decoration:line-through':''}">${esc(s.reason)}</b><span class="xs muted">${thaiDate(s.event_date)}${s.created_by_name?` · ${esc(s.created_by_name)}`:''}${s.voided_at?` · คืนดาวแล้ว (${esc(s.void_reason||'')})`:''}</span></div>
+      <span class="tag ${s.source==='manual'?'t-acc':''}">${s.source==='auto'?'อัตโนมัติ':s.source==='reset'?'รีเซ็ต':'ผู้บริหาร'}</span></div>`; }).join('');
+}
+function starAdjustHTML(){
+  return `<div class="card col" style="gap:12px" id="adj"><div class="seg"><button class="on" data-sg="-1">หักดาว</button><button data-sg="1">คืนดาว</button></div>
+    <div class="field"><label>จำนวน</label><div class="chips">${[0.5,1,1.5,2].map((n,i)=>`<button class="chip ${i===0?'on':''}" data-amt="${n}">${n}</button>`).join('')}</div></div>
+    <div class="field"><label for="adjr">เหตุผล *</label><input class="in" id="adjr" placeholder="เช่น ไม่สวมอุปกรณ์เซฟตี้หน้างาน"></div>
+    <button class="btn btn-p" data-apply>หัก 0.5 ดาว</button></div>`;
+}
+function bindStarAdjust(root, empId, onDone){
+  let sg=-1, amt=0.5; const btn=$('[data-apply]',root);
+  const lab=()=>btn.textContent=`${sg<0?'หัก':'คืน'} ${amt} ดาว`;
+  $$('[data-sg]',root).forEach(b=>b.onclick=()=>{ sg=+b.dataset.sg; $$('[data-sg]',root).forEach(x=>x.classList.toggle('on',x===b)); lab(); });
+  $$('[data-amt]',root).forEach(b=>b.onclick=()=>{ amt=+b.dataset.amt; $$('[data-amt]',root).forEach(x=>x.classList.toggle('on',x===b)); lab(); });
+  btn.onclick=async()=>{ const r=$('#adjr',root).value.trim(); if(!r) return toast('ระบุเหตุผล',true);
+    busy(btn,true); const {data,error}=await sb.rpc('adjust_stars',{p_emp:empId,p_delta:sg*amt,p_reason:r});
+    if(error){ busy(btn,false); return toast(errText(error),true); } toast(`ดาวปัจจุบัน ${Number(data).toFixed(1)}`); onDone(); };
+}
+
+/* =====================================================================
+   จัดการ: ผู้ใช้ / ไซต์งาน / ตำแหน่ง / กติกาดาว
+   ===================================================================== */
+let mgTab='sites';
+function pageManage(){
+  const tabs=[...(isAdmin()?[['users','ผู้ใช้']]:[]),['sites','ไซต์งาน'],['pos','ตำแหน่ง'],['stars','กติกาดาว']];
+  if(!tabs.some(t=>t[0]===mgTab)) mgTab=tabs[0][0];
+  setPage(head('จัดการ','ใช้ร่วมกันทั้งระบบ') + `<div class="col" style="max-width:760px"><div class="chips scroll" style="margin:0">${tabs.map(([k,t])=>`<button class="chip ${mgTab===k?'on':''}" data-mg="${k}">${t}</button>`).join('')}</div><div id="mg" class="col"><div class="loading"><div class="spin"></div></div></div></div>`);
+  $$('[data-mg]').forEach(b=>b.onclick=()=>{ mgTab=b.dataset.mg; pageManage(); });
+  ({users:mgUsers,sites:mgSites,pos:mgPos,stars:mgStars})[mgTab]();
+}
+const mgAfter=async msg=>{ toast(msg); await loadRefs(); pageManage(); };
+
 let userTab='pending';
-async function pageUsers(){
-  setPage(head('ผู้ใช้ระบบ','อนุมัติและกำหนดสิทธิ์') + `<div id="ub"><div class="loading"><div class="spin"></div></div></div>`);
+async function mgUsers(){
   const [u,e,a]=await Promise.all([ sb.from('profiles').select('*').order('created_at',{ascending:false}), sb.from('employees').select('id,first_name,last_name,nickname,position_id,status').order('first_name'), sb.from('site_assignments').select('*') ]);
-  if(u.error){ $('#ub').innerHTML=`<div class="note n-bad">${esc(errText(u.error))}</div>`; return; }
+  if(u.error){ $('#mg').innerHTML=`<div class="note n-bad">${esc(errText(u.error))}</div>`; return; }
   const users=u.data||[], emps=e.data||[], assigns=a.data||[];
   const groups={ pending:users.filter(x=>x.role==='pending'&&x.is_active), active:users.filter(x=>x.role!=='pending'&&x.is_active), blocked:users.filter(x=>!x.is_active) };
   const sites=S.sites.filter(s=>s.status==='active');
   const list=groups[userTab];
-  $('#ub').outerHTML=`<div class="col" style="max-width:760px">
-    <div class="seg">${[['pending',`รออนุมัติ ${groups.pending.length}`],['active',`ใช้งานอยู่ ${groups.active.length}`],['blocked',`ระงับ ${groups.blocked.length}`]].map(([k,t])=>`<button class="${userTab===k?'on':''}" data-ut="${k}">${t}</button>`).join('')}</div>
+  $('#mg').innerHTML=`<div class="seg">${[['pending',`รออนุมัติ ${groups.pending.length}`],['active',`ใช้งานอยู่ ${groups.active.length}`],['blocked',`ระงับ ${groups.blocked.length}`]].map(([k,t])=>`<button class="${userTab===k?'on':''}" data-ut="${k}">${t}</button>`).join('')}</div>
     ${list.length?list.map(p=>{ const mine=assigns.filter(x=>x.user_id===p.id).map(x=>x.site_id); const me=p.id===S.profile.id; const role=p.role==='pending'?'employee':p.role;
       return `<div class="card col" data-u="${p.id}" data-role="${role}" style="${p.role==='pending'?'border-color:var(--accent)':''}">
         <div class="row"><div class="av round">${esc((p.display_name||'?').charAt(0))}</div><div class="grow"><b>${esc(p.display_name)}${me?' <span class="tag">คุณ</span>':''}</b><div class="sm muted" style="overflow-wrap:anywhere">${esc(p.email)}${p.phone?` · ${esc(p.phone)}`:''}</div><div class="xs muted">สมัคร ${thaiDate(localISO(new Date(p.created_at)))}</div></div>${p.role==='pending'?'<span class="tag t-warn">ใหม่</span>':`<span class="tag">${ROLES[p.role]}</span>`}</div>
         <div class="field"><label>สิทธิ์การใช้งาน</label><div class="chips">${['employee','foreman','executive','admin'].map(r=>`<button class="chip ${role===r?'on':''}" data-r="${r}">${ROLES[r]}</button>`).join('')}</div></div>
-        <div class="field ${role==='foreman'?'':'hidden'}" data-sitesbox><label>ไซต์ที่รับผิดชอบ</label><div class="chips">${sites.length?sites.map(s=>`<button class="chip ${mine.includes(s.id)?'on':''}" data-site="${s.id}">${mine.includes(s.id)?IC.check:''}${esc(s.name)}</button>`).join(''):'<span class="hint">ยังไม่มีไซต์ เพิ่มได้ที่หน้าตั้งค่า</span>'}</div></div>
+        <div class="field ${role==='foreman'?'':'hidden'}" data-sitesbox><label>ไซต์ที่รับผิดชอบ</label><div class="chips">${sites.length?sites.map(s=>`<button class="chip ${mine.includes(s.id)?'on':''}" data-site="${s.id}">${mine.includes(s.id)?IC.check:''}${esc(s.name)}</button>`).join(''):'<span class="hint">ยังไม่มีไซต์ เพิ่มได้ที่แท็บไซต์งาน</span>'}</div></div>
         <div class="field"><label>ผูกกับทะเบียนพนักงาน</label><select class="in" data-emp><option value="">ไม่ผูก</option>${emps.map(x=>`<option value="${x.id}" ${p.employee_id===x.id?'selected':''}>${esc(shortName(x))}${x.nickname?` (${esc(x.nickname)})`:''} ${esc(posName(x.position_id))}</option>`).join('')}</select></div>
         <div class="row" style="gap:10px">${userTab==='pending'?`<button class="btn btn-bad grow" data-block>ปฏิเสธ</button><button class="btn btn-p" style="flex:2" data-save>อนุมัติ</button>`
           :userTab==='active'?`${me?'':'<button class="btn btn-bad grow" data-block>ระงับบัญชี</button>'}<button class="btn btn-p" style="flex:2" data-save>บันทึก</button>`
           :`<button class="btn btn-p grow" data-unblock>เปิดใช้งานอีกครั้ง</button>`}</div>
       </div>`; }).join('')
-      :`<div class="card empty"><b>${userTab==='pending'?'ไม่มีผู้สมัครรออนุมัติ':userTab==='active'?'ยังไม่มีผู้ใช้':'ไม่มีบัญชีที่ถูกระงับ'}</b>${userTab==='pending'?'เมื่อมีคนสมัคร รายชื่อจะขึ้นที่นี่':''}</div>`}
-  </div>`;
-  $$('[data-ut]').forEach(b=>b.onclick=()=>{ userTab=b.dataset.ut; pageUsers(); });
+      :`<div class="card empty"><b>${userTab==='pending'?'ไม่มีผู้สมัครรออนุมัติ':userTab==='active'?'ยังไม่มีผู้ใช้':'ไม่มีบัญชีที่ถูกระงับ'}</b>${userTab==='pending'?'เมื่อมีคนสมัคร รายชื่อจะขึ้นที่นี่':''}</div>`}`;
+  $$('[data-ut]').forEach(b=>b.onclick=()=>{ userTab=b.dataset.ut; mgUsers(); });
   $$('[data-u]').forEach(card=>{
     const id=card.dataset.u;
     $$('[data-r]',card).forEach(b=>b.onclick=()=>{ card.dataset.role=b.dataset.r; $$('[data-r]',card).forEach(x=>x.classList.toggle('on',x===b)); $('[data-sitesbox]',card).classList.toggle('hidden',b.dataset.r!=='foreman'); });
-    $$('[data-site]',card).forEach(b=>b.onclick=()=>{ b.classList.toggle('on'); const name=esc(S.sites.find(s=>s.id==b.dataset.site)?.name||''); b.innerHTML=(b.classList.contains('on')?IC.check:'')+name; });
+    $$('[data-site]',card).forEach(b=>b.onclick=()=>{ b.classList.toggle('on'); b.innerHTML=(b.classList.contains('on')?IC.check:'')+esc(S.sites.find(s=>s.id==b.dataset.site)?.name||''); });
     const upd=async(patch, btn, msg)=>{
       busy(btn,true,'...');
       const {error}=await sb.from('profiles').update(patch).eq('id',id);
@@ -937,7 +1230,7 @@ async function pageUsers(){
         if(add.length){ const r=await sb.from('site_assignments').insert(add.map(site_id=>({user_id:id,site_id}))); if(r.error){ busy(btn,false); return toast(errText(r.error),true);} }
         if(rem.length){ const r=await sb.from('site_assignments').delete().eq('user_id',id).in('site_id',rem); if(r.error){ busy(btn,false); return toast(errText(r.error),true);} }
       }
-      toast(msg); if(id===S.profile.id) await enter(); else pageUsers();
+      toast(msg); if(id===S.profile.id) await enter(); else mgUsers();
     };
     const sv=$('[data-save]',card); if(sv) sv.onclick=()=>upd({role:card.dataset.role, employee_id:$('[data-emp]',card).value||null}, sv, userTab==='pending'?'อนุมัติแล้ว':'บันทึกสิทธิ์แล้ว');
     const bl=$('[data-block]',card); if(bl) bl.onclick=async()=>{ if(await confirmBox(userTab==='pending'?'ปฏิเสธผู้สมัครนี้? บัญชีจะถูกย้ายไปที่ "ระงับ"':'ระงับบัญชีนี้? ผู้ใช้จะเข้าระบบไม่ได้จนกว่าจะเปิดใช้งานอีกครั้ง', userTab==='pending'?'ปฏิเสธ':'ระงับ', true)) upd({is_active:false}, bl, 'ระงับบัญชีแล้ว'); };
@@ -945,29 +1238,49 @@ async function pageUsers(){
   });
 }
 
-/* =====================================================================
-   ตั้งค่า
-   ===================================================================== */
-let setTab='sites';
-function pageSettings(){
-  const sitesHTML=`<form class="card col" id="as" style="gap:10px"><b>เพิ่มไซต์งานใหม่</b><input class="in" name="n" placeholder="ชื่อไซต์ เช่น บ้านคุณไพศาล" aria-label="ชื่อไซต์"><input class="in" name="l" placeholder="ที่ตั้ง (ไม่บังคับ)" aria-label="ที่ตั้ง"><button class="btn btn-p btn-sm">เพิ่มไซต์</button></form>
-    <div class="card card-l">${S.sites.length?S.sites.map(s=>`<div class="li" style="${s.status==='active'?'':'opacity:.7'}"><div class="av" style="${s.status==='active'?'background:var(--okBg);color:var(--ok);border:0':''}">${IC.site}</div><div class="grow"><b>${esc(s.name)}</b><span class="sm muted">${esc(s.location||'')}</span></div><button class="btn btn-sm" data-ts="${s.id}">${s.status==='active'?'ปิดไซต์':'เปิดอีกครั้ง'}</button></div>`).join(''):'<div class="empty"><b>ยังไม่มีไซต์งาน</b>เพิ่มไซต์แรกจากฟอร์มด้านบน</div>'}</div>`;
-  const posHTML=`<form class="card row" id="ap" style="gap:10px"><input class="in grow" name="n" placeholder="ชื่อตำแหน่งใหม่" aria-label="ชื่อตำแหน่งใหม่"><button class="btn btn-p btn-sm">เพิ่ม</button></form>
-    <div class="card card-l">${S.positions.map(p=>`<div class="li"><span class="grow">${esc(p.name)}</span><button class="btn btn-sm" data-ren="${p.id}">เปลี่ยนชื่อ</button><button class="btn btn-sm btn-bad" data-delp="${p.id}" aria-label="ลบ ${esc(p.name)}">ลบ</button></div>`).join('')}</div>`;
-  setPage(head('ตั้งค่า','ใช้ร่วมกันทั้งระบบ') + `<div class="col" style="max-width:760px"><div class="seg"><button class="${setTab==='sites'?'on':''}" data-st="sites">ไซต์งาน</button><button class="${setTab==='pos'?'on':''}" data-st="pos">ตำแหน่งงาน</button></div>${setTab==='sites'?sitesHTML:posHTML}</div>`);
-  $$('[data-st]').forEach(b=>b.onclick=()=>{ setTab=b.dataset.st; pageSettings(); });
-  const after=async msg=>{ toast(msg); await loadRefs(); pageSettings(); };
-  const as=$('#as'); if(as) as.onsubmit=async ev=>{ ev.preventDefault(); const n=as.n.value.trim(); if(!n) return toast('กรอกชื่อไซต์',true);
-    const {error}=await sb.from('sites').insert({name:n,location:as.l.value.trim()||null}); if(error) return toast(errText(error),true); after('เพิ่มไซต์แล้ว'); };
+function mgSites(){
+  const trades=[...(S.settings.site_trades||[])];
+  $('#mg').innerHTML=`<form class="card col" id="as" style="gap:10px"><b>เพิ่มไซต์งานใหม่</b><input class="in" name="n" placeholder="ชื่อไซต์ เช่น บ้านคุณไพศาล" aria-label="ชื่อไซต์"><input class="in" name="l" placeholder="ที่ตั้ง (ไม่บังคับ)" aria-label="ที่ตั้ง"><button class="btn btn-p btn-sm">เพิ่มไซต์</button></form>
+    <div class="card card-l">${S.sites.length?S.sites.map(s=>`<div class="li" style="${s.status==='active'?'':'opacity:.7'}"><div class="av" style="${s.status==='active'?'background:var(--okBg);color:var(--ok);border:0':''}">${IC.site}</div><div class="grow"><b>${esc(s.name)}</b><span class="sm muted">${esc(s.location||'')}</span></div><button class="btn btn-sm" data-ts="${s.id}">${s.status==='active'?'ปิดไซต์':'เปิดอีกครั้ง'}</button></div>`).join(''):'<div class="empty"><b>ยังไม่มีไซต์งาน</b>เพิ่มไซต์แรกจากฟอร์มด้านบน</div>'}</div>
+    ${S.hasPhase2?`<div class="card col" style="gap:10px"><b>ประเภทช่างในรายงานหน้างาน</b><div class="chips" id="trd">${trades.map((t,i)=>`<span class="chip">${esc(t)}<button type="button" class="linkbtn" data-rt="${i}" aria-label="ลบ ${esc(t)}" style="padding:0 0 0 4px;text-decoration:none">×</button></span>`).join('')}</div>
+      <form class="row" id="at" style="gap:8px"><input class="in grow" name="t" placeholder="เพิ่มประเภทช่าง เช่น ช่างกระเบื้อง" aria-label="ประเภทช่างใหม่"><button class="btn btn-sm">เพิ่ม</button></form></div>`:''}`;
+  const as=$('#as'); as.onsubmit=async ev=>{ ev.preventDefault(); const n=as.n.value.trim(); if(!n) return toast('กรอกชื่อไซต์',true);
+    const {error}=await sb.from('sites').insert({name:n,location:as.l.value.trim()||null}); if(error) return toast(errText(error),true); mgAfter('เพิ่มไซต์แล้ว'); };
   $$('[data-ts]').forEach(b=>b.onclick=async()=>{ const s=S.sites.find(x=>x.id==b.dataset.ts);
-    const {error}=await sb.from('sites').update({status:s.status==='active'?'closed':'active'}).eq('id',s.id); if(error) return toast(errText(error),true); after(s.status==='active'?'ปิดไซต์แล้ว':'เปิดไซต์แล้ว'); });
-  const ap=$('#ap'); if(ap) ap.onsubmit=async ev=>{ ev.preventDefault(); const n=ap.n.value.trim(); if(!n) return;
-    const {error}=await sb.from('positions').insert({name:n,sort_order:S.positions.length+1}); if(error) return toast(/duplicate/.test(error.message)?'มีตำแหน่งนี้แล้ว':errText(error),true); after('เพิ่มตำแหน่งแล้ว'); };
+    const {error}=await sb.from('sites').update({status:s.status==='active'?'closed':'active'}).eq('id',s.id); if(error) return toast(errText(error),true); mgAfter(s.status==='active'?'ปิดไซต์แล้ว':'เปิดไซต์แล้ว'); });
+  const saveTrades=async list=>{ const {error}=await sb.from('app_settings').update({value:list,updated_at:new Date().toISOString()}).eq('key','site_trades'); if(error) return toast(errText(error),true); mgAfter('บันทึกประเภทช่างแล้ว'); };
+  $$('[data-rt]').forEach(b=>b.onclick=()=>{ trades.splice(+b.dataset.rt,1); saveTrades(trades); });
+  const at=$('#at'); if(at) at.onsubmit=ev=>{ ev.preventDefault(); const t=at.t.value.trim(); if(!t) return; if(trades.includes(t)) return toast('มีประเภทนี้แล้ว',true); trades.push(t); saveTrades(trades); };
+}
+
+function mgPos(){
+  $('#mg').innerHTML=`<form class="card row" id="ap" style="gap:10px"><input class="in grow" name="n" placeholder="ชื่อตำแหน่งใหม่" aria-label="ชื่อตำแหน่งใหม่"><button class="btn btn-p btn-sm">เพิ่ม</button></form>
+    <div class="card card-l">${S.positions.map(p=>`<div class="li"><span class="grow">${esc(p.name)}</span><button class="btn btn-sm" data-ren="${p.id}">เปลี่ยนชื่อ</button><button class="btn btn-sm btn-bad" data-delp="${p.id}" aria-label="ลบ ${esc(p.name)}">ลบ</button></div>`).join('')}</div>`;
+  const ap=$('#ap'); ap.onsubmit=async ev=>{ ev.preventDefault(); const n=ap.n.value.trim(); if(!n) return;
+    const {error}=await sb.from('positions').insert({name:n,sort_order:S.positions.length+1}); if(error) return toast(/duplicate/.test(error.message)?'มีตำแหน่งนี้แล้ว':errText(error),true); mgAfter('เพิ่มตำแหน่งแล้ว'); };
   $$('[data-ren]').forEach(b=>b.onclick=async()=>{ const p=S.positions.find(x=>x.id==b.dataset.ren); const n=await promptBox('ชื่อตำแหน่งใหม่',p.name); if(!n||n===p.name) return;
-    const {error}=await sb.from('positions').update({name:n}).eq('id',p.id); if(error) return toast(errText(error),true); after('เปลี่ยนชื่อแล้ว'); });
+    const {error}=await sb.from('positions').update({name:n}).eq('id',p.id); if(error) return toast(errText(error),true); mgAfter('เปลี่ยนชื่อแล้ว'); });
   $$('[data-delp]').forEach(b=>b.onclick=async()=>{ const p=S.positions.find(x=>x.id==b.dataset.delp);
     if(!await confirmBox(`ลบตำแหน่ง "${p.name}"? พนักงานในตำแหน่งนี้จะกลายเป็น "ไม่ระบุตำแหน่ง"`,'ลบ',true)) return;
-    const {error}=await sb.from('positions').delete().eq('id',p.id); if(error) return toast(errText(error),true); after('ลบตำแหน่งแล้ว'); });
+    const {error}=await sb.from('positions').delete().eq('id',p.id); if(error) return toast(errText(error),true); mgAfter('ลบตำแหน่งแล้ว'); });
+}
+
+function mgStars(){
+  if(!S.hasPhase2){ $('#mg').innerHTML=need03(); return; }
+  const R={...S.settings.star_rules};
+  const defs=[['absent','ขาดงานไม่แจ้ง','หักดาวต่อครั้ง',0.5,0,5],['late_count','มาสาย','จำนวนครั้งต่อเดือนที่ครบแล้วหัก',1,1,10],['late_penalty','มาสายครบจำนวน','หักดาว',0.5,0,5],['no_notice','ลากิจ/พักร้อนไม่แจ้งล่วงหน้า','หักดาวต่อครั้ง',0.5,0,5]];
+  function draw(){
+    $('#mg').innerHTML=`<div class="card card-l">${defs.map(([k,t,s,st])=>`<div class="li"><div class="grow"><b style="font-size:14.5px">${t}</b><span class="xs muted">${s}</span></div><button class="btn btn-sm" data-dn="${k}" aria-label="ลด ${t}" style="width:40px;padding:0">−</button><b class="num" style="width:36px;text-align:center">${R[k]}</b><button class="btn btn-sm" data-up="${k}" aria-label="เพิ่ม ${t}" style="width:40px;padding:0">+</button></div>`).join('')}</div>
+      <div class="note n-info">${IC.info}<span>ลาป่วย ครึ่งวัน และลาที่แจ้งล่วงหน้า ไม่ถูกหักดาว ดาวเต็ม 5 ปรับครั้งละ 0.5 ต่ำสุด 0 กติกาใหม่มีผลกับการเช็คชื่อครั้งถัดไป รายการที่หักไปแล้วไม่เปลี่ยน</span></div>
+      <button class="btn btn-p" data-save>บันทึกกติกา</button>
+      <div class="card col" style="gap:10px;border-color:var(--bad)"><b>เริ่มรอบใหม่</b><span class="sm muted">ตั้งดาวของพนักงานที่ทำงานอยู่ทุกคนกลับเป็น 5 ดาว ประวัติเดิมยังเก็บไว้ครบ</span><button class="btn btn-bad" data-reset>รีเซ็ตดาวทุกคนเป็น 5</button></div>`;
+    defs.forEach(([k,,,st,mn,mx])=>{ $(`[data-up="${k}"]`).onclick=()=>{ R[k]=Math.min(mx,+(Number(R[k])+st).toFixed(1)); draw(); }; $(`[data-dn="${k}"]`).onclick=()=>{ R[k]=Math.max(mn,+(Number(R[k])-st).toFixed(1)); draw(); }; });
+    $('[data-save]').onclick=async e=>{ busy(e.target,true); const {error}=await sb.from('app_settings').update({value:R,updated_at:new Date().toISOString()}).eq('key','star_rules'); if(error){ busy(e.target,false); return toast(errText(error),true);} mgAfter('บันทึกกติกาดาวแล้ว'); };
+    $('[data-reset]').onclick=async()=>{ if(!await confirmBox('รีเซ็ตดาวพนักงานที่ทำงานอยู่ทุกคนกลับเป็น 5 ดาว?','รีเซ็ต',true)) return;
+      const r=await promptBox('เหตุผล / ชื่อรอบ','เริ่มรอบใหม่ ปี '+(new Date().getFullYear()+543),'รีเซ็ตดาว'); if(r===null) return;
+      const {data,error}=await sb.rpc('reset_all_stars',{p_reason:r}); if(error) return toast(errText(error),true); toast(`รีเซ็ตดาว ${data} คนแล้ว`); };
+  }
+  draw();
 }
 
 /* =====================================================================
@@ -1003,8 +1316,10 @@ async function pageMe(){
         <div class="grow"><b style="font-size:17px">${esc(fullName(e))}</b><div class="sm muted">${esc(posName(e.position_id))} · ${esc(e.emp_code)}</div><div style="margin-top:4px">${starBadge(e.stars)} <span class="sm muted">จาก 5 ดาว</span></div></div></div>
         <div class="card-l" style="padding:0"><div class="kv"><span>อายุงาน</span><span>${e.start_date?serviceText(e.start_date):'-'}</span></div><div class="kv"><span>บัตรประชาชนหมดอายุ</span><span>${e.id_expiry_date?thaiDate(e.id_expiry_date):'-'}</span></div></div>
         <button class="btn btn-sm" id="seeCard" style="align-self:flex-start">ดูบัตรพนักงาน</button></div>`;
+      if(S.hasPhase2) $('#myEmp').insertAdjacentHTML('beforeend',`<div class="card card-l" style="margin-top:14px"><div style="padding:12px 0 4px"><b>ประวัติดาวของฉัน</b></div><div id="msh"><div class="spin" style="margin:12px auto"></div></div></div>`);
       hydratePhotos($('#myEmp'));
       $('#seeCard').onclick=()=>readOnlyCard(e);
+      if(S.hasPhase2) starHistoryHTML(e.id).then(h=>{ const el=$('#msh'); if(el) el.outerHTML=h; });
       return;
     }
   }
