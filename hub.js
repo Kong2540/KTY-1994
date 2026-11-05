@@ -1,0 +1,336 @@
+/* =====================================================================
+   KTY Hub — โครงหน้า: แถบเมนูด้านข้าง / ลิ้นชักเมนูบนมือถือ / ตัวเลือกไซต์
+   ===================================================================== */
+const MOD = {
+  att:      { t:'เช็คชื่อ',            hue:'#2E9E5B', i:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>' },
+  daily:    { t:'รายงานประจำวัน',      hue:'#2F6FDB', i:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>' },
+  materials:{ t:'เบิกจ่ายวัสดุ',        hue:'#E07A1F', i:'<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>' },
+  borrow:   { t:'ยืม-คืนอุปกรณ์',       hue:'#7A5AF8', i:'<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>' },
+  issues:   { t:'ปัญหาหน้างาน',         hue:'#D64545', i:'<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/>' },
+  people:   { t:'พนักงาน',             hue:'#7A5AF8', i:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><circle cx="17" cy="9" r="2.6"/><path d="M16 14.6c2.7-.2 4.8 1.5 5.5 4.4"/>' },
+  payroll:  { t:'เงินเดือน',            hue:'#14918C', i:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/>' },
+  sites:    { t:'ไซต์งาน',             hue:'#5B6B73', i:'<path d="M3 21h18M5 21V10l7-5 7 5v11M10 21v-5h4v5"/>' },
+  manage:   { t:'จัดการระบบ',          hue:'#5B6B73', i:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>' },
+  home:     { t:'หน้าหลัก',            hue:'#5B6B73', i:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>' },
+  tasks:    { t:'งานที่รอ',             hue:'#5B6B73', i:'<path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6l1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"/>' },
+  stars:    { t:'ดาวและประวัติ',         hue:'#C99400', i:'<path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z"/>' },
+  me:       { t:'ข้อมูลของฉัน',          hue:'#5B6B73', i:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4.2 4.2-6.5 8-6.5s7 2.3 8 6.5"/>' }
+};
+const SOON = { daily:'รายงานประจำวันรอบเย็น ดึงคนงานจากรอบเช้า รูปถ่ายลง Google Drive และส่งสรุปเข้ากลุ่ม LINE', materials:'ขอเบิกแบบตะกร้า อนุมัติ จ่ายของ รับของที่ไซต์ งบ BOQ และสต็อก (ย้ายจากระบบเดิม)', borrow:'ขอยืม-คืนเครื่องมือ ติดตามว่าอุปกรณ์อยู่ไซต์ไหน', issues:'โฟร์แมนแจ้งปัญหาหน้างานพร้อมรูป ผู้บริหารได้รับแจ้งเตือนทันที', payroll:'คำนวณค่าแรงจากการเช็คชื่อ ประกันสังคม และสลิปเงินเดือน' };
+const modIcon = (k, size=34) => `<span class="micon" style="--h:${MOD[k].hue};width:${size}px;height:${size}px;border-radius:${Math.round(size*.3)}px">${svg(MOD[k].i,`style="width:${Math.round(size*.56)}px;height:${Math.round(size*.56)}px"`)}</span>`;
+
+S.badges = S.badges || {};
+S.site = (()=>{ try{ return localStorage.getItem('kty-site')||''; }catch(e){ return ''; } })();
+const mySiteIds = () => isManager() ? S.sites.filter(s=>s.status==='active').map(s=>s.id) : (S.mySites||[]);
+const siteLabel = () => S.site ? (S.sites.find(s=>String(s.id)===S.site)?.name || 'ไซต์ที่เลือก') : (isManager() ? 'ทุกไซต์' : 'ไซต์ของฉันทั้งหมด');
+const hasMod = (m, roles) => isManager() || (S.modules||[]).some(r=>r.module===m && (!roles || roles.includes(r.role)));
+
+/* โหลดข้อมูลเฉพาะผู้ใช้หลังเข้าสู่ระบบ */
+async function loadUserCtx(){
+  const [a,m]=await Promise.all([ sb.from('site_assignments').select('site_id').eq('user_id',S.profile.id), sb.from('module_roles').select('*').eq('user_id',S.profile.id) ]);
+  S.mySites=(a.data||[]).map(x=>x.site_id); S.modules=m.error?[]:(m.data||[]); S.hasHub=!m.error;
+  if(S.site && !isManager() && !S.mySites.includes(+S.site)) S.site='';
+}
+
+/* เมนูทั้งหมดตามสิทธิ์ (ใช้ทั้งแถบด้านข้าง/ลิ้นชัก) */
+function navSections(){
+  const p=S.profile, mgr=isManager(), out=[];
+  if(mgr){
+    out.push({t:'ภาพรวม', items:[{k:'home',m:'home'},{k:'tasks',m:'tasks',b:'tasks'}]});
+    out.push({t:'ระบบงาน', items:[
+      {k:'att',m:'att',b:'att'}, {k:'roll',m:'att',t:'เช็คชื่อแบบติ๊ก',sub:1}, {k:'att/month',m:'att',t:'ตารางรายเดือน',sub:1}, {k:'att/site',m:'att',t:'คนงานหน้างาน',sub:1,b:'crew'},
+      {k:'soon/daily',m:'daily'}, {k:'soon/materials',m:'materials'}, {k:'soon/borrow',m:'borrow'}, {k:'soon/issues',m:'issues'},
+      {k:'employees',m:'people'}, {k:'soon/payroll',m:'payroll'} ]});
+    out.push({t:'ตั้งค่า', items:[{k:'manage/sites',m:'sites'},{k:'manage',m:'manage',b:'users'}]});
+  } else {
+    const it=[{k:'home',m:'home'}];
+    if(p.can_check) it.push({k:'roll',m:'att',t:'เช็คชื่อหน้าไซต์งาน'});
+    if(p.role==='foreman'||hasMod('daily')) it.push({k:'report',m:'daily',t:'รายงานประจำวัน',b:'crew'});
+    if(hasMod('materials')) it.push({k:'soon/materials',m:'materials',t:'ขอเบิกวัสดุ'});
+    if(hasMod('borrow')) it.push({k:'soon/borrow',m:'borrow',t:'ขอยืมอุปกรณ์'});
+    if(hasMod('issues')) it.push({k:'soon/issues',m:'issues',t:'รายงานปัญหาหน้างาน'});
+    out.push({t:'งานของฉัน', items:it});
+    out.push({t:'ของฉัน', items:[{k:'me/stars',m:'stars'},{k:'me',m:'me'}]});
+  }
+  return out;
+}
+function bottomItems(){
+  const p=S.profile;
+  if(isManager()) return [{k:'home',m:'home',t:'หน้าหลัก'},{k:'att',m:'att',t:'เช็คชื่อ'},{k:'tasks',m:'tasks',t:'งานที่รอ',b:'tasks'},{k:'employees',m:'people',t:'พนักงาน'},{k:'me',m:'me',t:'ฉัน'}];
+  const it=[{k:'home',m:'home',t:'หน้าหลัก'}];
+  if(p.can_check) it.push({k:'roll',m:'att',t:'เช็คชื่อ'});
+  if(p.role==='foreman'||hasMod('daily')) it.push({k:'report',m:'daily',t:'รายงาน',b:'crew'});
+  it.push({k:'me',m:'me',t:'ฉัน'});
+  return it;
+}
+const keyOf = h => (h||'home').replace('#','') || 'home';
+function isActive(k, cur){ if(k===cur) return true; const [a]=k.split('/'), [b]=cur.split('/'); return !k.includes('/') && a===b && !['soon','manage','att','me'].includes(a) ? true : (k==='att'&&cur==='att'); }
+
+function navItemHTML(x, cur){
+  const meta=MOD[x.m]||MOD.home, t=x.t||meta.t, on=x.k===cur;
+  const b=x.b?`<span class="nbadge hidden" data-badge="${x.b}"></span>`:'';
+  return `<a href="#${x.k}" class="nitem ${x.sub?'sub':''} ${on?'on':''}">${x.sub?'<span class="nsp"></span>':modIcon(x.m)}<span class="grow">${t}</span>${b}</a>`;
+}
+function sitePickerHTML(){ return `<button class="sitepick" data-sitepick><span class="micon" style="--h:#F2B705;background:var(--bar);color:#F2B705;width:34px;height:34px;border-radius:10px">${svg(MOD.sites.i,'style="width:18px;height:18px"')}</span><span class="grow" style="text-align:left"><span class="xs muted" style="display:block">แสดงข้อมูลของ</span><b style="font-size:14.5px">${esc(siteLabel())}</b></span>${svg('<path d="M6 9l6 6 6-6"/>','style="width:18px;color:var(--ink2)"')}</button>`; }
+function themeSegHTML(){ const th=curTheme(); return `<div class="seg" style="padding:3px">${[['auto','ตามเครื่อง'],['light','สว่าง'],['dark','มืด']].map(([k,t])=>`<button class="${th===k?'on':''}" data-th="${k}" style="min-height:34px">${t}</button>`).join('')}</div>`; }
+function navBodyHTML(cur){
+  return `${sitePickerHTML()}${navSections().map(s=>`<div class="nsec">${s.t}</div>${s.items.map(x=>navItemHTML(x,cur)).join('')}`).join('')}
+    <div class="nfoot">${themeSegHTML()}<button class="linkbtn" data-logout style="color:var(--bad);text-decoration:none;font-weight:600;padding:8px 10px;text-align:left">ออกจากระบบ</button></div>`;
+}
+function bindNav(root){
+  $$('[data-sitepick]',root).forEach(b=>b.onclick=pickSite);
+  $$('[data-th]',root).forEach(b=>b.onclick=()=>{ applyTheme(b.dataset.th); $$('[data-th]').forEach(x=>x.classList.toggle('on',x.dataset.th===b.dataset.th)); });
+  $$('[data-logout]',root).forEach(b=>b.onclick=logout);
+  paintBadges();
+}
+function paintBadges(){ $$('[data-badge]').forEach(el=>{ const v=S.badges[el.dataset.badge]; el.textContent=v||''; el.classList.toggle('hidden',!v); }); }
+
+function route(){
+  $$('.sheet-bg').forEach(x=>x.remove()); document.body.style.overflow='';
+  const cur=keyOf(location.hash); const [k,id]=cur.split('/');
+  if(k==='users'){ mgTab='users'; } if(k==='settings'){ mgTab='sites'; }
+  const mgr=isManager(), p=S.profile;
+  const can={ home:1, tasks:1, me:1, soon:1, att:mgr, employees:mgr, emp:mgr, manage:mgr, users:mgr, settings:mgr, roll:mgr||p.can_check, report:p.role==='foreman'||mgr||hasMod('daily') };
+  const key=can[k]?k:'home';
+  if(key==='att'&&id&&['day','month','site'].includes(id)) attTab=id;
+  if(key==='manage'&&id) mgTab=id;
+  if(key==='me'&&id==='stars') profTab='stars';
+  renderShell(can[k]?cur:'home');
+  ({home:pageHome, tasks:pageTasks, att:pageAtt, employees:pageEmployees, emp:()=>pageProfile(id), manage:pageManage, users:pageManage, settings:pageManage, report:pageReport, roll:pageRoll, me:()=>id==='stars'?pageMyStars():pageMe(), soon:()=>pageSoon(id)})[key]();
+  scrollTo(0,0);
+}
+function renderShell(cur){
+  const bi=bottomItems();
+  $('#app').innerHTML=`<div class="app">
+    <aside class="side"><div class="brand" style="margin:0 6px 14px"><div class="mark"><span>KTY</span></div><div><b>KTY Hub</b><div class="xs muted">${COMPANY}</div></div></div>${navBodyHTML(cur)}</aside>
+    <div class="appwrap"><div id="page"><div class="loading"><div><div class="spin"></div>กำลังโหลด</div></div></div></div>
+    <nav class="bnav" aria-label="เมนูหลัก">${bi.map(x=>`<a href="#${x.k}" class="${(x.k===cur||(x.k!=='home'&&cur.startsWith(x.k)))?'on':''}"><span class="pill" style="position:relative">${svg(MOD[x.m].i)}${x.b?`<span class="ndot hidden" data-badge="${x.b}"></span>`:''}</span>${x.t}</a>`).join('')}</nav></div>`;
+  bindNav($('.side'));
+}
+function openDrawer(){
+  const cur=keyOf(location.hash);
+  const m=overlay(`<aside class="drawer" role="dialog" aria-modal="true" aria-label="เมนู"><div class="row" style="gap:12px;padding:4px 4px 12px"><div class="av round" style="width:46px;height:46px">${esc((S.profile.display_name||'?').charAt(0))}</div><div class="grow"><b style="font-size:16px">${esc(S.profile.display_name)}</b><div class="xs muted">${ROLES[S.profile.role]}${S.profile.can_check&&!isManager()?' · ผู้เช็คชื่อ':''}</div></div></div>${navBodyHTML(cur)}</aside>`, false);
+  m.el.classList.add('drawer-bg');
+  const d=$('.drawer',m.el); bindNav(d);
+  $$('a',d).forEach(a=>a.addEventListener('click',()=>m.close()));
+  let x0=null; d.addEventListener('touchstart',e=>{x0=e.touches[0].clientX;},{passive:true}); d.addEventListener('touchend',e=>{ if(x0!==null&&e.changedTouches[0].clientX-x0<-60) m.close(); x0=null; });
+}
+async function pickSite(){
+  const ids=mySiteIds(); const list=S.sites.filter(s=>ids.includes(s.id));
+  const opts=[['',isManager()?'ทุกไซต์':'ไซต์ของฉันทั้งหมด'],...list.map(s=>[String(s.id),s.name+(s.code?` (${s.code})`:'')])];
+  const m=overlay(`<div class="modal" role="dialog" aria-modal="true"><h3 class="h2" style="font-size:18px">แสดงข้อมูลของ</h3><div class="card card-l" style="box-shadow:none">${opts.map(([v,t])=>`<button class="li" data-v="${v}">${modIcon('sites',30)}<span class="grow">${esc(t)}</span>${S.site===v?svg('<path d="M5 12l5 5 9-10"/>','style="color:var(--ok)"'):''}</button>`).join('')}</div><button class="btn" data-x>ปิด</button></div>`);
+  $('[data-x]',m.el).onclick=m.close;
+  $$('[data-v]',m.el).forEach(b=>b.onclick=()=>{ S.site=b.dataset.v; try{ localStorage.setItem('kty-site',S.site); }catch(_){} m.close(); $$('.drawer-bg').forEach(x=>x.remove()); document.body.style.overflow=''; route(); });
+}
+async function logout(){ if(await confirmBox('ออกจากระบบตอนนี้?','ออกจากระบบ')) sb.auth.signOut(); }
+function head(title, sub='', o={}){
+  const menuBtn=o.back?`<a href="${o.back}" class="ibtn" aria-label="ย้อนกลับ">${IC.back}</a>`:`<button class="ibtn" data-drawer aria-label="เปิดเมนู">${svg('<path d="M4 7h16M4 12h16M4 17h16"/>')}</button>`;
+  return `<header class="appbar stripe">${menuBtn}${o.lead||''}<h1>${title}${sub?`<small>${sub}</small>`:''}</h1>${o.mActions||''}</header>
+    <div class="main">${o.noDesk?'':`<div class="phead"><div>${o.back?`<a href="${o.back}" class="linkbtn" style="text-decoration:none">‹ ย้อนกลับ</a>`:''}<h1>${title}</h1>${sub?`<p>${sub}</p>`:''}</div><div class="row">${o.dActions||''}</div></div>`}`;
+}
+const setPage = html => { $('#page').innerHTML = html + '</div>'; const d=$('[data-drawer]'); if(d) d.onclick=openDrawer; };
+
+/* =====================================================================
+   งานที่รอ (รวมจากทุกระบบ) — ใช้ทั้งหน้าหลักและหน้า "งานที่รอ"
+   ===================================================================== */
+async function collectTasks(){
+  const today=localISO(), mgr=isManager(), tasks=[];
+  const siteIds=S.site?[+S.site]:mySiteIds();
+  const q=[ S.hasPhase2&&siteIds.length?sb.from('site_reports').select('site_id,total,updated_at').eq('report_date',today).in('site_id',siteIds):Promise.resolve({data:[]}) ];
+  if(mgr){ q.push(isAdmin()?sb.from('profiles').select('id,role,is_active'):Promise.resolve({data:[]}), sb.from('employees').select('id,first_name,last_name,status,id_expiry_date,employment_type,probation_end'), S.hasPhase2?sb.from('attendance').select('employee_id,site_id').eq('work_date',today):Promise.resolve({data:[]})); }
+  const [rep,prof,emp,att]=await Promise.all(q);
+  const sent=new Set((rep.data||[]).map(r=>r.site_id));
+  const missing=siteIds.filter(id=>!sent.has(id)).map(id=>S.sites.find(s=>s.id===id)).filter(Boolean);
+  missing.forEach(s=>tasks.push({m:'daily',t:`${s.name} ยังไม่ส่งคนงานเช้า`,sub:mgr?'แตะเพื่อบันทึกแทน':'ส่งก่อนเริ่มงาน',tag:'ยังไม่ส่ง',c:'t-warn',href:mgr?'#att/site':'#report'}));
+  let crew=(rep.data||[]).reduce((a,r)=>a+r.total,0);
+  if(mgr){
+    const pend=(prof?.data||[]).filter(x=>x.role==='pending'&&x.is_active).length;
+    if(pend) tasks.unshift({m:'people',t:`ผู้สมัครใหม่รออนุมัติ ${pend} คน`,sub:'กำหนดสิทธิ์และไซต์',tag:'ใหม่',c:'t-acc',href:'#manage/users'});
+    const act=(emp?.data||[]).filter(e=>e.status==='active');
+    const done=new Set((att?.data||[]).map(a=>a.employee_id)); const todo=act.filter(e=>!done.has(e.id)).length;
+    if(S.hasPhase2&&todo) tasks.push({m:'att',t:`เช็คชื่อวันนี้ยังไม่ครบ ${todo} คน`,sub:`บันทึกแล้ว ${done.size} จาก ${act.length} คน`,tag:'ค้าง',c:'t-warn',href:'#roll'});
+    act.filter(e=>{ const d=daysUntil(e.id_expiry_date); return d!==null&&d<=60; }).forEach(e=>tasks.push({m:'people',t:`บัตรประชาชน ${shortName(e)} ${daysUntil(e.id_expiry_date)<0?'หมดอายุแล้ว':'ใกล้หมดอายุ'}`,sub:thaiDate(e.id_expiry_date),tag:'บัตร',c:'t-warn',href:`#emp/${e.id}`}));
+    act.filter(e=>e.employment_type==='probation'&&daysUntil(e.probation_end)!==null&&daysUntil(e.probation_end)<=30).forEach(e=>tasks.push({m:'people',t:`${shortName(e)} ใกล้ครบทดลองงาน`,sub:thaiDate(e.probation_end),tag:'ทดลองงาน',c:'',href:`#emp/${e.id}`}));
+    S.badges.users=pend||0; S.badges.att=todo||0;
+    return {tasks, act:act.length, done:done.size, sent:sent.size, sites:siteIds.length, crew, pend};
+  }
+  return {tasks, sent:sent.size, sites:siteIds.length, crew, rep:rep.data||[]};
+}
+const taskHTML = x => `<a href="${x.href}" class="li" style="text-decoration:none">${modIcon(x.m,40)}<div class="grow"><b style="font-size:14.5px">${esc(x.t)}</b><span class="xs muted">${esc(x.sub||'')}</span></div>${x.tag?`<span class="tag ${x.c}">${esc(x.tag)}</span>`:''}${svg('<path d="M9 6l6 6-6 6"/>','style="width:18px;color:var(--ink2)"')}</a>`;
+
+function tileHTML(k, href, label, badgeKey, soon){
+  return `<a href="${href}" class="tile ${soon?'soon':''}">${modIcon(k,64)}${badgeKey?`<span class="tbadge hidden" data-badge="${badgeKey}"></span>`:''}<span class="tl">${label||MOD[k].t}</span>${soon?'<span class="tag" style="height:18px;font-size:10.5px">เร็ว ๆ นี้</span>':''}</a>`;
+}
+
+/* =====================================================================
+   หน้าหลัก Hub (แยกตามบทบาท)
+   ===================================================================== */
+async function pageHome(){
+  const p=S.profile, mgr=isManager(), first=(p.display_name||'').split(' ')[0];
+  const lead=`<div class="mark" style="width:40px;height:40px"><span>KTY</span></div>`;
+  const chips = (mgr||(S.mySites||[]).length>1) ? `<div class="chips scroll" style="margin:0 -16px">${[['',mgr?'ทุกไซต์':'ทุกไซต์ของฉัน'],...S.sites.filter(s=>mySiteIds().includes(s.id)).map(s=>[String(s.id),s.name])].map(([v,t])=>`<button class="chip ${S.site===v?'on':''}" data-site="${v}">${esc(t)}</button>`).join('')}</div>` : '';
+  setPage(head(`สวัสดี คุณ${esc(first)}`, `${esc(siteLabel())} · ${todayLong()}`, {mActions:`<span class="tag t-acc">${ROLES[p.role]}</span>`}) + chips + `<div id="hb"><div class="loading"><div class="spin"></div></div></div>`);
+  $$('[data-site]').forEach(b=>b.onclick=()=>{ S.site=b.dataset.site; try{ localStorage.setItem('kty-site',S.site); }catch(_){} route(); });
+  let tiles='';
+  if(mgr){
+    tiles=[tileHTML('att','#att','เช็คชื่อ','att'), tileHTML('daily','#soon/daily',null,'crew',true), tileHTML('materials','#soon/materials',null,null,true), tileHTML('borrow','#soon/borrow',null,null,true), tileHTML('issues','#soon/issues',null,null,true), tileHTML('people','#employees'), tileHTML('payroll','#soon/payroll',null,null,true), tileHTML('sites','#manage/sites'), tileHTML('manage','#manage','จัดการ','users')].join('');
+  } else {
+    const t=[];
+    if(p.can_check) t.push(tileHTML('att','#roll','เช็คชื่อหน้าไซต์งาน'));
+    if(p.role==='foreman'||hasMod('daily')) t.push(tileHTML('daily','#report','รายงานประจำวัน','crew'));
+    if(hasMod('materials')) t.push(tileHTML('materials','#soon/materials','ขอเบิกวัสดุ',null,true));
+    if(hasMod('borrow')) t.push(tileHTML('borrow','#soon/borrow','ขอยืมอุปกรณ์',null,true));
+    if(hasMod('issues')) t.push(tileHTML('issues','#soon/issues','รายงานปัญหาหน้างาน',null,true));
+    t.push(tileHTML('stars','#me/stars','ดาวของฉัน'), tileHTML('me','#me','ข้อมูลของฉัน'));
+    tiles=t.join('');
+  }
+  let d; try{ d=await collectTasks(); }catch(err){ $('#hb').outerHTML=`<div class="note n-bad">${esc(errText(err))}</div>`; return; }
+  S.badges.tasks=d.tasks.length; S.badges.crew=Math.max(0,d.sites-d.sent);
+  let top='';
+  if(mgr){
+    top=`<div class="card sumstrip"><div><b class="num">${d.done}<small>/${d.act}</small></b><span>เช็คชื่อวันนี้</span></div><div><b class="num">${d.sent}<small>/${d.sites}</small></b><span>ไซต์ส่งคนงานเช้า</span></div><div><b class="num">${d.crew}</b><span>คนงานหน้างาน</span></div><div><b class="num" style="${d.tasks.length?'color:var(--warn)':''}">${d.tasks.length}</b><span>งานที่รอคุณ</span></div></div>`;
+  } else if(p.role==='foreman'||hasMod('daily')){
+    const sites=S.sites.filter(s=>(S.site?[+S.site]:S.mySites).includes(s.id)&&s.status==='active');
+    const rep={}; (d.rep||[]).forEach(r=>rep[r.site_id]=r);
+    top=sites.length?`<div class="card col" style="gap:12px"><h3 class="h2">วันนี้ที่ไซต์ของคุณ</h3><div class="timeline">${sites.map(s=>{ const r=rep[s.id]; return `<div class="row"><span class="dot ${r?'done':'now'}">${r?svg('<path d="M5 12l5 5 9-10"/>','style="width:14px;height:14px;stroke-width:3"'):''}</span><div class="grow"><b>${esc(s.name)}</b><div class="sm muted">${r?`ส่งคนงานเช้าแล้ว ${r.total} คน · ${new Date(r.updated_at).toTimeString().slice(0,5)}`:'ยังไม่ส่งคนงานเช้า'}</div></div></div>`; }).join('')}
+      <div class="row" style="opacity:.6"><span class="dot"></span><div><b>รายงานเย็น</b><div class="sm muted">เปิดใช้เร็ว ๆ นี้</div></div></div></div><a href="#report" class="btn ${d.sites>d.sent?'btn-p':''}">${d.sites>d.sent?'ส่งคนงานเช้า':'ดู / แก้ไขรายงานวันนี้'}</a></div>`:`<div class="card empty"><b>ยังไม่ได้กำหนดไซต์ที่รับผิดชอบ</b>ติดต่อแอดมิน</div>`;
+  }
+  $('#hb').outerHTML=`<div class="col" style="gap:16px">${top}<div class="tiles">${tiles}</div>
+    ${!mgr&&hasMod('issues')?`<div class="note n-warn" style="align-items:center">${modIcon('issues',30)}<span>รายงานปัญหาหน้างาน จะส่งแจ้งเตือนถึงผู้บริหารทันที</span></div>`:''}
+    <div class="row" style="justify-content:space-between"><h3 class="h2">${mgr?'งานที่รอคุณ':'งานของฉันวันนี้'}</h3>${d.tasks.length>4?'<a href="#tasks" class="sm" style="color:var(--ink2)">ดูทั้งหมด</a>':''}</div>
+    ${d.tasks.length?`<div class="card card-l">${d.tasks.slice(0,4).map(taskHTML).join('')}</div>`:`<div class="card empty" style="padding:24px"><b>ไม่มีงานค้าง</b>เรียบร้อยดีทุกอย่าง</div>`}</div>`;
+  paintBadges();
+}
+async function pageTasks(){
+  setPage(head('งานที่รอ',siteLabel()) + `<div id="tb"><div class="loading"><div class="spin"></div></div></div>`);
+  const d=await collectTasks(); S.badges.tasks=d.tasks.length;
+  $('#tb').outerHTML=d.tasks.length?`<div class="card card-l" style="max-width:760px">${d.tasks.map(taskHTML).join('')}</div>`:`<div class="card empty"><b>ไม่มีงานค้าง</b>เรียบร้อยดีทุกอย่าง</div>`;
+  paintBadges();
+}
+function pageSoon(k){
+  const meta=MOD[k]||MOD.home;
+  setPage(head(meta.t,'อยู่ระหว่างพัฒนา') + `<div class="card col" style="align-items:center;text-align:center;gap:14px;padding:36px 20px;max-width:560px">${modIcon(k in MOD?k:'home',84)}<h2 style="margin:0;font-size:22px">${meta.t}</h2><p class="muted" style="margin:0">${esc(SOON[k]||'ระบบนี้กำลังพัฒนา')}</p><span class="tag t-acc">เร็ว ๆ นี้ใน KTY Hub</span></div>`);
+}
+async function pageMyStars(){
+  setPage(head('ดาวของฉัน','คะแนนความประพฤติ') + `<div id="ms" style="max-width:640px"><div class="loading"><div class="spin"></div></div></div>`);
+  if(!S.profile.employee_id){ $('#ms').innerHTML=`<div class="note n-info">${IC.info}<span>บัญชีนี้ยังไม่ได้ผูกกับทะเบียนพนักงาน</span></div>`; return; }
+  const {data:e}=await sb.from('employees').select('id,stars').eq('id',S.profile.employee_id).single();
+  $('#ms').innerHTML=`<div class="idc" style="text-align:center;padding-bottom:28px"><div style="margin-bottom:6px">${stars5(e?.stars??5)}</div><b style="font-size:30px">${Number(e?.stars??5).toFixed(1)}</b> <span style="color:#C2D0D3">/ 5 ดาว</span></div><div class="card card-l" style="margin-top:14px" id="msh"><div class="spin" style="margin:16px auto"></div></div>`;
+  $('#msh').innerHTML=await starHistoryHTML(S.profile.employee_id);
+}
+
+/* =====================================================================
+   จัดการ: สิทธิ์รายระบบ
+   ===================================================================== */
+const MROLES = {
+  daily:{t:'รายงานประจำวัน', o:[['','ไม่มี'],['writer','เขียน'],['viewer','ดูทั้งหมด']]},
+  materials:{t:'เบิกจ่ายวัสดุ', o:[['','ไม่มี'],['requester','ผู้ขอเบิก'],['approver','ผู้อนุมัติ'],['store','สโตร์'],['admin','แอดมิน']]},
+  borrow:{t:'ยืม-คืนอุปกรณ์', o:[['','ไม่มี'],['requester','ผู้ขอยืม'],['approver','ผู้อนุมัติ']]},
+  issues:{t:'ปัญหาหน้างาน', o:[['','ไม่มี'],['reporter','แจ้งปัญหา'],['receiver','รับแจ้ง']]}
+};
+async function mgPerms(){
+  const [u,r]=await Promise.all([ sb.from('profiles').select('*').eq('is_active',true).neq('role','pending').order('display_name'), sb.from('module_roles').select('*') ]);
+  if(r.error){ $('#mg').innerHTML=`<div class="card empty"><b>ยังไม่ได้อัปเดตฐานข้อมูล Hub</b>รันไฟล์ 05_hub.sql ใน Supabase แล้วโหลดหน้านี้ใหม่</div>`; return; }
+  const roles=r.data||[], get=(uid,m)=>roles.find(x=>x.user_id===uid&&x.module===m)?.role||'';
+  const short={writer:'เขียน',viewer:'ดู',requester:'ขอ',approver:'อนุ',store:'สโตร์',admin:'แอด',reporter:'แจ้ง',receiver:'รับ'};
+  $('#mg').innerHTML=`<div class="note n-info">${IC.info}<span>ผู้บริหารและแอดมินใช้ได้ทุกระบบโดยอัตโนมัติ ตั้งค่าเฉพาะผู้ใช้อื่น ส่วนรายชื่อที่ผู้เช็คชื่อเห็น ตั้งที่แท็บผู้ใช้</span></div>
+    ${(u.data||[]).map(p=>{ const mgr=['admin','executive'].includes(p.role);
+      return `<details class="card perm" data-u="${p.id}" ${mgr?'':''}><summary class="row" style="gap:12px;cursor:pointer;list-style:none"><div class="av round" style="width:40px;height:40px">${esc((p.display_name||'?').charAt(0))}</div><div class="grow"><b>${esc(p.display_name)}</b><div class="xs muted">${ROLES[p.role]}</div></div>
+        <div class="row" style="gap:4px;flex-wrap:wrap;justify-content:flex-end">${mgr?'<span class="tag t-acc">ทุกระบบ</span>':`<span class="tag ${p.can_check?'t-ok':''}" style="height:22px;font-size:11px">${p.can_check?'เช็คชื่อ':'–'}</span>`+Object.keys(MROLES).map(m=>{ const v=get(p.id,m); return `<span class="tag ${v?'t-ok':''}" style="height:22px;font-size:11px;${v?'':'opacity:.5'}">${v?short[v]:'–'}</span>`; }).join('')}</div></summary>
+        ${mgr?'<p class="sm muted" style="margin:10px 0 0">บทบาทผู้บริหาร/แอดมิน ใช้ได้ทุกระบบ</p>':`<div class="col" style="gap:0;margin-top:8px">
+          <div class="prow"><div class="row" style="gap:10px">${modIcon('att',30)}<b>เช็คชื่อ</b></div><div class="chips" style="gap:6px"><button class="chip ${p.can_check?'':'on'}" data-ck="0">ไม่มี</button><button class="chip ${p.can_check?'on':''}" data-ck="1">ผู้เช็คชื่อ</button></div></div>
+          ${Object.entries(MROLES).map(([m,def])=>`<div class="prow"><div class="row" style="gap:10px">${modIcon(m,30)}<b>${def.t}</b></div><div class="chips" style="gap:6px">${def.o.map(([v,t])=>`<button class="chip ${get(p.id,m)===v?'on':''}" data-m="${m}" data-v="${v}">${t}</button>`).join('')}</div></div>`).join('')}
+          <div class="row" style="padding-top:12px"><span class="xs muted grow">${p.role==='foreman'?'โฟร์แมนส่งคนงานเช้าได้ตามไซต์ที่รับผิดชอบ':''}</span><button class="btn btn-p btn-sm" data-save>บันทึก</button></div></div>`}
+      </details>`; }).join('')}`;
+  $$('details.perm').forEach(card=>{
+    const id=card.dataset.u;
+    $$('[data-ck]',card).forEach(b=>b.onclick=()=>{ $$('[data-ck]',card).forEach(x=>x.classList.toggle('on',x===b)); });
+    $$('[data-m]',card).forEach(b=>b.onclick=()=>{ $$(`[data-m="${b.dataset.m}"]`,card).forEach(x=>x.classList.toggle('on',x===b)); });
+    const sv=$('[data-save]',card); if(!sv) return;
+    sv.onclick=async()=>{
+      busy(sv,true,'...');
+      const can=$('[data-ck].on',card)?.dataset.ck==='1';
+      const pr=await sb.from('profiles').update({can_check:can}).eq('id',id); if(pr.error){ busy(sv,false); return toast(errText(pr.error),true); }
+      for(const m of Object.keys(MROLES)){
+        const v=$(`[data-m="${m}"].on`,card)?.dataset.v||'', had=get(id,m);
+        if(v===had) continue;
+        const res = v ? await sb.from('module_roles').upsert({user_id:id,module:m,role:v},{onConflict:'user_id,module'}) : await sb.from('module_roles').delete().eq('user_id',id).eq('module',m);
+        if(res.error){ busy(sv,false); return toast(errText(res.error),true); }
+      }
+      toast('บันทึกสิทธิ์แล้ว'); if(id===S.profile.id) await enter(); else mgPerms();
+    };
+  });
+}
+
+/* =====================================================================
+   จัดการ: ข้อมูลไซต์งานฉบับรวม
+   ===================================================================== */
+async function siteDetail(s){
+  const [pf,asg]=await Promise.all([ sb.from('profiles').select('id,display_name,role').in('role',['admin','executive','foreman']).eq('is_active',true), sb.from('site_assignments').select('user_id').eq('site_id',s.id) ]);
+  const team=(pf.data||[]).filter(p=>(asg.data||[]).some(a=>a.user_id===p.id));
+  const m=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="ข้อมูลไซต์งาน"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>${esc(s.name)}<small>${esc(s.code||'ยังไม่มีรหัส')} · ${s.status==='active'?'เปิดอยู่':'ปิดแล้ว'}</small></h1></header>
+    <form class="sheet-body" id="sf" novalidate>
+      <div class="field"><label for="s_name">ชื่อไซต์ / โครงการ</label><input class="in" id="s_name" value="${esc(s.name)}"></div>
+      <div class="g2"><div class="field"><label for="s_code">รหัสโครงการ</label><input class="in" id="s_code" value="${esc(s.code||'')}" placeholder="เช่น SB03"></div>
+        <div class="field"><label for="s_mgr">ผู้จัดการโครงการ</label><select class="in" id="s_mgr"><option value="">ไม่ระบุ</option>${(pf.data||[]).filter(p=>p.role!=='foreman').map(p=>`<option value="${p.id}" ${s.manager_id===p.id?'selected':''}>${esc(p.display_name)}</option>`).join('')}</select></div></div>
+      <div class="field"><label for="s_loc">ที่ตั้ง</label><input class="in" id="s_loc" value="${esc(s.location||'')}"></div>
+      <div class="g2"><div class="field"><label for="s_st">วันเริ่ม</label><input class="in" type="date" id="s_st" value="${s.start_date||''}"></div><div class="field"><label for="s_en">วันสิ้นสุด</label><input class="in" type="date" id="s_en" value="${s.end_date||''}"></div></div>
+      <div class="sec">การเชื่อมต่อ</div>
+      <div class="field"><label for="s_line">รหัสกลุ่ม LINE (ขึ้นต้นด้วย C)</label><input class="in" id="s_line" value="${esc(s.line_group_id||'')}" placeholder="ใช้ส่งสรุปรายงานประจำวันเข้ากลุ่ม"></div>
+      <div class="field"><label for="s_drive">รหัสโฟลเดอร์ Google Drive (ไม่บังคับ)</label><input class="in" id="s_drive" value="${esc(s.drive_folder_id||'')}" placeholder="ระบบสร้างให้อัตโนมัติเมื่อมีรูปแรก"></div>
+      <div class="sec">ทีมที่รับผิดชอบ</div>
+      <div class="chips">${team.length?team.map(p=>`<span class="chip">${esc(p.display_name)} · ${ROLES[p.role]}</span>`).join(''):'<span class="hint">ยังไม่มี กำหนดได้ที่แท็บผู้ใช้</span>'}</div>
+      <div class="field"><label for="s_note">หมายเหตุ</label><textarea class="in" id="s_note">${esc(s.note||'')}</textarea></div>
+    </form>
+    <div class="sheet-foot"><button class="btn" data-toggle>${s.status==='active'?'ปิดไซต์':'เปิดไซต์อีกครั้ง'}</button><button class="btn btn-p" data-save>บันทึก</button></div></div>`, false, false);
+  $('[data-x]',m.el).onclick=m.close;
+  const save=async(extra={})=>{
+    const row={ name:$('#s_name').value.trim(), code:$('#s_code').value.trim().toUpperCase()||null, manager_id:$('#s_mgr').value||null, location:$('#s_loc').value.trim()||null,
+      start_date:$('#s_st').value||null, end_date:$('#s_en').value||null, line_group_id:$('#s_line').value.trim()||null, drive_folder_id:$('#s_drive').value.trim()||null, note:$('#s_note').value.trim()||null, ...extra };
+    if(!row.name) return toast('กรอกชื่อไซต์',true);
+    const {error}=await sb.from('sites').update(row).eq('id',s.id);
+    if(error) return toast(/sites_code_uq|duplicate/.test(error.message)?'รหัสโครงการนี้มีแล้ว':errText(error),true);
+    m.close(); toast('บันทึกข้อมูลไซต์แล้ว'); await loadRefs(); pageManage();
+  };
+  $('[data-save]',m.el).onclick=()=>save();
+  $('[data-toggle]',m.el).onclick=()=>save({status:s.status==='active'?'closed':'active'});
+}
+
+/* =====================================================================
+   จัดการ: พื้นที่ใช้งานและสำรองข้อมูล
+   ===================================================================== */
+const fmtBytes = b => b>=1073741824?`${(b/1073741824).toFixed(2)} GB`:b>=1048576?`${(b/1048576).toFixed(1)} MB`:`${Math.round(b/1024)} KB`;
+async function bridge(action, extra={}){
+  const url=String(S.settings.bridge_url||'').trim(); if(!url) throw new Error('ยังไม่ได้ตั้งค่า Bridge URL');
+  const {data}=await sb.auth.getSession();
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token:data.session?.access_token,...extra})});
+  const j=await r.json(); if(j.error) throw new Error(j.error); return j;
+}
+function gaugeHTML(k,title,used,total,note){
+  const pct=total?Math.min(100,Math.round(used/total*100)):0, warn=pct>=(S.settings.retention?.warn_pct||70);
+  return `<div class="card col" style="gap:10px"><div class="row" style="gap:12px">${modIcon(k,40)}<div class="grow"><b>${title}</b><div class="xs muted">${note}</div></div><b class="num" style="font-size:20px;${warn?'color:var(--bad)':''}">${pct}%</b></div>
+    <div class="track" style="height:12px"><i style="width:${pct}%;background:${warn?'var(--bad)':MOD[k].hue}"></i></div><div class="row xs muted" style="justify-content:space-between"><span>ใช้ไป ${fmtBytes(used)}</span><span>จาก ${fmtBytes(total)} · เตือนที่ ${S.settings.retention?.warn_pct||70}%</span></div></div>`;
+}
+async function mgStorage(){
+  const host=$('#mg'); host.innerHTML='<div class="loading"><div class="spin"></div></div>';
+  const {data:st,error}=await sb.rpc('db_stats');
+  let html='';
+  if(error||!st) html+=`<div class="card empty"><b>ยังไม่ได้อัปเดตฐานข้อมูล Hub</b>รันไฟล์ 05_hub.sql ใน Supabase</div>`;
+  else html+=gaugeHTML('manage','ฐานข้อมูล Supabase',st.db_bytes,500*1048576,'แพ็กเกจฟรี 500 MB')+`<details class="card"><summary style="cursor:pointer"><b>ขนาดแยกตามตาราง</b></summary><div style="margin-top:8px">${(st.tables||[]).slice(0,12).map(t=>`<div class="kv"><span>${esc(t.name)} <span class="xs">(${t.rows} แถว)</span></span><span class="num">${fmtBytes(t.bytes)}</span></div>`).join('')}</div></details>`;
+  html+=`<div id="drv"></div>`;
+  if(isAdmin()) html+=`<form class="card col" id="bf" style="gap:10px"><b>KTY Hub Bridge (Apps Script)</b><span class="xs muted">ใช้สำรองข้อมูลลง Google Drive และอ่านพื้นที่ Drive (ภายหลังใช้ส่งรูปและแจ้ง LINE)</span><input class="in" name="u" value="${esc(S.settings.bridge_url||'')}" placeholder="https://script.google.com/macros/s/.../exec" aria-label="Bridge URL"><button class="btn btn-sm" style="align-self:flex-start">บันทึก URL</button></form>`;
+  html+=`<div class="card row" style="gap:12px;opacity:.75">${modIcon('tasks',40)}<div class="grow"><b>ปิดปีและย้ายข้อมูลเก่า</b><div class="xs muted">เก็บรายละเอียดในฐานข้อมูล ${S.settings.retention?.keep_years||2} ปี ปุ่มนี้จะเปิดใช้ก่อนสิ้นปี 2570</div></div></div>`;
+  host.innerHTML=html;
+  const bf=$('#bf'); if(bf) bf.onsubmit=async ev=>{ ev.preventDefault(); const v=bf.u.value.trim();
+    const {error}=await sb.from('app_settings').update({value:v,updated_at:new Date().toISOString()}).eq('key','bridge_url'); if(error) return toast(errText(error),true); await loadRefs(); toast('บันทึก Bridge URL แล้ว'); mgStorage(); };
+  const drv=$('#drv');
+  if(!String(S.settings.bridge_url||'').trim()){ drv.innerHTML=`<div class="note n-warn">${IC.info}<span>ยังไม่ได้ติดตั้ง Bridge จึงยังไม่มีการสำรองข้อมูลอัตโนมัติ ดูวิธีติดตั้งในคู่มือ</span></div>`; return; }
+  drv.innerHTML='<div class="card"><div class="spin" style="margin:8px auto"></div></div>';
+  try{
+    const j=await bridge('stats');
+    drv.innerHTML=gaugeHTML('daily','Google Drive บริษัท',j.drive_used,j.drive_limit,'รูปถ่าย + ไฟล์สำรอง')+`<div class="card" style="padding:12px 16px 4px"><div class="row" style="justify-content:space-between"><b>สำรองรายสัปดาห์</b><span class="tag ${j.backups?.length?'t-ok':'t-warn'}">${j.backups?.length||0} ชุด</span></div>
+      ${(j.backups||[]).map(b=>`<div class="li" style="padding:9px 0">${svg('<path d="M5 12l5 5 9-10"/>','style="color:var(--ok);width:18px"')}<span class="grow sm">${esc(b.name)}</span><span class="xs muted num">${fmtBytes(b.size)}</span></div>`).join('')||'<p class="sm muted">ยังไม่มีไฟล์สำรอง</p>'}
+      <div style="padding:8px 0 10px"><button class="btn btn-sm" id="bkn">สำรองตอนนี้</button></div></div>`;
+    const bk=$('#bkn'); if(bk) bk.onclick=async()=>{ busy(bk,true,'กำลังสำรอง...'); try{ const r=await bridge('backup'); toast(`สำรองแล้ว ${r.name}`); mgStorage(); }catch(e){ busy(bk,false); toast(errText(e),true); } };
+  }catch(e){ drv.innerHTML=`<div class="note n-bad">${IC.info}<span>เชื่อมต่อ Bridge ไม่ได้: ${esc(e.message)}</span></div>`; }
+}
