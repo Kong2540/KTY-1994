@@ -309,3 +309,20 @@ details.perm>summary::-webkit-details-marker{display:none}
 .rs-L .rtile b{font-size:17px}
 .rs-L .rtile .rchk{width:32px;height:32px}
 @media (max-width:420px){.rgrid.rs-M{grid-template-columns:repeat(2,minmax(0,1fr))}.rgrid.rs-L{grid-template-columns:1fr}.rgrid.rs-S{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* ================= รายงานประจำวัน ================= */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
+.pthumb{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;background:var(--surface2);border:1px solid var(--line);display:block}
+.pthumb img{width:100%;height:100%;object-fit:cover;display:block}
+.pthumb button{position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:13px;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:16px;line-height:1;padding:0}
+.padd{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-style:dashed;color:var(--ink2);cursor:pointer}
+.lcardp{flex:none;max-width:360px;border-radius:16px;overflow:hidden;border:1px solid var(--line);background:#fff;color:#1B262C;box-shadow:var(--shadow)}
+.lch{background:#22313A;color:#fff;padding:12px 14px;display:flex;flex-direction:column;gap:2px}.lch span{color:#B9C8CC;font-size:13px}
+.lcb{padding:12px 14px;display:flex;flex-direction:column;gap:6px;font-size:13.5px}.lcb div span{color:#55636A;display:inline-block;width:80px}.lcb p{margin:0}.lcb small{color:#55636A}
+.lcf{display:flex;gap:8px;padding:0 14px 14px}.lbtn{flex:1;text-align:center;border-radius:8px;padding:8px;font-size:13px;font-weight:600;background:#EEF1EF}.lbtn.p{background:#22313A;color:#fff}
+.pdfprev{width:100%;height:420px;border:1px solid var(--line);border-radius:14px;background:var(--surface2)}
+@media (max-width:600px){.pdfprev{height:300px}}
+.sendopt{display:flex;gap:12px;align-items:flex-start;padding:14px;border:2px solid var(--line);border-radius:16px;background:var(--surface);cursor:pointer}
+.sendopt input{width:22px;height:22px;accent-color:#F2B705;margin-top:2px;flex:none}
+.sendopt:has(input:checked){border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--surface))}
+.sendopt.off{opacity:.45;cursor:not-allowed}

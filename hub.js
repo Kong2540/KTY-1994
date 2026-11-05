@@ -16,7 +16,7 @@ const MOD = {
   stars:    { t:'ดาวและประวัติ',         hue:'#C99400', i:'<path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z"/>' },
   me:       { t:'ข้อมูลของฉัน',          hue:'#5B6B73', i:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4.2 4.2-6.5 8-6.5s7 2.3 8 6.5"/>' }
 };
-const SOON = { daily:'รายงานประจำวันรอบเย็น ดึงคนงานจากรอบเช้า รูปถ่ายลง Google Drive และส่งสรุปเข้ากลุ่ม LINE', materials:'ขอเบิกแบบตะกร้า อนุมัติ จ่ายของ รับของที่ไซต์ งบ BOQ และสต็อก (ย้ายจากระบบเดิม)', borrow:'ขอยืม-คืนเครื่องมือ ติดตามว่าอุปกรณ์อยู่ไซต์ไหน', issues:'โฟร์แมนแจ้งปัญหาหน้างานพร้อมรูป ผู้บริหารได้รับแจ้งเตือนทันที', payroll:'คำนวณค่าแรงจากการเช็คชื่อ ประกันสังคม และสลิปเงินเดือน' };
+const SOON = { materials:'ขอเบิกแบบตะกร้า อนุมัติ จ่ายของ รับของที่ไซต์ งบ BOQ และสต็อก (ย้ายจากระบบเดิม)', borrow:'ขอยืม-คืนเครื่องมือ ติดตามว่าอุปกรณ์อยู่ไซต์ไหน', issues:'โฟร์แมนแจ้งปัญหาหน้างานพร้อมรูป ผู้บริหารได้รับแจ้งเตือนทันที', payroll:'คำนวณค่าแรงจากการเช็คชื่อ ประกันสังคม และสลิปเงินเดือน' };
 const modIcon = (k, size=34) => `<span class="micon" style="--h:${MOD[k].hue};width:${size}px;height:${size}px;border-radius:${Math.round(size*.3)}px">${svg(MOD[k].i,`style="width:${Math.round(size*.56)}px;height:${Math.round(size*.56)}px"`)}</span>`;
 
 S.badges = S.badges || {};
@@ -39,13 +39,13 @@ function navSections(){
     out.push({t:'ภาพรวม', items:[{k:'home',m:'home'},{k:'tasks',m:'tasks',b:'tasks'}]});
     out.push({t:'ระบบงาน', items:[
       {k:'att',m:'att',b:'att'}, {k:'roll',m:'att',t:'เช็คชื่อแบบติ๊ก',sub:1}, {k:'att/month',m:'att',t:'ตารางรายเดือน',sub:1}, {k:'att/site',m:'att',t:'คนงานหน้างาน',sub:1,b:'crew'},
-      {k:'soon/daily',m:'daily'}, {k:'soon/materials',m:'materials'}, {k:'soon/borrow',m:'borrow'}, {k:'soon/issues',m:'issues'},
+      {k:'daily',m:'daily',b:'daily'}, {k:'soon/materials',m:'materials'}, {k:'soon/borrow',m:'borrow'}, {k:'soon/issues',m:'issues'},
       {k:'employees',m:'people'}, {k:'soon/payroll',m:'payroll'} ]});
     out.push({t:'ตั้งค่า', items:[{k:'manage/sites',m:'sites'},{k:'manage',m:'manage',b:'users'}]});
   } else {
     const it=[{k:'home',m:'home'}];
     if(p.can_check) it.push({k:'roll',m:'att',t:'เช็คชื่อหน้าไซต์งาน'});
-    if(p.role==='foreman'||hasMod('daily')) it.push({k:'report',m:'daily',t:'รายงานประจำวัน',b:'crew'});
+    if(p.role==='foreman'||hasMod('daily')) it.push({k:'daily',m:'daily',t:'รายงานประจำวัน',b:'daily'});
     if(hasMod('materials')) it.push({k:'soon/materials',m:'materials',t:'ขอเบิกวัสดุ'});
     if(hasMod('borrow')) it.push({k:'soon/borrow',m:'borrow',t:'ขอยืมอุปกรณ์'});
     if(hasMod('issues')) it.push({k:'soon/issues',m:'issues',t:'รายงานปัญหาหน้างาน'});
@@ -59,7 +59,7 @@ function bottomItems(){
   if(isManager()) return [{k:'home',m:'home',t:'หน้าหลัก'},{k:'att',m:'att',t:'เช็คชื่อ'},{k:'tasks',m:'tasks',t:'งานที่รอ',b:'tasks'},{k:'employees',m:'people',t:'พนักงาน'},{k:'me',m:'me',t:'ฉัน'}];
   const it=[{k:'home',m:'home',t:'หน้าหลัก'}];
   if(p.can_check) it.push({k:'roll',m:'att',t:'เช็คชื่อ'});
-  if(p.role==='foreman'||hasMod('daily')) it.push({k:'report',m:'daily',t:'รายงาน',b:'crew'});
+  if(p.role==='foreman'||hasMod('daily')) it.push({k:'daily',m:'daily',t:'รายงาน',b:'daily'});
   it.push({k:'me',m:'me',t:'ฉัน'});
   return it;
 }
@@ -67,7 +67,7 @@ const keyOf = h => (h||'home').replace('#','') || 'home';
 function isActive(k, cur){ if(k===cur) return true; const [a]=k.split('/'), [b]=cur.split('/'); return !k.includes('/') && a===b && !['soon','manage','att','me'].includes(a) ? true : (k==='att'&&cur==='att'); }
 
 function navItemHTML(x, cur){
-  const meta=MOD[x.m]||MOD.home, t=x.t||meta.t, on=x.k===cur;
+  const meta=MOD[x.m]||MOD.home, t=x.t||meta.t, on=x.k===cur||(!x.sub&&!x.k.includes('/')&&cur.startsWith(x.k+'/')&&x.k!=='att');
   const b=x.b?`<span class="nbadge hidden" data-badge="${x.b}"></span>`:'';
   return `<a href="#${x.k}" class="nitem ${x.sub?'sub':''} ${on?'on':''}">${x.sub?'<span class="nsp"></span>':modIcon(x.m)}<span class="grow">${t}</span>${b}</a>`;
 }
@@ -87,16 +87,16 @@ function paintBadges(){ $$('[data-badge]').forEach(el=>{ const v=S.badges[el.dat
 
 function route(){
   $$('.sheet-bg').forEach(x=>x.remove()); document.body.style.overflow='';
-  const cur=keyOf(location.hash); const [k,id]=cur.split('/');
+  const cur=keyOf(location.hash); const [k,id,id2]=cur.split('/');
   if(k==='users'){ mgTab='users'; } if(k==='settings'){ mgTab='sites'; }
   const mgr=isManager(), p=S.profile;
-  const can={ home:1, tasks:1, me:1, soon:1, att:mgr, employees:mgr, emp:mgr, manage:mgr, users:mgr, settings:mgr, roll:mgr||p.can_check, report:p.role==='foreman'||mgr||hasMod('daily') };
+  const can={ home:1, tasks:1, me:1, soon:1, att:mgr, employees:mgr, emp:mgr, manage:mgr, users:mgr, settings:mgr, roll:mgr||p.can_check, report:p.role==='foreman'||mgr||hasMod('daily'), daily:p.role==='foreman'||mgr||hasMod('daily') };
   const key=can[k]?k:'home';
   if(key==='att'&&id&&['day','month','site'].includes(id)) attTab=id;
   if(key==='manage'&&id) mgTab=id;
   if(key==='me'&&id==='stars') profTab='stars';
   renderShell(can[k]?cur:'home');
-  ({home:pageHome, tasks:pageTasks, att:pageAtt, employees:pageEmployees, emp:()=>pageProfile(id), manage:pageManage, users:pageManage, settings:pageManage, report:pageReport, roll:pageRoll, me:()=>id==='stars'?pageMyStars():pageMe(), soon:()=>pageSoon(id)})[key]();
+  ({home:pageHome, tasks:pageTasks, att:pageAtt, employees:pageEmployees, emp:()=>pageProfile(id), manage:pageManage, users:pageManage, settings:pageManage, report:pageReport, daily:()=>pageDaily(id,id2), roll:pageRoll, me:()=>id==='stars'?pageMyStars():pageMe(), soon:()=>pageSoon(id)})[key]();
   scrollTo(0,0);
 }
 function renderShell(cur){
@@ -136,12 +136,16 @@ const setPage = html => { $('#page').innerHTML = html + '</div>'; const d=$('[da
 async function collectTasks(){
   const today=localISO(), mgr=isManager(), tasks=[];
   const siteIds=S.site?[+S.site]:mySiteIds();
-  const q=[ S.hasPhase2&&siteIds.length?sb.from('site_reports').select('site_id,total,updated_at').eq('report_date',today).in('site_id',siteIds):Promise.resolve({data:[]}) ];
+  const q=[ S.hasPhase2&&siteIds.length?sb.from('site_reports').select('site_id,total,updated_at').eq('report_date',today).in('site_id',siteIds):Promise.resolve({data:[]}),
+    siteIds.length?sb.from('daily_reports').select('id,site_id,total,no_work,updated_at,line_status').eq('report_date',today).in('site_id',siteIds):Promise.resolve({data:[]}) ];
   if(mgr){ q.push(isAdmin()?sb.from('profiles').select('id,role,is_active'):Promise.resolve({data:[]}), sb.from('employees').select('id,first_name,last_name,status,id_expiry_date,employment_type,probation_end'), S.hasPhase2?sb.from('attendance').select('employee_id,site_id').eq('work_date',today):Promise.resolve({data:[]})); }
-  const [rep,prof,emp,att]=await Promise.all(q);
+  const [rep,dly,prof,emp,att]=await Promise.all(q);
+  const daily={}; (dly.error?[]:(dly.data||[])).forEach(r=>daily[r.site_id]=r);
   const sent=new Set((rep.data||[]).map(r=>r.site_id));
   const missing=siteIds.filter(id=>!sent.has(id)).map(id=>S.sites.find(s=>s.id===id)).filter(Boolean);
   missing.forEach(s=>tasks.push({m:'daily',t:`${s.name} ยังไม่ส่งคนงานเช้า`,sub:mgr?'แตะเพื่อบันทึกแทน':'ส่งก่อนเริ่มงาน',tag:'ยังไม่ส่ง',c:'t-warn',href:mgr?'#att/site':'#report'}));
+  if(!dly.error) siteIds.filter(id=>!daily[id]).map(id=>S.sites.find(s=>s.id===id)).filter(Boolean).forEach(s=>tasks.push({m:'daily',t:`${s.name} ยังไม่ส่งรายงานเย็น`,sub:mgr?'แตะเพื่อดูหรือเขียนแทน':'ส่งก่อนเลิกงาน',tag:'รอส่ง',c:'',href:'#daily'}));
+  S.badges.daily=dly.error?0:siteIds.filter(id=>!daily[id]).length;
   let crew=(rep.data||[]).reduce((a,r)=>a+r.total,0);
   if(mgr){
     const pend=(prof?.data||[]).filter(x=>x.role==='pending'&&x.is_active).length;
@@ -152,9 +156,9 @@ async function collectTasks(){
     act.filter(e=>{ const d=daysUntil(e.id_expiry_date); return d!==null&&d<=60; }).forEach(e=>tasks.push({m:'people',t:`บัตรประชาชน ${shortName(e)} ${daysUntil(e.id_expiry_date)<0?'หมดอายุแล้ว':'ใกล้หมดอายุ'}`,sub:thaiDate(e.id_expiry_date),tag:'บัตร',c:'t-warn',href:`#emp/${e.id}`}));
     act.filter(e=>e.employment_type==='probation'&&daysUntil(e.probation_end)!==null&&daysUntil(e.probation_end)<=30).forEach(e=>tasks.push({m:'people',t:`${shortName(e)} ใกล้ครบทดลองงาน`,sub:thaiDate(e.probation_end),tag:'ทดลองงาน',c:'',href:`#emp/${e.id}`}));
     S.badges.users=pend||0; S.badges.att=todo||0;
-    return {tasks, act:act.length, done:done.size, sent:sent.size, sites:siteIds.length, crew, pend};
+    return {tasks, act:act.length, done:done.size, sent:sent.size, sites:siteIds.length, crew, pend, daily};
   }
-  return {tasks, sent:sent.size, sites:siteIds.length, crew, rep:rep.data||[]};
+  return {tasks, sent:sent.size, sites:siteIds.length, crew, rep:rep.data||[], daily};
 }
 const taskHTML = x => `<a href="${x.href}" class="li" style="text-decoration:none">${modIcon(x.m,40)}<div class="grow"><b style="font-size:14.5px">${esc(x.t)}</b><span class="xs muted">${esc(x.sub||'')}</span></div>${x.tag?`<span class="tag ${x.c}">${esc(x.tag)}</span>`:''}${svg('<path d="M9 6l6 6-6 6"/>','style="width:18px;color:var(--ink2)"')}</a>`;
 
@@ -173,11 +177,11 @@ async function pageHome(){
   $$('[data-site]').forEach(b=>b.onclick=()=>{ S.site=b.dataset.site; try{ localStorage.setItem('kty-site',S.site); }catch(_){} route(); });
   let tiles='';
   if(mgr){
-    tiles=[tileHTML('att','#att','เช็คชื่อ','att'), tileHTML('daily','#soon/daily',null,'crew',true), tileHTML('materials','#soon/materials',null,null,true), tileHTML('borrow','#soon/borrow',null,null,true), tileHTML('issues','#soon/issues',null,null,true), tileHTML('people','#employees'), tileHTML('payroll','#soon/payroll',null,null,true), tileHTML('sites','#manage/sites'), tileHTML('manage','#manage','จัดการ','users')].join('');
+    tiles=[tileHTML('att','#att','เช็คชื่อ','att'), tileHTML('daily','#daily',null,'daily'), tileHTML('materials','#soon/materials',null,null,true), tileHTML('borrow','#soon/borrow',null,null,true), tileHTML('issues','#soon/issues',null,null,true), tileHTML('people','#employees'), tileHTML('payroll','#soon/payroll',null,null,true), tileHTML('sites','#manage/sites'), tileHTML('manage','#manage','จัดการ','users')].join('');
   } else {
     const t=[];
     if(p.can_check) t.push(tileHTML('att','#roll','เช็คชื่อหน้าไซต์งาน'));
-    if(p.role==='foreman'||hasMod('daily')) t.push(tileHTML('daily','#report','รายงานประจำวัน','crew'));
+    if(p.role==='foreman'||hasMod('daily')) t.push(tileHTML('daily','#daily','รายงานประจำวัน','daily'));
     if(hasMod('materials')) t.push(tileHTML('materials','#soon/materials','ขอเบิกวัสดุ',null,true));
     if(hasMod('borrow')) t.push(tileHTML('borrow','#soon/borrow','ขอยืมอุปกรณ์',null,true));
     if(hasMod('issues')) t.push(tileHTML('issues','#soon/issues','รายงานปัญหาหน้างาน',null,true));
@@ -193,7 +197,7 @@ async function pageHome(){
     const sites=S.sites.filter(s=>(S.site?[+S.site]:S.mySites).includes(s.id)&&s.status==='active');
     const rep={}; (d.rep||[]).forEach(r=>rep[r.site_id]=r);
     top=sites.length?`<div class="card col" style="gap:12px"><h3 class="h2">วันนี้ที่ไซต์ของคุณ</h3><div class="timeline">${sites.map(s=>{ const r=rep[s.id]; return `<div class="row"><span class="dot ${r?'done':'now'}">${r?svg('<path d="M5 12l5 5 9-10"/>','style="width:14px;height:14px;stroke-width:3"'):''}</span><div class="grow"><b>${esc(s.name)}</b><div class="sm muted">${r?`ส่งคนงานเช้าแล้ว ${r.total} คน · ${new Date(r.updated_at).toTimeString().slice(0,5)}`:'ยังไม่ส่งคนงานเช้า'}</div></div></div>`; }).join('')}
-      <div class="row" style="opacity:.6"><span class="dot"></span><div><b>รายงานเย็น</b><div class="sm muted">เปิดใช้เร็ว ๆ นี้</div></div></div></div><a href="#report" class="btn ${d.sites>d.sent?'btn-p':''}">${d.sites>d.sent?'ส่งคนงานเช้า':'ดู / แก้ไขรายงานวันนี้'}</a></div>`:`<div class="card empty"><b>ยังไม่ได้กำหนดไซต์ที่รับผิดชอบ</b>ติดต่อแอดมิน</div>`;
+      ${sites.map(s=>{ const r=d.daily[s.id]; return `<div class="row"><span class="dot ${r?'done':'now'}">${r?svg('<path d="M5 12l5 5 9-10"/>','style="width:14px;height:14px;stroke-width:3"'):''}</span><div class="grow"><b>รายงานเย็น ${sites.length>1?esc(s.name):''}</b><div class="sm muted">${r?`ส่งแล้ว ${new Date(r.updated_at).toTimeString().slice(0,5)}`:'ส่งก่อนเลิกงาน'}</div></div></div>`; }).join('')}</div><a href="#daily" class="btn btn-p">${d.sites>d.sent?'ส่งคนงานเช้า / รายงานเย็น':'เขียนหรือดูรายงานประจำวัน'}</a></div>`:`<div class="card empty"><b>ยังไม่ได้กำหนดไซต์ที่รับผิดชอบ</b>ติดต่อแอดมิน</div>`;
   }
   $('#hb').outerHTML=`<div class="col" style="gap:16px">${top}<div class="tiles">${tiles}</div>
     ${!mgr&&hasMod('issues')?`<div class="note n-warn" style="align-items:center">${modIcon('issues',30)}<span>รายงานปัญหาหน้างาน จะส่งแจ้งเตือนถึงผู้บริหารทันที</span></div>`:''}
@@ -277,7 +281,7 @@ async function siteDetail(s){
       <div class="g2"><div class="field"><label for="s_st">วันเริ่ม</label><input class="in" type="date" id="s_st" value="${s.start_date||''}"></div><div class="field"><label for="s_en">วันสิ้นสุด</label><input class="in" type="date" id="s_en" value="${s.end_date||''}"></div></div>
       <div class="sec">การเชื่อมต่อ</div>
       <div class="field"><label for="s_line">รหัสกลุ่ม LINE (ขึ้นต้นด้วย C)</label><input class="in" id="s_line" value="${esc(s.line_group_id||'')}" placeholder="ใช้ส่งสรุปรายงานประจำวันเข้ากลุ่ม"></div>
-      <div class="field"><label for="s_drive">รหัสโฟลเดอร์ Google Drive (ไม่บังคับ)</label><input class="in" id="s_drive" value="${esc(s.drive_folder_id||'')}" placeholder="ระบบสร้างให้อัตโนมัติเมื่อมีรูปแรก"></div>
+      <div class="field"><label for="s_drive">รหัสโฟลเดอร์ Google Drive (ไม่บังคับ)</label><input class="in" id="s_drive" value="${esc(s.drive_folder_id||'')}" placeholder="ระบบสร้างให้อัตโนมัติเมื่อส่งรายงานแรก">${s.drive_folder_id?`<a class="sm" href="https://drive.google.com/drive/folders/${esc(s.drive_folder_id)}" target="_blank" rel="noopener">เปิดโฟลเดอร์ของไซต์นี้</a>`:''}</div>
       <div class="sec">ทีมที่รับผิดชอบ</div>
       <div class="chips">${team.length?team.map(p=>`<span class="chip">${esc(p.display_name)} · ${ROLES[p.role]}</span>`).join(''):'<span class="hint">ยังไม่มี กำหนดได้ที่แท็บผู้ใช้</span>'}</div>
       <div class="field"><label for="s_note">หมายเหตุ</label><textarea class="in" id="s_note">${esc(s.note||'')}</textarea></div>
