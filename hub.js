@@ -278,6 +278,9 @@ async function siteDetail(s){
       <div class="g2"><div class="field"><label for="s_code">รหัสโครงการ</label><input class="in" id="s_code" value="${esc(s.code||'')}" placeholder="เช่น SB03"></div>
         <div class="field"><label for="s_mgr">ผู้จัดการโครงการ</label><select class="in" id="s_mgr"><option value="">ไม่ระบุ</option>${(pf.data||[]).filter(p=>p.role!=='foreman').map(p=>`<option value="${p.id}" ${s.manager_id===p.id?'selected':''}>${esc(p.display_name)}</option>`).join('')}</select></div></div>
       <div class="field"><label for="s_loc">ที่ตั้ง</label><input class="in" id="s_loc" value="${esc(s.location||'')}"></div>
+      <div class="sec">ข้อมูลสัญญา (แสดงในรายงาน PDF)</div>
+      <div class="field"><label for="s_cname">ชื่องานตามสัญญา</label><input class="in" id="s_cname" value="${esc(s.contract_name||'')}" placeholder="เช่น ก่อสร้างบ้านพักอาศัย 2 ชั้น"></div>
+      <div class="g2"><div class="field"><label for="s_cno">สัญญาเลขที่</label><input class="in" id="s_cno" value="${esc(s.contract_no||'')}" placeholder="เช่น 12/2569"></div><div class="field"><label for="s_cdate">ลงวันที่</label><input class="in" type="date" id="s_cdate" value="${s.contract_date||''}"></div></div>
       <div class="g2"><div class="field"><label for="s_st">วันเริ่ม</label><input class="in" type="date" id="s_st" value="${s.start_date||''}"></div><div class="field"><label for="s_en">วันสิ้นสุด</label><input class="in" type="date" id="s_en" value="${s.end_date||''}"></div></div>
       <div class="sec">การเชื่อมต่อ</div>
       <div class="field"><label for="s_line">รหัสกลุ่ม LINE (ขึ้นต้นด้วย C)</label><input class="in" id="s_line" value="${esc(s.line_group_id||'')}" placeholder="ใช้ส่งสรุปรายงานประจำวันเข้ากลุ่ม"></div>
@@ -290,7 +293,7 @@ async function siteDetail(s){
   $('[data-x]',m.el).onclick=m.close;
   const save=async(extra={})=>{
     const row={ name:$('#s_name').value.trim(), code:$('#s_code').value.trim().toUpperCase()||null, manager_id:$('#s_mgr').value||null, location:$('#s_loc').value.trim()||null,
-      start_date:$('#s_st').value||null, end_date:$('#s_en').value||null, line_group_id:$('#s_line').value.trim()||null, drive_folder_id:$('#s_drive').value.trim()||null, note:$('#s_note').value.trim()||null, ...extra };
+      start_date:$('#s_st').value||null, end_date:$('#s_en').value||null, line_group_id:$('#s_line').value.trim()||null, drive_folder_id:$('#s_drive').value.trim()||null, note:$('#s_note').value.trim()||null, contract_name:$('#s_cname').value.trim()||null, contract_no:$('#s_cno').value.trim()||null, contract_date:$('#s_cdate').value||null, ...extra };
     if(!row.name) return toast('กรอกชื่อไซต์',true);
     const {error}=await sb.from('sites').update(row).eq('id',s.id);
     if(error) return toast(/sites_code_uq|duplicate/.test(error.message)?'รหัสโครงการนี้มีแล้ว':errText(error),true);
