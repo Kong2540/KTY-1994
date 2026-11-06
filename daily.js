@@ -7,6 +7,7 @@ const canWriteDaily = () => isManager() || S.profile.role==='foreman' || hasMod(
 const lineTag = r => r.line_status==='sent'?'<span class="tag t-ok">ส่ง LINE แล้ว</span>':r.line_status==='shared'?'<span class="tag t-ok">แชร์ LINE แล้ว</span>':r.line_status==='failed'?'<span class="tag t-bad">ส่ง LINE ไม่สำเร็จ</span>':'<span class="tag">ยังไม่ส่ง LINE</span>';
 const blobToB64 = b => new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(b); });
 const thumbOf = p => p.thumb || `https://drive.google.com/thumbnail?id=${p.id}&sz=w400`;
+const dayLongFull = iso => { const p=parseISO(iso); const dt=new Date(p.y,p.m-1,p.d); return `วัน${TH_DAYS[dt.getDay()]} ที่ ${p.d} ${TH_MONTHS[p.m-1]} พ.ศ. ${p.y+543}`; };
 const hasBridge = () => !!String(S.settings.bridge_url||'').trim();
 
 function dailyText(r, site){
@@ -175,10 +176,15 @@ async function dailyPreview(r, pdf){
   const m=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="ดูตัวอย่างก่อนส่ง"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>ดูตัวอย่างก่อนส่ง<small>${esc(site?.name||'')} · ${dayLong(r.report_date)}</small></h1></header>
     <div class="sheet-body">
       <div class="sec">การ์ดที่จะส่งเข้ากลุ่ม LINE</div>
-      <div class="lcardp"><div class="lch"><b style="color:#F2B705">รายงานประจำวัน</b><b>${esc((site?.code?site.code+' ':'')+(site?.name||''))}</b><span>${dayLong(r.report_date)}${r.late?' (ส่งย้อนหลัง)':''}</span></div>
-        <div class="lcb"><div><span>อากาศ</span>${esc(r.weather||'-')}</div><div><span>คนงาน</span>${r.no_work?'ไม่มีการทำงาน':`${r.total} คน: ${esc(crew)}`}</div><p>${r.no_work?esc('เหตุผล: '+(r.no_work_reason||'-')):esc(String(r.work_items||'').split('\n').filter(Boolean).slice(0,6).map(w=>'• '+w.replace(/^[-•]\s*/,'')).join('\n')).replace(/\n/g,'<br>')}</p>
-          <div><span>เครื่องจักร</span>${esc((r.machinery||[]).join(', ')||'-')}</div><div><span>ปัญหา</span>${esc(r.problems||'ไม่มี')}</div><small>ผู้รายงาน: ${esc(r.submitted_name||'')}</small></div>
-        <div class="lcf"><span class="lbtn p">เปิด PDF</span><span class="lbtn">รูป ${(r.photos||[]).length} รูป</span></div></div>
+      <div class="lcardp"><div class="lch"><b>🏗️ รายงานการปฏิบัติงานประจำวัน</b><span>หจก.กิตติยาก่อสร้าง 1994</span></div>
+        <div class="lcb"><div class="lr"><span>📍 หน้างาน</span><b>${esc((site?.code?site.code+' ':'')+(site?.name||''))}</b></div><div class="lr"><span>📅 วันที่</span><span class="v">${dayLongFull(r.report_date)}</span></div><div class="lr"><span>🌤️ อากาศ</span><span class="v">${esc(r.weather||'-')}</span></div>
+          ${r.late?'<div class="llate">⏱ ส่งย้อนหลัง</div>':''}<hr>
+          ${r.no_work?`<b class="ls" style="color:#C0392B">⛔ ไม่มีการทำงาน</b><p>${esc(r.no_work_reason||'-')}</p>`:`<b class="ls">🔨 งานที่ปฏิบัติ</b><p>${String(r.work_items||'').split('\n').filter(Boolean).map(w=>'- '+esc(w.replace(/^[-•]\s*/,''))).join('<br>')}</p><hr>
+          <div class="lr"><b class="ls">👷 กำลังคน</b><b>รวม ${r.total} คน</b></div><p class="lm">${esc(Object.entries(r.crew||{}).filter(([,n])=>n>0).map(([k,n])=>`${k} ${n} คน`).join(' · '))}</p>
+          ${(r.crew_changes||[]).map(c=>`<p class="lw">↕ ${esc(c.trade)} ${c.from} → ${c.to} (${esc(c.period)}) ${esc(c.reason||'')}</p>`).join('')}<hr>
+          <b class="ls">🚜 เครื่องจักร / เครื่องมือ</b><p>${esc([...(r.machinery||[]),...(r.tools||[])].join(', ')||'-')}</p>`}<hr>
+          <b class="ls" style="color:#C0392B">⚠️ ปัญหา / อุปสรรค</b><p>${esc(r.problems||'-')}</p></div>
+        <div class="lcf"><div class="lr"><span>ผู้รายงาน</span><span class="v">${esc(r.submitted_name||'')}</span></div><span class="lbtn p">📄 ดาวน์โหลด PDF</span>${(r.photos||[]).length?`<span class="lbtn">🖼️ ดูรูปถ่าย ${r.photos.length} รูป</span>`:''}</div></div>
       <div class="sec">ไฟล์ PDF</div>
       ${r.pdf_url?`<div class="card row" style="gap:12px">${modIcon('daily',40)}<div class="grow"><b>${esc(pdf?.pdf_name||'รายงาน.pdf')}</b><div class="xs muted">แท็บ ${esc(r.sheet_tab||'')} ใน Google Sheet</div></div><a class="btn btn-sm" href="${esc(r.pdf_url)}" target="_blank" rel="noopener">เปิด</a></div>
         <iframe class="pdfprev" src="https://drive.google.com/file/d/${esc(r.pdf_id)}/preview" title="ตัวอย่าง PDF" loading="lazy"></iframe>`:`<div class="note n-warn">${IC.info}<span>ยังไม่มี PDF (ยังไม่ได้ติดตั้ง Bridge)</span></div>`}
