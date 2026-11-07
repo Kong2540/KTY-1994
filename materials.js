@@ -16,7 +16,7 @@ const LIB = { h2c:'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html
 async function loadMat(force){
   if(MAT.loaded&&!force) return true;
   const [c,i,p,l,k]=await Promise.all([ sb.from('mat_categories').select('*').order('sort'),
-    sb.from('materials').select('id,name,category_code,spec,unit,min_stock,item_type,status,note').order('id'),
+    (async()=>{ let r=await sb.from('materials').select('id,name,category_code,spec,unit,min_stock,item_type,status,note,image_url').order('id'); if(r.error&&/image_url/.test(r.error.message)) r=await sb.from('materials').select('id,name,category_code,spec,unit,min_stock,item_type,status,note').order('id'); return r; })(),
     sb.rpc('price_list'), sb.from('stock_locations').select('*').order('id'), sb.from('kits').select('*').eq('status','active').order('name') ]);
   if(i.error){ MAT.error=i.error; return false; }
   MAT.cats=c.data||[]; MAT.items=i.data||[]; MAT.price={}; (p.data||[]).forEach(x=>MAT.price[x.id]=+x.unit_price); MAT.locs=l.data||[]; MAT.kits=k.data||[]; MAT.loaded=true; MAT.error=null;
@@ -79,7 +79,7 @@ async function matCart(){
   const boqOf=id=>boq.find(b=>b.material_id===id&&(!CART.cat||b.work_category===CART.cat));
   function rowHTML(m){
     const n=CART.items[m.id]||0, bq=boqOf(m.id), left=bq?bq.budget-bq.used-n:null;
-    return `<div class="li"><div class="grow"><b style="font-size:14.5px">${esc(m.name)}</b><span class="xs muted">${esc([m.id,m.spec].filter(Boolean).join(' · '))}${bq?` · <span style="color:${left<0?'var(--bad)':'inherit'}">งบเหลือ ${fmtN(left)} ${esc(m.unit)}</span>`:''}</span></div>
+    return `<div class="li">${m.image_url?`<img class="mthumb" src="${esc(m.image_url)}" alt="" loading="lazy">`:''}<div class="grow"><b style="font-size:14.5px">${esc(m.name)}</b><span class="xs muted">${esc([m.id,m.spec].filter(Boolean).join(' · '))}${bq?` · <span style="color:${left<0?'var(--bad)':'inherit'}">งบเหลือ ${fmtN(left)} ${esc(m.unit)}</span>`:''}</span></div>
       ${MAT.price[m.id]!==undefined?`<span class="xs muted num" style="margin-right:4px">${baht(MAT.price[m.id])}</span>`:''}
       ${n?`<button class="btn btn-sm" data-d="${m.id}" style="width:36px;padding:0" aria-label="ลด">−</button><button class="linkbtn num" data-q="${m.id}" style="width:44px;text-align:center;font-weight:700;font-size:16px;text-decoration:none">${fmtN(n)}</button>`:''}
       <button class="btn btn-sm ${n?'btn-p':''}" data-i="${m.id}" style="width:36px;padding:0" aria-label="เพิ่ม">+</button></div>`;
@@ -332,21 +332,104 @@ async function shareDocImage(id){
 }
 
 /* ---------------- จัดการ: ทะเบียนวัสดุ / BOQ / ชุดวัสดุ / ใครเห็นเงิน ---------------- */
+let GRID={q:'',cat:'',type:''};
 async function mgMat(){
   const host=$('#mg'); host.innerHTML='<div class="loading"><div class="spin"></div></div>';
   if(!await loadMat(true)){ host.innerHTML=needMat(); return; }
-  let q='', cat='';
-  const draw=()=>{ const list=MAT.items.filter(m=>(!cat||m.category_code===cat)&&(!q||(m.id+m.name+(m.spec||'')).toLowerCase().includes(q)));
-    host.innerHTML=`<div class="row" style="gap:8px;flex-wrap:wrap"><input class="in grow" id="mq" placeholder="ค้นหารหัส / ชื่อ" value="${esc(q)}" style="min-width:180px"><button class="btn btn-sm" data-new>+ เพิ่มวัสดุ</button><button class="btn btn-sm" data-imp>นำเข้า (Google Sheet / ไฟล์)</button></div>
-      <div class="chips scroll" style="margin:0 -16px"><button class="chip ${!cat?'on':''}" data-c="">ทั้งหมด ${MAT.items.length}</button>${MAT.cats.map(c=>`<button class="chip ${cat===c.code?'on':''}" data-c="${c.code}">${esc(c.name)}</button>`).join('')}</div>
-      <div class="card card-l">${list.slice(0,200).map(m=>`<button class="li" data-ed="${m.id}" style="${m.status==='active'?'':'opacity:.55'}"><div class="grow"><b>${esc(m.name)}</b><span class="xs muted">${esc(m.id)} · ${esc(m.unit)}${m.spec?' · '+esc(m.spec):''}</span></div>${m.item_type==='tool'?'<span class="tag t-acc">อุปกรณ์</span>':''}${MAT.price[m.id]!==undefined?`<span class="sm num">${baht(MAT.price[m.id])}</span>`:''}${IC.chev}</button>`).join('')||'<div class="empty"><b>ไม่พบวัสดุ</b></div>'}</div>${list.length>200?`<span class="xs muted">แสดง 200 จาก ${list.length} รายการ ค้นหาเพื่อจำกัดผล</span>`:''}`;
-    const mq=$('#mq'); mq.oninput=e=>{ q=e.target.value.trim().toLowerCase(); const p=mq.selectionStart; draw(); const n=$('#mq'); n.focus(); n.setSelectionRange(p,p); };
-    $$('[data-c]',host).forEach(b=>b.onclick=()=>{ cat=b.dataset.c; draw(); });
-    $('[data-new]',host).onclick=()=>matEdit(null);
-    $$('[data-ed]',host).forEach(b=>b.onclick=()=>matEdit(MAT.items.find(m=>m.id===b.dataset.ed)));
-    $('[data-imp]',host).onclick=matImportAny;
-  };
+  const admin=isMatRole(['admin']), imgRole=isMatRole(['admin','store']), money=canMoney();
+  let stock={}; if(isMatRole(['store','admin','approver'])&&centralLoc()){ const {data}=await sb.rpc('stock_view',{p_loc:centralLoc().id}); (data||[]).forEach(x=>stock[x.material_id]=+x.qty); }
+  const typeOpts=[['consumable','วัสดุ'],['tool','อุปกรณ์']], stOpts=[['active','ใช้งาน'],['inactive','เลิกใช้']];
+  const COLS=[{k:'image_url',t:'รูป',w:58,type:'img'},{k:'id',t:'รหัส',w:104,type:'text',req:1},{k:'name',t:'ชื่อวัสดุ / อุปกรณ์',w:240,type:'text',req:1},
+    {k:'category_code',t:'หมวด',w:150,type:'select',opts:MAT.cats.map(c=>[c.code,c.name])},{k:'spec',t:'สเปก',w:150,type:'text'},{k:'unit',t:'หน่วย',w:80,type:'text',req:1},
+    ...(money?[{k:'unit_price',t:'ราคา/หน่วย',w:110,type:'num'}]:[]),{k:'min_stock',t:'ขั้นต่ำ',w:80,type:'num'},{k:'item_type',t:'ประเภท',w:104,type:'select',opts:typeOpts},
+    {k:'status',t:'สถานะ',w:96,type:'select',opts:stOpts},{k:'_stock',t:'คงคลังกลาง',w:100,type:'ro'}];
+  const EDIT=COLS.filter(c=>!['img','ro'].includes(c.type));
+  let rows=MAT.items.map(x=>({...x,unit_price:MAT.price[x.id]??'',_stock:stock[x.id]??''})); const dirty=new Map(); let newSeq=0;
+  const val=(r,k)=>dirty.get(r._key)?.[k]??r[k];
+  rows.forEach(r=>r._key=r.id);
+  const shown=()=>rows.filter(r=>r._new||((!GRID.cat||val(r,'category_code')===GRID.cat)&&(!GRID.type||val(r,'item_type')===GRID.type)&&(!GRID.q||(r.id+val(r,'name')+(val(r,'spec')||'')).toLowerCase().includes(GRID.q))));
+  function cell(r,c,ri,ci){
+    const v=val(r,c.k), d=dirty.get(r._key)&&c.k in dirty.get(r._key), cls=`gc${d?' dirty':''}`;
+    if(c.type==='img') return `<td class="gimg">${v?`<button class="gthumb" data-img="${esc(r._key)}" aria-label="รูปของ ${esc(val(r,'name')||'')}"><img src="${esc(v)}" alt="" loading="lazy"></button>`:`<button class="gthumb empty" data-img="${esc(r._key)}" ${imgRole&&!r._new?'':'disabled'} aria-label="เพิ่มรูป">${IC.camera}</button>`}</td>`;
+    if(c.type==='ro') return `<td class="gro num">${v===''?'':fmtN(v)}</td>`;
+    const ro=!admin||(c.k==='id'&&!r._new);
+    if(c.type==='select') return `<td class="${cls}"><select data-r="${ri}" data-c="${ci}" data-k="${c.k}" ${ro?'disabled':''}>${c.opts.map(([o,t])=>`<option value="${o}" ${o===v?'selected':''}>${esc(t)}</option>`).join('')}</select></td>`;
+    return `<td class="${cls}${c.req&&!String(v??'').trim()&&r._new?' bad':''}"><input data-r="${ri}" data-c="${ci}" data-k="${c.k}" value="${esc(v??'')}" ${c.type==='num'?'inputmode="decimal"':''} ${ro?'readonly':''} class="${c.type==='num'?'num':''}" aria-label="${esc(c.t)}"></td>`;
+  }
+  function draw(){
+    const list=shown(), nd=dirty.size;
+    host.innerHTML=`<div class="gbar"><input class="in" id="gq" placeholder="ค้นหารหัส / ชื่อ / สเปก" value="${esc(GRID.q)}">
+        <select class="in" id="gcat"><option value="">ทุกหมวด</option>${MAT.cats.map(c=>`<option value="${c.code}" ${GRID.cat===c.code?'selected':''}>${esc(c.name)}</option>`).join('')}</select>
+        <select class="in" id="gtype"><option value="">วัสดุ + อุปกรณ์</option>${typeOpts.map(([o,t])=>`<option value="${o}" ${GRID.type===o?'selected':''}>${t}</option>`).join('')}</select></div>
+      <div class="gbar">${admin?`<button class="btn btn-sm" data-add>+ เพิ่มแถว</button><button class="btn btn-sm" data-paste>วางจาก Google Sheet / Excel</button>`:''}${admin?'<button class="btn btn-sm" data-imp>นำเข้า (ลิงก์ / ไฟล์)</button>':''}<button class="btn btn-sm" data-copy>คัดลอกทั้งตาราง</button><button class="btn btn-sm" data-csv>ดาวน์โหลด CSV</button>
+        <span class="grow"></span>${admin?`<button class="btn btn-sm" data-undo ${nd?'':'disabled'}>ยกเลิกที่แก้</button><button class="btn btn-sm btn-p" data-save ${nd?'':'disabled'}>บันทึก${nd?` (${nd} แถว)`:''}</button>`:''}</div>
+      <div class="gwrap"><table class="grid"><thead><tr><th class="gno">#</th>${COLS.map(c=>`<th style="min-width:${c.w}px;width:${c.w}px" class="${c.type==='num'||c.type==='ro'?'num':''}">${esc(c.t)}${c.req?' *':''}</th>`).join('')}</tr></thead>
+      <tbody>${list.map((r,ri)=>`<tr class="${r._new?'gnew':''} ${val(r,'status')==='inactive'?'goff':''}"><td class="gno">${r._new?'ใหม่':ri+1}</td>${COLS.map((c,ci)=>cell(r,c,ri,ci)).join('')}</tr>`).join('')||`<tr><td colspan="${COLS.length+1}"><div class="empty"><b>ยังไม่มีรายการ</b>${admin?'กด "+ เพิ่มแถว" หรือ "วางจาก Google Sheet"':''}</div></td></tr>`}</tbody></table></div>
+      <span class="xs muted">${list.length} รายการ${admin?' · แตะช่องเพื่อแก้ · วาง (Ctrl+V) หลายแถวจาก Google Sheet ลงช่องใดก็ได้ ระบบเติมต่อให้เหมือนชีต · แถวสีเหลือง = ยังไม่บันทึก':' · อ่านอย่างเดียว'}</span>`;
+    bind(list);
+  }
+  function setVal(r,k,v){ if(k==='id') v=String(v).trim().toUpperCase(); const orig=r._new?undefined:r[k]; const cur=dirty.get(r._key)||{};
+    if(!r._new&&String(orig??'')===String(v??'')){ delete cur[k]; } else cur[k]=v; if(Object.keys(cur).length||r._new) dirty.set(r._key,cur); else dirty.delete(r._key); }
+  function addRow(init){ const r={_new:true,_key:'new'+(++newSeq),id:'',name:'',category_code:GRID.cat||'OT',spec:'',unit:'ชิ้น',unit_price:'',min_stock:0,item_type:GRID.type||'consumable',status:'active',_stock:'',image_url:''}; rows.unshift(r); dirty.set(r._key,{...init}); return r; }
+  function pasteGrid(text, list, ri, ci, append){
+    const lines=text.replace(/\r/g,'').split('\n'); if(lines.at(-1)==='') lines.pop(); const data=lines.map(l=>l.split('\t'));
+    const first=data[0].map(x=>x.trim().toLowerCase()); const hdrMap={mat_id:'id',id:'id','รหัส':'id',name:'name','ชื่อ':'name','ชื่อวัสดุ / อุปกรณ์':'name',category_code:'category_code','หมวด':'category_code',spec:'spec','สเปก':'spec',unit:'unit','หน่วย':'unit',unit_price:'unit_price','ราคา/หน่วย':'unit_price',min_stock:'min_stock','ขั้นต่ำ':'min_stock',item_type:'item_type','ประเภท':'item_type',status:'status','สถานะ':'status'};
+    const viaHdr=first.filter(h=>hdrMap[h]).length>=2; const keys=viaHdr?first.map(h=>hdrMap[h]||null):null; const body=viaHdr?data.slice(1):data;
+    const catByName={}; MAT.cats.forEach(c=>{ catByName[c.name]=c.code; catByName[c.code]=c.code; });
+    const norm=(k,v)=>{ v=String(v??'').trim(); if(k==='category_code') return catByName[v]||catByName[v.toUpperCase()]||'OT'; if(k==='item_type') return /tool|อุปกรณ์|เครื่องมือ/i.test(v)?'tool':'consumable'; if(k==='status') return /inactive|เลิก/i.test(v)?'inactive':'active'; if(k==='unit_price'||k==='min_stock') return v===''?'':Number(v.replace(/,/g,''))||0; return v; };
+    let added=0, upd=0;
+    body.forEach((cols,i)=>{
+      if(!cols.some(x=>x.trim())) return;
+      const vals={}; cols.forEach((v,j)=>{ const k=viaHdr?keys[j]:EDIT[EDIT.findIndex(c=>c===COLS[ci])+j]?.k; if(k) vals[k]=norm(k,v); });
+      let r=(vals.id&&rows.find(x=>!x._new&&x.id===vals.id))||((viaHdr||append)?null:list[ri+i]);
+      if(!r){ r=addRow({}); added++; } else upd++;
+      Object.entries(vals).forEach(([k,v])=>{ if(k==='id'&&!r._new) return; setVal(r,k,v); });
+    });
+    toast(`วางข้อมูลแล้ว: แก้ ${upd} แถว · เพิ่มใหม่ ${added} แถว (ยังไม่บันทึก)`); draw();
+  }
+  function bind(list){
+    const q=$('#gq'); q.oninput=e=>{ GRID.q=e.target.value.trim().toLowerCase(); const p=q.selectionStart; draw(); const n=$('#gq'); n.focus(); n.setSelectionRange(p,p); };
+    $('#gcat').onchange=e=>{ GRID.cat=e.target.value; draw(); }; $('#gtype').onchange=e=>{ GRID.type=e.target.value; draw(); };
+    $$('.grid [data-k]',host).forEach(inp=>{
+      const r=list[+inp.dataset.r], k=inp.dataset.k;
+      inp.addEventListener(inp.tagName==='SELECT'?'change':'input',()=>{ setVal(r,k,inp.value); inp.closest('td').classList.add('dirty'); const sv=$('[data-save]',host); if(sv){ sv.disabled=false; sv.textContent=`บันทึก (${dirty.size} แถว)`; } $('[data-undo]',host).disabled=false; });
+      inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const nx=$(`.grid [data-r="${+inp.dataset.r+1}"][data-c="${inp.dataset.c}"]`,host); if(nx) nx.focus(); } });
+      if(admin) inp.addEventListener('paste',e=>{ const t=e.clipboardData?.getData('text/plain')||''; if(/[\t\n]/.test(t.trim())){ e.preventDefault(); pasteGrid(t,list,+inp.dataset.r,+inp.dataset.c); } });
+    });
+    const ad=$('[data-add]',host); if(ad) ad.onclick=()=>{ addRow({}); draw(); setTimeout(()=>$('.grid tbody tr input[data-k="id"]',host)?.focus(),30); };
+    const ps=$('[data-paste]',host); if(ps) ps.onclick=()=>{ const ov=overlay(`<div class="modal" role="dialog" aria-modal="true"><h3 class="h2" style="font-size:18px">วางข้อมูลจาก Google Sheet / Excel</h3><p class="sm muted" style="margin:0">ในชีต เลือกช่วงข้อมูล (รวมแถวหัวคอลัมน์ mat_id, name, ...) กด Ctrl+C แล้ววางในกล่องนี้ ถ้าไม่มีหัวคอลัมน์ ระบบเรียงตามลำดับ: รหัส ชื่อ หมวด สเปก หน่วย${money?' ราคา':''} ขั้นต่ำ ประเภท สถานะ</p><textarea class="in" id="pt" rows="8" style="font-family:monospace;font-size:13px"></textarea><div class="row" style="gap:8px;justify-content:flex-end"><button class="btn" data-x>ยกเลิก</button><button class="btn btn-p" data-ok>วางลงตาราง</button></div></div>`);
+      $('[data-x]',ov.el).onclick=ov.close; $('[data-ok]',ov.el).onclick=()=>{ const t=$('#pt',ov.el).value; ov.close(); if(t.trim()) pasteGrid(t,shown(),0,1,true); }; };
+    const im=$('[data-imp]',host); if(im) im.onclick=matImportAny;
+    const tsv=()=>[EDIT.map(c=>c.k==='id'?'mat_id':c.k)].concat(shown().filter(r=>!r._new).map(r=>EDIT.map(c=>String(val(r,c.k)??'').replace(/[\t\n]/g,' ')))).map(r=>r.join('\t')).join('\n');
+    $('[data-copy]',host).onclick=async()=>{ try{ await navigator.clipboard.writeText(tsv()); toast('คัดลอกแล้ว นำไปวางใน Google Sheet ได้เลย'); }catch(_){ toast('คัดลอกไม่ได้ ใช้ดาวน์โหลด CSV แทน',true); } };
+    $('[data-csv]',host).onclick=()=>{ const csv='\ufeff'+tsv().split('\n').map(l=>l.split('\t').map(v=>/[",]/.test(v)?`"${v.replace(/"/g,'""')}"`:v).join(',')).join('\n'); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='KTY_ทะเบียนวัสดุ.csv'; a.click(); };
+    const ud=$('[data-undo]',host); if(ud) ud.onclick=()=>{ rows=rows.filter(r=>!r._new); dirty.clear(); draw(); };
+    const sv=$('[data-save]',host); if(sv) sv.onclick=async ev=>{
+      const out=[], ids=new Set(rows.filter(r=>!r._new).map(r=>r.id)), seen=new Set();
+      for(const [key,ch] of dirty){ const r=rows.find(x=>x._key===key); const o={id:val(r,'id'),name:String(val(r,'name')||'').trim(),category_code:val(r,'category_code')||'OT',spec:String(val(r,'spec')||'').trim()||null,unit:String(val(r,'unit')||'').trim(),min_stock:Number(val(r,'min_stock'))||0,item_type:val(r,'item_type'),status:val(r,'status'),updated_at:new Date().toISOString()};
+        if(money&&(r._new||'unit_price' in ch)) o.unit_price=Number(val(r,'unit_price'))||0;
+        if(!o.id||!o.name||!o.unit) return toast(`แถว ${o.id||'ใหม่'}: ต้องมีรหัส ชื่อ และหน่วย`,true);
+        if(r._new&&ids.has(o.id)) return toast(`รหัส ${o.id} มีอยู่แล้ว`,true); if(seen.has(o.id)) return toast(`รหัส ${o.id} ซ้ำในตาราง`,true); seen.add(o.id); out.push(o); }
+      busy(ev.target,true,'กำลังบันทึก...');
+      for(let i=0;i<out.length;i+=200){ const {error}=await sb.from('materials').upsert(out.slice(i,i+200),{onConflict:'id'}); if(error){ busy(ev.target,false); return toast(errText(error),true); } }
+      toast(`บันทึกแล้ว ${out.length} แถว`); mgMat();
+    };
+    $$('[data-img]',host).forEach(b=>b.onclick=()=>{ const r=rows.find(x=>x._key===b.dataset.img); if(r._new) return toast('บันทึกแถวก่อนใส่รูป',true); matImageSheet(r, imgRole, ()=>mgMat()); });
+  }
   draw();
+}
+function matImageSheet(r, canEdit, done){
+  const ov=overlay(`<div class="modal" role="dialog" aria-modal="true"><h3 class="h2" style="font-size:18px">${esc(r.id)} · ${esc(r.name)}</h3>
+    <div class="matimg">${r.image_url?`<img src="${esc(r.image_url)}" alt="">`:`<span class="muted">${IC.camera}<br>ยังไม่มีรูป</span>`}</div>
+    ${canEdit?`<div class="row" style="gap:8px;flex-wrap:wrap"><label class="btn btn-p grow">${r.image_url?'เปลี่ยนรูป':'ถ่าย / เลือกรูป'}<input type="file" accept="image/*" hidden data-f></label>${r.image_url?'<button class="btn btn-bad" data-del>ลบรูป</button>':''}</div>`:''}<button class="btn" data-x>ปิด</button></div>`);
+  $('[data-x]',ov.el).onclick=ov.close;
+  const set=async url=>{ const {error}=await sb.rpc('set_material_image',{p_id:r.id,p_url:url}); if(error) throw error; };
+  const del=$('[data-del]',ov.el); if(del) del.onclick=async()=>{ try{ await set(''); ov.close(); toast('ลบรูปแล้ว'); done(); }catch(e){ toast(errText(e),true); } };
+  const f=$('[data-f]',ov.el); if(f) f.onchange=async()=>{ const file=f.files[0]; if(!file) return;
+    try{ toast('กำลังอัปโหลดรูป...'); const blob=await resizeImage(file,600); const path=`${r.id}.jpg`;
+      const {error}=await sb.storage.from('material-images').upload(path,blob,{upsert:true,contentType:'image/jpeg',cacheControl:'3600'}); if(error) throw error;
+      const url=sb.storage.from('material-images').getPublicUrl(path).data.publicUrl+'?v='+Date.now(); await set(url); ov.close(); toast('บันทึกรูปแล้ว'); done(); }
+    catch(e){ toast(/bucket|not found/i.test(e.message||'')?'ยังไม่ได้รันไฟล์ 10_material_images.sql':errText(e),true); } };
 }
 function matEdit(m){
   const isNew=!m; m=m||{id:'',name:'',category_code:'OT',spec:'',unit:'ชิ้น',min_stock:0,item_type:'consumable',status:'active'};
@@ -368,12 +451,12 @@ function matEdit(m){
 async function matImportRows(rows){
   try{
     const pick=(r,...k)=>{ for(const x of k){ const key=Object.keys(r).find(c=>c.trim().toLowerCase()===x); if(key&&r[key]!=='') return r[key]; } return ''; };
-    const cats=new Set(MAT.cats.map(c=>c.code));
-    const items=rows.map(r=>{ const cat=String(pick(r,'category_code','category','หมวด')).trim().toUpperCase(); const t=String(pick(r,'item_type','ประเภท')).toLowerCase();
-      return { id:String(pick(r,'mat_id','id','รหัส')).trim().toUpperCase(), name:String(pick(r,'name','ชื่อ')).trim(), category_code:cats.has(cat)?cat:'OT', spec:String(pick(r,'spec','สเปก')).trim()||null,
+    const cats=new Set(MAT.cats.map(c=>c.code)), catByName={}; MAT.cats.forEach(c=>catByName[c.name]=c.code);
+    const items=rows.map(r=>{ const cr=String(pick(r,'category_code','category','หมวด','รหัสหมวด')).trim(), cat=catByName[cr]||cr.toUpperCase(); const t=String(pick(r,'item_type','ประเภท')).toLowerCase();
+      return { id:String(pick(r,'mat_id','id','รหัส','รหัสวัสดุ')).trim().toUpperCase(), name:String(pick(r,'name','ชื่อ','ชื่อวัสดุ','ชื่อวัสดุ / อุปกรณ์','รายการ')).trim(), category_code:cats.has(cat)?cat:'OT', spec:String(pick(r,'spec','สเปก')).trim()||null,
         unit:String(pick(r,'unit','หน่วย')).trim()||'ชิ้น', unit_price:Number(pick(r,'unit_price','price','ราคา'))||0, min_stock:Number(pick(r,'min_stock','ขั้นต่ำ'))||0,
         item_type:/tool|asset|อุปกรณ์|เครื่องมือ/.test(t)?'tool':'consumable', status:/inactive|ยกเลิก/.test(String(pick(r,'status')).toLowerCase())?'inactive':'active' }; }).filter(x=>x.id&&x.name);
-    if(!items.length) return toast('ไม่พบข้อมูลในไฟล์ (ต้องมีคอลัมน์ mat_id และ name)',true);
+    if(!items.length) return toast(`ไม่พบข้อมูล: ต้องมีคอลัมน์ mat_id และ name (คอลัมน์ที่พบ: ${Object.keys(rows[0]||{}).filter(Boolean).join(', ')||'ไม่มี'})`,true);
     if(!await confirmBox(`นำเข้า ${items.length} รายการ? รหัสที่มีอยู่แล้วจะถูกอัปเดต`,'นำเข้า')) return;
     for(let i=0;i<items.length;i+=200){ const {error}=await sb.from('materials').upsert(items.slice(i,i+200),{onConflict:'id'}); if(error) throw error; }
     toast(`นำเข้าแล้ว ${items.length} รายการ`); mgMat();
@@ -413,9 +496,13 @@ function pickSource(title){
       ov.close(); resolve({title:f.name,sheets:wb.SheetNames.map(n=>({name:n,rows:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:''})}))}); }catch(err){ toast(errText(err),true); } };
   });
 }
-const rowsToObjects = rows => { const hi=rows.findIndex(r=>r.some(c=>String(c).trim())); if(hi<0) return []; const h=rows[hi].map(c=>String(c).trim()); return rows.slice(hi+1).filter(r=>r.some(c=>String(c).trim()!=='')).map(r=>Object.fromEntries(h.map((k,i)=>[k,r[i]??'']))); };
+const HDR_HINT=/^(mat_id|id|รหัส|รหัสวัสดุ|name|ชื่อ|site_code|work_category)$/i;
+const rowsToObjects = rows => { let hi=rows.slice(0,15).findIndex(r=>r.filter(c=>HDR_HINT.test(String(c).trim())).length>=1); if(hi<0) hi=rows.findIndex(r=>r.some(c=>String(c).trim())); if(hi<0) return []; const h=rows[hi].map(c=>String(c).trim()); return rows.slice(hi+1).filter(r=>r.some(c=>String(c).trim()!=='')).map(r=>Object.fromEntries(h.map((k,i)=>[k,r[i]??'']))); };
 async function matImportAny(){ const src=await pickSource('นำเข้าทะเบียนวัสดุ'); if(!src) return;
-  const sh=src.sheets.find(s=>/^materials$/i.test(s.name))||src.sheets.find(s=>(s.rows[0]||[]).some(c=>/mat_id/i.test(c)))||src.sheets[0];
+  const has=(s,re)=>s.rows.slice(0,15).some(r=>r.some(c=>re.test(String(c).trim())));
+  const sh=src.sheets.find(s=>/^materials$/i.test(s.name.trim()))||src.sheets.find(s=>has(s,/^(mat_id|รหัสวัสดุ|รหัส)$/i)&&!has(s,/^site_code$/i))||src.sheets.find(s=>has(s,/^(mat_id|รหัส)$/i));
+  if(!sh) return toast(`ไม่พบแผ่นที่มีคอลัมน์ mat_id ในไฟล์ "${src.title}" (แผ่นที่พบ: ${src.sheets.map(s=>s.name).join(', ')})`,true);
+  if(has(sh,/^site_code$/i)) return toast('ไฟล์นี้เป็นแม่แบบ BOQ ให้นำเข้าที่ จัดการ > งบ BOQ',true);
   return matImportRows(rowsToObjects(sh.rows)); }
 async function boqImportAny(done){ const src=await pickSource('นำเข้างบ BOQ'); if(!src) return;
   const tpl=src.sheets.find(s=>/^boq$/i.test(s.name))||src.sheets.find(s=>(s.rows[0]||[]).some(c=>/site_code/i.test(c)));

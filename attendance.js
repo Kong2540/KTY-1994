@@ -530,7 +530,7 @@ let mgTab='sites';
 function pageManage(){
   const tabs=[...(isAdmin()?[['users','ผู้ใช้'],['perms','สิทธิ์รายระบบ']]:[]),['sites','ไซต์งาน'],['pos','ตำแหน่ง'],['stars','กติกาดาว'],['mat','วัสดุ'],['boq','งบ BOQ'],['kits','ชุดวัสดุ'],['money','ใครเห็นเงิน'],['storage','พื้นที่และสำรอง']];
   if(!tabs.some(t=>t[0]===mgTab)) mgTab=tabs[0][0];
-  setPage(head('จัดการ','ใช้ร่วมกันทั้งระบบ') + `<div class="col" style="max-width:760px"><div class="chips scroll" style="margin:0">${tabs.map(([k,t])=>`<button class="chip ${mgTab===k?'on':''}" data-mg="${k}">${t}</button>`).join('')}</div><div id="mg" class="col"><div class="loading"><div class="spin"></div></div></div></div>`);
+  setPage(head('จัดการ','ใช้ร่วมกันทั้งระบบ') + `<div class="col" style="max-width:${['mat','boq'].includes(mgTab)?'1400px':'760px'}"><div class="chips scroll" style="margin:0">${tabs.map(([k,t])=>`<button class="chip ${mgTab===k?'on':''}" data-mg="${k}">${t}</button>`).join('')}</div><div id="mg" class="col"><div class="loading"><div class="spin"></div></div></div></div>`);
   $$('[data-mg]').forEach(b=>b.onclick=()=>{ mgTab=b.dataset.mg; history.replaceState(null,'','#manage/'+mgTab); pageManage(); });
   ({users:mgUsers,perms:mgPerms,sites:mgSites,pos:mgPos,stars:mgStars,mat:mgMat,boq:mgBoq,kits:mgKits,money:mgMoney,storage:mgStorage})[mgTab]();
 }
