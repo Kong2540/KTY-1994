@@ -135,25 +135,30 @@ async function matCart(){
 
 /* ---------------- ใบเบิก (ดู / อนุมัติ / จ่าย / รับ) ---------------- */
 async function matDoc(id){
-  setPage(head('เอกสารคลัง','',{back:'#mat'}) + `<div id="db2"><div class="loading"><div class="spin"></div></div></div>`);
+  const bk=location.hash.startsWith('#brw')?'#brw':'#mat';
+  setPage(head(bk==='#brw'?'ใบยืมอุปกรณ์':'เอกสารคลัง','',{back:bk}) + `<div id="db2"><div class="loading"><div class="spin"></div></div></div>`);
   if(!await loadMat()) { $('#db2').outerHTML=needMat(); return; }
-  const [d,l,v,val]=await Promise.all([ sb.from('docs').select('*').eq('id',id).single(), sb.from('doc_lines').select('*').eq('doc_id',id).order('id'), sb.from('deliveries').select('*').eq('doc_id',id).order('round'), sb.rpc('doc_value',{p_doc:id}) ]);
+  const [d,l,v,val,rt]=await Promise.all([ sb.from('docs').select('*').eq('id',id).single(), sb.from('doc_lines').select('*').eq('doc_id',id).order('id'), sb.from('deliveries').select('*').eq('doc_id',id).order('round'), sb.rpc('doc_value',{p_doc:id}), sb.from('returns').select('*').eq('doc_id',id).order('returned_at') ]);
   if(d.error||!d.data){ $('#db2').outerHTML=`<div class="card empty"><b>ไม่พบเอกสาร หรือไม่มีสิทธิ์ดู</b></div>`; return; }
   const doc=d.data, lines=l.data||[], dlv=v.data||[], st=DOC_ST[doc.status]||[doc.status,''];
-  const site=S.sites.find(s=>s.id===doc.site_id), req=doc.doc_type==='REQ';
+  const site=S.sites.find(s=>s.id===doc.site_id), req=['REQ','BRW'].includes(doc.doc_type), brw=doc.doc_type==='BRW', rets=rt.error?[]:(rt.data||[]);
+  const canApprove=brw?isBrwApprover():isMatRole(['approver','admin']), canIssue=brw?(isBrwApprover()||isMatRole(['store','admin'])):isMatRole(['store','admin']);
   const mine=doc.requester===S.profile.id, siteUser=mine||isManager()||(S.mySites||[]).includes(doc.site_id);
   const acts=[];
-  if(req&&doc.status==='pending'&&(mine||isManager())) acts.push('<button class="btn btn-bad" data-act="cancel">ยกเลิกใบเบิก</button>');
-  if(req&&doc.status==='pending'&&isMatRole(['approver','admin'])) acts.push('<button class="btn btn-bad" data-act="reject">ไม่อนุมัติ</button>','<button class="btn btn-p" data-act="approve">อนุมัติ</button>');
-  if(req&&['approved','partial'].includes(doc.status)&&isMatRole(['store','admin'])) acts.push('<button class="btn btn-p" data-act="issue">จ่ายของ</button>');
+  if(req&&doc.status==='pending'&&(mine||isManager())) acts.push(`<button class="btn btn-bad" data-act="cancel">ยกเลิก${brw?'ใบยืม':'ใบเบิก'}</button>`);
+  if(req&&doc.status==='pending'&&canApprove) acts.push('<button class="btn btn-bad" data-act="reject">ไม่อนุมัติ</button>','<button class="btn btn-p" data-act="approve">อนุมัติ</button>');
+  if(req&&['approved','partial'].includes(doc.status)&&canIssue) acts.push(`<button class="btn btn-p" data-act="issue">${brw?'ส่งอุปกรณ์':'จ่ายของ'}</button>`);
+  if(brw&&brwOut(doc)&&(siteUser||canIssue)) acts.push('<button class="btn btn-p" data-act="return">คืนอุปกรณ์</button>');
+  if(brw&&['approved','partial','issued','received'].includes(doc.status)&&siteUser&&!doc.ext_due) acts.push('<button class="btn" data-act="ext">ขอขยายเวลา</button>');
+  if(brw&&doc.ext_due&&canApprove) acts.push('<button class="btn" data-act="extno">ไม่ขยาย</button>','<button class="btn btn-p" data-act="extok">อนุมัติขยายเวลา</button>');
   const kv=(a,b)=>`<div class="kv"><span>${a}</span><span>${b||'-'}</span></div>`;
   $('#db2').outerHTML=`<div class="col" style="gap:12px;max-width:820px">
     <div class="card col" style="gap:4px"><div class="row"><b class="grow" style="font-size:17px">${esc(doc.doc_no)}</b><span class="tag ${st[1]}">${st[0]}</span></div><span class="sm muted">${DOC_T[doc.doc_type]} · ${dayLong(localISO(new Date(doc.created_at)))}</span></div>
-    <div class="card card-l">${kv('ไซต์ / คลัง',esc(site?.name||locName(doc.to_loc)))}${req?kv('หมวดงาน',esc(doc.work_category)):''}${doc.from_loc&&!req?kv('จาก',esc(locName(doc.from_loc))):''}${kv(req?'ผู้ขอเบิก':'ผู้บันทึก',esc(doc.requester_name))}
-      ${req?kv('ต้องการใช้',doc.need_date?`${thaiDate(doc.need_date)} ${esc(doc.need_note||'')}`:esc(doc.need_note)):''}${doc.supplier?kv('ผู้ขาย',esc(doc.supplier)):''}${doc.approver_name&&req?kv('ผู้อนุมัติ',`${esc(doc.approver_name)} · ${new Date(doc.approved_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}`):''}
+    <div class="card card-l">${kv('ไซต์ / คลัง',esc(site?.name||locName(doc.to_loc)))}${req&&!brw?kv('หมวดงาน',esc(doc.work_category)):''}${doc.from_loc&&!req?kv('จาก',esc(locName(doc.from_loc))):''}${kv(brw?'ผู้ขอยืม':req?'ผู้ขอเบิก':'ผู้บันทึก',esc(doc.requester_name))}
+      ${brw?kv('ระยะเวลายืม',`${thaiDate(doc.need_date)} – <b style="color:${doc.due_date<localISO()&&brwOut(doc)?'var(--bad)':'inherit'}">${thaiDate(doc.due_date)}</b>`)+kv('ใช้สำหรับ',esc(doc.need_note))+(doc.ext_due?kv('ขอขยายถึง',`<span style="color:var(--warn)">${thaiDate(doc.ext_due)} · ${esc(doc.ext_reason||'')}</span>`):''):req?kv('ต้องการใช้',doc.need_date?`${thaiDate(doc.need_date)} ${esc(doc.need_note||'')}`:esc(doc.need_note)):''}${doc.supplier?kv('ผู้ขาย',esc(doc.supplier)):''}${doc.approver_name&&req?kv('ผู้อนุมัติ',`${esc(doc.approver_name)} · ${new Date(doc.approved_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}`):''}
       ${val.data!=null?kv('มูลค่า',`<b class="num">${baht(val.data)}</b>`):''}${doc.reject_reason?kv('เหตุผลไม่อนุมัติ',`<span style="color:var(--bad)">${esc(doc.reject_reason)}</span>`):''}${doc.note?kv('หมายเหตุ',esc(doc.note).replace(/\n/g,'<br>')):''}</div>
-    <div class="card" style="padding:0;overflow-x:auto"><table class="tbl"><thead><tr><th>รายการ</th><th class="num">ขอ</th>${req?'<th class="num">อนุมัติ</th><th class="num">จ่ายแล้ว</th><th class="num">รับแล้ว</th>':''}</tr></thead><tbody>
-      ${lines.map(x=>{ const m=matById(x.material_id); return `<tr><td><b>${esc(m.name)}</b><div class="xs muted">${esc(m.id)} · ${esc(m.unit)}</div></td><td class="num">${fmtN(x.qty_req)}</td>${req?`<td class="num">${x.qty_approved==null?'-':fmtN(x.qty_approved)}</td><td class="num">${fmtN(x.qty_issued)}</td><td class="num">${fmtN(x.qty_received)}</td>`:''}</tr>`; }).join('')}</tbody></table></div>
+    <div class="card" style="padding:0;overflow-x:auto"><table class="tbl"><thead><tr><th>รายการ</th><th class="num">ขอ</th>${req?`<th class="num">อนุมัติ</th><th class="num">${brw?'ส่งแล้ว':'จ่ายแล้ว'}</th><th class="num">รับแล้ว</th>${brw?'<th class="num">คืนแล้ว</th>':''}`:''}</tr></thead><tbody>
+      ${lines.map(x=>{ const m=matById(x.material_id); return `<tr><td><b>${esc(m.name)}</b><div class="xs muted">${esc(m.id)} · ${esc(m.unit)}</div></td><td class="num">${fmtN(x.qty_req)}</td>${req?`<td class="num">${x.qty_approved==null?'-':fmtN(x.qty_approved)}</td><td class="num">${fmtN(x.qty_issued)}</td><td class="num">${fmtN(x.qty_received)}</td>${brw?`<td class="num">${fmtN(x.qty_returned+x.qty_damaged+x.qty_lost)}${x.qty_damaged||x.qty_lost?`<div class="xs" style="color:var(--bad)">ชำรุด ${fmtN(x.qty_damaged)} หาย ${fmtN(x.qty_lost)}</div>`:''}</td>`:''}`:''}</tr>`; }).join('')}</tbody></table></div>
     ${dlv.map(x=>`<div class="card col" style="gap:8px"><div class="row"><b class="grow">จ่ายรอบที่ ${x.round}</b><span class="tag ${x.status==='review'?'t-bad':x.status==='sent'?'t-acc':'t-ok'}">${{sent:'รอไซต์รับ',received:'รับครบ',review:'รับไม่ตรง รอตรวจ',closed:'ปิดแล้ว'}[x.status]}</span></div>
       <span class="sm muted">จ่ายโดย ${esc(x.issued_name||'')} · ${new Date(x.issued_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}${x.received_name?` · รับโดย ${esc(x.received_name)} · ${new Date(x.received_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}`:''}</span>
       <div class="sm">${x.lines.map(y=>{ const got=(x.received_lines||[]).find(z=>z.line_id===y.line_id); return `${esc(matById(y.material_id).name)} ${fmtN(y.qty)}${got&&+got.qty!==+y.qty?` <span style="color:var(--bad)">(รับ ${fmtN(got.qty)})</span>`:''}`; }).join(' · ')}</div>
@@ -161,15 +166,20 @@ async function matDoc(id){
       ${(x.photos||[]).length?`<div class="pgrid">${x.photos.map(p=>`<a class="pthumb" href="${esc(p.url)}" target="_blank" rel="noopener"><img src="${esc(p.thumb)}" alt="" loading="lazy"></a>`).join('')}</div>`:''}
       ${x.resolve_note?`<span class="xs muted">ผลตรวจ: ${esc(x.resolve_note)}</span>`:''}
       <div class="row" style="gap:8px">${x.status==='sent'&&siteUser?`<button class="btn btn-p" data-recv="${x.id}">ยืนยันรับของรอบนี้</button>`:''}${x.status==='review'&&isMatRole(['store','admin'])?`<button class="btn" data-res="${x.id}|resend">ส่งขาด: จ่ายใหม่</button><button class="btn btn-bad" data-res="${x.id}|writeoff">ตัดเป็นสูญหาย</button>`:''}</div></div>`).join('')}
-    <div class="row" style="gap:8px;flex-wrap:wrap">${req?'<button class="btn" data-act="share">แชร์รูปใบเบิก</button>':''}${acts.join('')}</div></div>`;
+    ${rets.map(r=>`<div class="card col" style="gap:6px"><div class="row"><b class="grow">คืนอุปกรณ์</b><span class="xs muted">${esc(r.returned_name||'')} · ${new Date(r.returned_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}</span></div><div class="sm">${r.lines.map(y=>`${esc(matById(y.material_id).name)} ปกติ ${fmtN(y.ok)}${y.damaged?` · <span style="color:var(--warn)">ชำรุด ${fmtN(y.damaged)}</span>`:''}${y.lost?` · <span style="color:var(--bad)">หาย ${fmtN(y.lost)}</span>`:''}`).join('<br>')}</div>${r.note?`<span class="xs muted">${esc(r.note)}</span>`:''}${r.signature?`<img src="${r.signature}" alt="ลายเซ็นผู้คืน" style="max-width:220px;height:70px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:8px">`:''}</div>`).join('')}
+    <div class="row" style="gap:8px;flex-wrap:wrap">${req?`<button class="btn" data-act="share">แชร์รูป${brw?'ใบยืม':'ใบเบิก'}</button>`:''}${acts.join('')}</div></div>`;
   const reload=()=>matDoc(id);
   $$('[data-act]').forEach(b=>b.onclick=async()=>{ const a=b.dataset.act;
     if(a==='share') return shareDocImage(id);
-    if(a==='cancel'){ if(!await confirmBox('ยกเลิกใบเบิกนี้?','ยกเลิกใบเบิก',true)) return; const {error}=await sb.rpc('cancel_doc',{p_doc:id}); if(error) return toast(errText(error),true); toast('ยกเลิกแล้ว'); return reload(); }
+    if(a==='return') return returnSheet(doc,lines,reload);
+    if(a==='ext'){ const ov=overlay(`<div class="modal" role="dialog" aria-modal="true"><h3 class="h2" style="font-size:18px">ขอขยายเวลาคืน</h3><div class="field"><label>กำหนดคืนใหม่</label><input class="in" type="date" id="ex_d" min="${addDays(doc.due_date||localISO(),1)}" value="${addDays(doc.due_date||localISO(),3)}"></div><div class="field"><label>เหตุผล</label><input class="in" id="ex_r"></div><div class="row" style="gap:8px;justify-content:flex-end"><button class="btn" data-x>ยกเลิก</button><button class="btn btn-p" data-ok>ส่งคำขอ</button></div></div>`);
+      $('[data-x]',ov.el).onclick=ov.close; $('[data-ok]',ov.el).onclick=async()=>{ const {error}=await sb.rpc('request_ext',{p_doc:id,p_due:$('#ex_d',ov.el).value,p_reason:$('#ex_r',ov.el).value.trim()||null}); if(error) return toast(errText(error),true); ov.close(); toast('ส่งคำขอขยายเวลาแล้ว'); reload(); }; return; }
+    if(a==='extok'||a==='extno'){ const {error}=await sb.rpc('decide_ext',{p_doc:id,p_ok:a==='extok'}); if(error) return toast(errText(error),true); toast(a==='extok'?'ขยายกำหนดคืนแล้ว':'ไม่อนุมัติขยายเวลา'); return reload(); }
+    if(a==='cancel'){ if(!await confirmBox(`ยกเลิก${brw?'ใบยืม':'ใบเบิก'}นี้?`,'ยกเลิก',true)) return; const {error}=await sb.rpc('cancel_doc',{p_doc:id}); if(error) return toast(errText(error),true); toast('ยกเลิกแล้ว'); return reload(); }
     if(a==='reject'){ const r=await promptBox('เหตุผลที่ไม่อนุมัติ',''); if(!r) return; const {error}=await sb.rpc('reject_req',{p_doc:id,p_reason:r}); if(error) return toast(errText(error),true); toast('ไม่อนุมัติแล้ว'); return reload(); }
     if(a==='approve') return qtySheet('อนุมัติใบเบิก','จำนวนที่อนุมัติ (แก้ได้)',lines.map(x=>({id:x.id,m:x.material_id,max:null,def:x.qty_req,sub:`ขอ ${fmtN(x.qty_req)}`})),'อนุมัติ',async(vals,note)=>{ const {error}=await sb.rpc('approve_req',{p_doc:id,p_lines:vals.map(x=>({line_id:x.id,qty:x.v})),p_note:note||null}); if(error) throw error; toast('อนุมัติแล้ว'); reload(); },true);
     if(a==='issue'){ const c=centralLoc(); const {data:stk}=await sb.rpc('stock_view',{p_loc:c.id}); const s={}; (stk||[]).forEach(x=>s[x.material_id]=+x.qty);
-      return qtySheet('จ่ายของ',`จ่ายจาก ${c.name} (ค้างจ่าย / คงคลัง)`,lines.filter(x=>x.qty_approved-x.qty_issued>0).map(x=>{ const rem=x.qty_approved-x.qty_issued, have=s[x.material_id]||0; return {id:x.id,m:x.material_id,max:Math.min(rem,have),def:Math.min(rem,have),sub:`ค้างจ่าย ${fmtN(rem)} · คงคลัง ${fmtN(have)}`,warn:have<rem}; }),'ยืนยันจ่ายรอบนี้',async vals=>{ const {error}=await sb.rpc('issue_req',{p_doc:id,p_lines:vals.map(x=>({line_id:x.id,qty:x.v}))}); if(error) throw error; toast('บันทึกการจ่ายแล้ว'); reload(); }); }
+      return qtySheet(brw?'ส่งอุปกรณ์':'จ่ายของ',`จ่ายจาก ${c.name} (ค้างจ่าย / คงคลัง)`,lines.filter(x=>x.qty_approved-x.qty_issued>0).map(x=>{ const rem=x.qty_approved-x.qty_issued, have=s[x.material_id]||0; return {id:x.id,m:x.material_id,max:Math.min(rem,have),def:Math.min(rem,have),sub:`ค้างจ่าย ${fmtN(rem)} · คงคลัง ${fmtN(have)}`,warn:have<rem}; }),'ยืนยันจ่ายรอบนี้',async vals=>{ const {error}=await sb.rpc('issue_req',{p_doc:id,p_lines:vals.map(x=>({line_id:x.id,qty:x.v}))}); if(error) throw error; toast('บันทึกการจ่ายแล้ว'); reload(); }); }
   });
   $$('[data-recv]').forEach(b=>b.onclick=()=>receiveSheet(dlv.find(x=>x.id==b.dataset.recv),doc,reload));
   $$('[data-res]').forEach(b=>b.onclick=async()=>{ const [did,act]=b.dataset.res.split('|'); const note=await promptBox(act==='resend'?'หมายเหตุ (ส่งขาด จะคืนยอดเข้าคลังกลางและจ่ายใหม่ได้)':'หมายเหตุ (ตัดเป็นสูญหาย)',''); if(note===null) return;
@@ -283,25 +293,25 @@ async function matPost(type){
 
 /* ---------------- รูปใบเบิกสำหรับแชร์ (สร้างในเครื่อง ไม่ใช้โควตา LINE) ---------------- */
 async function shareDocImage(id){
-  const prog=overlay(`<div class="modal" role="dialog" aria-modal="true"><div class="row" style="gap:10px"><span class="spin" style="margin:0"></span><b>กำลังสร้างรูปใบเบิก</b></div></div>`,true,false);
+  const prog=overlay(`<div class="modal" role="dialog" aria-modal="true"><div class="row" style="gap:10px"><span class="spin" style="margin:0"></span><b>กำลังสร้างรูปเอกสาร</b></div></div>`,true,false);
   try{
     await Promise.all([loadScript(LIB.h2c),loadScript(LIB.qr),loadMat()]);
     const [d,l]=await Promise.all([ sb.from('docs').select('*').eq('id',id).single(), sb.from('doc_lines').select('*').eq('doc_id',id).order('id') ]);
-    const doc=d.data, lines=l.data||[], site=S.sites.find(s=>s.id===doc.site_id);
+    const doc=d.data, lines=l.data||[], site=S.sites.find(s=>s.id===doc.site_id), brw=doc.doc_type==='BRW';
     const qr=qrcode(0,'M'); qr.addData(`${location.origin}${location.pathname}#mat/d/${id}`); qr.make();
-    const stepI={pending:1,approved:2,partial:2,issued:3,received:4,review:3}[doc.status]??1;
-    const steps=['ขอ','อนุมัติ','จ่ายของ','รับของ'].map((t,i)=>`<div class="ds-st ${i<stepI?'done':i===stepI?'now':''}"><span>${i<stepI?'✓':i+1}</span><em>${t}</em></div>`).join('<div class="ds-ln"></div>');
+    const stepI=(brw?{pending:1,approved:2,partial:2,issued:2,received:3,review:3,returned:4}:{pending:1,approved:2,partial:2,issued:3,received:4,review:3})[doc.status]??1;
+    const steps=(brw?['ขอยืม','อนุมัติ','รับของ','คืนแล้ว']:['ขอ','อนุมัติ','จ่ายของ','รับของ']).map((t,i)=>`<div class="ds-st ${i<stepI?'done':i===stepI?'now':''}"><span>${i<stepI?'✓':i+1}</span><em>${t}</em></div>`).join('<div class="ds-ln"></div>');
     const shown=lines.slice(0,12);
     const logo=S.settings.company_logo?.drive_id;
     const el=document.createElement('div'); el.className='docslip';
-    el.innerHTML=`<div class="ds-head"><div class="ds-logo">${logo?`<img src="https://drive.google.com/thumbnail?id=${logo}&sz=w200" crossorigin="anonymous" alt="">`:'KTY'}</div><div class="ds-co"><b>ห้างหุ้นส่วนจำกัด กิตติยาก่อสร้าง 1994</b><span>KITTIYA CONSTRUCTION 1994 LIMITED PARTNERSHIP</span></div><div class="ds-ti"><b>ใบขอเบิกวัสดุ</b><span>MATERIAL REQUISITION</span></div></div><div class="ds-rule"></div>
+    el.innerHTML=`<div class="ds-head"><div class="ds-logo">${logo?`<img src="https://drive.google.com/thumbnail?id=${logo}&sz=w200" crossorigin="anonymous" alt="">`:'KTY'}</div><div class="ds-co"><b>ห้างหุ้นส่วนจำกัด กิตติยาก่อสร้าง 1994</b><span>KITTIYA CONSTRUCTION 1994 LIMITED PARTNERSHIP</span></div><div class="ds-ti"><b>${brw?'ใบขอยืมอุปกรณ์':'ใบขอเบิกวัสดุ'}</b><span>${brw?'EQUIPMENT BORROW SLIP':'MATERIAL REQUISITION'}</span></div></div><div class="ds-rule"></div>
       <div class="ds-no"><span>เลขที่ <b>${esc(doc.doc_no)}</b></span><span>${thaiDate(localISO(new Date(doc.created_at)))} · ${new Date(doc.created_at).toTimeString().slice(0,5)} น.</span></div>
-      <div class="ds-info"><div>${[['โครงการ',(site?.code?site.code+' ':'')+(site?.name||'')],['หมวดงาน',doc.work_category||'-'],['ผู้ขอเบิก',doc.requester_name],['ต้องการใช้',doc.need_date?thaiDate(doc.need_date)+' '+(doc.need_note||''):(doc.need_note||'-')]].map(([a,b])=>`<p><span>${a}</span><b>${esc(b||'-')}</b></p>`).join('')}</div><div class="ds-qr">${qr.createSvgTag({cellSize:3,margin:0,scalable:true})}<small>สแกนเปิดใน KTY Hub</small></div></div>
+      <div class="ds-info"><div>${(brw?[['โครงการ',(site?.code?site.code+' ':'')+(site?.name||'')],['ผู้ขอยืม',doc.requester_name],['ระยะเวลายืม',`${thaiDate(doc.need_date)} – ${thaiDate(doc.due_date)}`],['ใช้สำหรับ',doc.need_note||'-']]:[['โครงการ',(site?.code?site.code+' ':'')+(site?.name||'')],['หมวดงาน',doc.work_category||'-'],['ผู้ขอเบิก',doc.requester_name],['ต้องการใช้',doc.need_date?thaiDate(doc.need_date)+' '+(doc.need_note||''):(doc.need_note||'-')]]).map(([a,b])=>`<p><span>${a}</span><b>${esc(b||'-')}</b></p>`).join('')}</div><div class="ds-qr">${qr.createSvgTag({cellSize:3,margin:0,scalable:true})}<small>สแกนเปิดใน KTY Hub</small></div></div>
       <table><tr><th>ที่</th><th>รายการ</th><th class="r">จำนวน</th><th>หน่วย</th></tr>${shown.map((x,i)=>{ const m=matById(x.material_id); return `<tr><td>${i+1}</td><td><b>${esc(m.name)}</b>${m.spec?`<i>${esc(m.spec)}</i>`:''}</td><td class="r"><b>${fmtN(x.qty_approved??x.qty_req)}</b></td><td>${esc(m.unit)}</td></tr>`; }).join('')}</table>
       <div class="ds-sum">รวม ${lines.length} รายการ${lines.length>shown.length?` (แสดง ${shown.length} รายการแรก)`:''}</div>
-      ${doc.note?`<div class="ds-note">${esc(doc.note)}</div>`:''}
+      ${brw?'<div class="ds-note">ผู้ยืมรับผิดชอบดูแลอุปกรณ์จนกว่าจะคืน หากชำรุดหรือสูญหายต้องแจ้งทันที</div>':''}${doc.note?`<div class="ds-note">${esc(doc.note)}</div>`:''}
       <div class="ds-steps">${steps}</div>
-      <div class="ds-sign"><div><b>${esc(doc.requester_name||'')}</b><span>ผู้ขอเบิก · ส่งในระบบ ${new Date(doc.created_at).toTimeString().slice(0,5)} น.</span></div><div><b>${esc(doc.approver_name||(doc.status==='rejected'?'ไม่อนุมัติ':'รออนุมัติ'))}</b><span>ผู้อนุมัติ${doc.approved_at?' · '+new Date(doc.approved_at).toTimeString().slice(0,5)+' น.':''}</span></div></div>
+      <div class="ds-sign"><div><b>${esc(doc.requester_name||'')}</b><span>${brw?'ผู้ขอยืม':'ผู้ขอเบิก'} · ส่งในระบบ ${new Date(doc.created_at).toTimeString().slice(0,5)} น.</span></div><div><b>${esc(doc.approver_name||(doc.status==='rejected'?'ไม่อนุมัติ':'รออนุมัติ'))}</b><span>ผู้อนุมัติ${doc.approved_at?' · '+new Date(doc.approved_at).toTimeString().slice(0,5)+' น.':''}</span></div></div>
       <div class="ds-foot"><span>สร้างโดย KTY Hub</span><span>ไม่แสดงราคา · เอกสารอ้างอิงในระบบ</span></div>`;
     document.body.appendChild(el);
     await document.fonts?.ready; await new Promise(r=>setTimeout(r,150));
@@ -310,8 +320,8 @@ async function shareDocImage(id){
     const blob=await new Promise(r=>canvas.toBlob(r,'image/png'));
     const url=URL.createObjectURL(blob), name=`${doc.doc_no}.png`;
     prog.close();
-    const m=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="ดูตัวอย่างใบเบิก"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>ดูตัวอย่างใบเบิก<small>${esc(doc.doc_no)}</small></h1></header>
-      <div class="sheet-body"><img src="${url}" alt="รูปใบเบิก" style="width:100%;max-width:520px;border-radius:10px;box-shadow:var(--shadow);align-self:center"><div class="note n-info">${IC.check}<span>บันทึกในระบบแล้ว ผู้อนุมัติเห็นในแอปทันที การแชร์รูปเข้า LINE ไม่ใช้โควตาของ bot</span></div></div>
+    const m=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="ดูตัวอย่างใบเบิก"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>ดูตัวอย่าง${brw?'ใบยืม':'ใบเบิก'}<small>${esc(doc.doc_no)}</small></h1></header>
+      <div class="sheet-body"><img src="${url}" alt="รูปเอกสาร" style="width:100%;max-width:520px;border-radius:10px;box-shadow:var(--shadow);align-self:center"><div class="note n-info">${IC.check}<span>บันทึกในระบบแล้ว ผู้อนุมัติเห็นในแอปทันที การแชร์รูปเข้า LINE ไม่ใช้โควตาของ bot</span></div></div>
       <div class="sheet-foot" style="flex-wrap:wrap"><button class="btn" data-save>บันทึกรูป</button><button class="btn btn-p" data-share style="background:#06C755;border-color:#06C755;color:#fff">แชร์รูปเข้า LINE</button></div></div>`, false, false);
     $('[data-x]',m.el).onclick=()=>{ URL.revokeObjectURL(url); m.close(); };
     $('[data-save]',m.el).onclick=()=>{ const a=document.createElement('a'); a.href=url; a.download=name; a.click(); };
