@@ -475,7 +475,7 @@ async function mgBoq(){
         <div class="g2"><input class="in" name="qty" type="number" step="any" placeholder="จำนวนงบ" required><input class="in" name="price" type="number" step="any" placeholder="ราคาต่อหน่วยใน BOQ (ไม่บังคับ)"></div><button class="btn btn-sm" style="align-self:flex-start">บันทึก</button></form>
       <div class="card" style="padding:0;overflow-x:auto"><table class="tbl"><thead><tr><th>หมวดงาน / วัสดุ</th><th class="num">งบ</th><th class="num">ขอแล้ว</th><th></th></tr></thead><tbody>${rows.map(r=>{ const m=matById(r.material_id), p=r.budget?Math.round(r.used/r.budget*100):0; return `<tr><td><span class="xs muted">${esc(r.work_category)}</span><br><b>${esc(m.name)}</b></td><td class="num">${fmtN(r.budget)} ${esc(m.unit)}</td><td class="num" style="${p>100?'color:var(--bad)':p>80?'color:var(--warn)':''}">${fmtN(r.used)} (${p}%)</td><td><button class="ibtn" data-del="${esc(r.work_category)}|${r.material_id}" aria-label="ลบ">${IC.close}</button></td></tr>`; }).join('')||'<tr><td colspan="4"><div class="empty"><b>ยังไม่มีงบ BOQ ของไซต์นี้</b></div></td></tr>'}</tbody></table></div>`;
     $('#bs').onchange=e=>{ site=+e.target.value; draw(); };
-    $('[data-bimp]').onclick=()=>boqImportAny(()=>draw());
+    $('[data-bimp]').onclick=()=>boqImportAny(s=>{ if(s) site=s; draw(); }, site);
     $('#bf').onsubmit=async e=>{ e.preventDefault(); const f=e.target; const row={site_id:site,work_category:f.cat.value.trim(),material_id:f.mat.value.trim().toUpperCase(),qty:Number(f.qty.value)||0}; if(f.price.value) row.unit_price=Number(f.price.value);
       const {error}=await sb.from('boq_budget').upsert(row,{onConflict:'site_id,work_category,material_id'}); if(error) return toast(errText(error),true); toast('บันทึกงบแล้ว'); draw(); };
     $$('[data-del]').forEach(b=>b.onclick=async()=>{ const [c,mid]=b.dataset.del.split('|'); if(!await confirmBox('ลบรายการงบนี้?','ลบ',true)) return; const {error}=await sb.from('boq_budget').delete().eq('site_id',site).eq('work_category',c).eq('material_id',mid); if(error) return toast(errText(error),true); draw(); });
@@ -504,12 +504,12 @@ async function matImportAny(){ const src=await pickSource('นำเข้าท
   if(!sh) return toast(`ไม่พบแผ่นที่มีคอลัมน์ mat_id ในไฟล์ "${src.title}" (แผ่นที่พบ: ${src.sheets.map(s=>s.name).join(', ')})`,true);
   if(has(sh,/^site_code$/i)) return toast('ไฟล์นี้เป็นแม่แบบ BOQ ให้นำเข้าที่ จัดการ > งบ BOQ',true);
   return matImportRows(rowsToObjects(sh.rows)); }
-async function boqImportAny(done){ const src=await pickSource('นำเข้างบ BOQ'); if(!src) return;
-  const tpl=src.sheets.find(s=>/^boq$/i.test(s.name))||src.sheets.find(s=>(s.rows[0]||[]).some(c=>/site_code/i.test(c)));
-  if(tpl) return boqImportRows(rowsToObjects(tpl.rows),done);
+async function boqImportAny(done, siteHint){ const src=await pickSource('นำเข้างบ BOQ'); if(!src) return;
+  const tpl=src.sheets.find(s=>/^boq$/i.test(s.name.trim()))||src.sheets.find(s=>s.rows.slice(0,15).some(r=>r.some(c=>/^work_category$/i.test(String(c).trim()))&&r.some(c=>/^mat_id$/i.test(String(c).trim()))));
+  if(tpl) return boqImportRows(rowsToObjects(tpl.rows),done,siteHint);
   const pr4=src.sheets.map(s=>({name:s.name,items:parsePr4(s.rows)})).filter(s=>s.items.length);
   if(!pr4.length) return toast('ไม่พบแผ่น BOQ แบบแม่แบบ หรือแบบ ปร.4 ในไฟล์นี้',true);
-  return pr4Mapper(src.title,pr4,done);
+  return pr4Mapper(src.title,pr4,done,siteHint);
 }
 /* ---------------- อ่านแบบ ปร.4 ---------------- */
 function parsePr4(rows){
@@ -539,8 +539,8 @@ function bestMatch(name){
   let best=null, sc=0; MAT.items.forEach(m=>{ const B=bg(clean(m.name)); let inter=0; A.forEach(x=>{ if(B.has(x)) inter++; }); const j=inter/Math.max(1,A.size+B.size-inter); if(j>sc){ sc=j; best=m; } });
   return sc>=.45?best:null;
 }
-function pr4Mapper(title, sheets, done){
-  const sites=S.sites.filter(s=>s.status==='active'); let site=S.site?+S.site:sites[0]?.id;
+function pr4Mapper(title, sheets, done, siteHint){
+  const sites=S.sites.filter(s=>s.status==='active'); let site=siteHint||(S.site?+S.site:sites[0]?.id);
   const main=[...sheets].sort((x,y)=>y.items.length-x.items.length)[0]; const sel=new Set([main.name]); const items=[]; sheets.forEach(s=>s.items.forEach(it=>items.push({...it,sheet:s.name})));
   items.forEach(it=>{ const mm=bestMatch(it.name); it.act=mm?mm.id:'new'; });
   const ov=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="นำเข้า BOQ จาก ปร.4"></div>`,false,false); const sh=$('.sheet',ov.el);
@@ -572,30 +572,54 @@ function pr4Mapper(title, sheets, done){
         const agg={}; use.forEach(it=>{ const mid=it.act==='new'?it.mid:it.act, k=`${it.cat}|${mid}`; if(agg[k]) agg[k].qty+=it.qty; else agg[k]={site_id:site,work_category:it.cat,material_id:mid,qty:it.qty,unit_price:it.price}; });
         const rows=Object.values(agg).map(r=>({...r,qty:Math.round(r.qty*100)/100}));
         for(let i=0;i<rows.length;i+=200){ const {error}=await sb.from('boq_budget').upsert(rows.slice(i,i+200),{onConflict:'site_id,work_category,material_id'}); if(error) throw error; }
-        ov.close(); await loadMat(true); toast(`นำเข้างบ ${rows.length} รายการ · สร้างวัสดุใหม่ ${newMats.length} รายการ`); done&&done();
+        ov.close(); await loadMat(true); toast(`นำเข้างบ ${rows.length} รายการ · สร้างวัสดุใหม่ ${newMats.length} รายการ`); done&&done(site);
       }catch(e){ busy(ev.target,false); toast(errText(e),true); }
     };
   }
   draw();
 }
-async function boqImportRows(rows, done){
-  try{
-    const pick=(r,...k)=>{ for(const x of k){ const key=Object.keys(r).find(c=>c.trim().toLowerCase()===x); if(key&&r[key]!=='') return r[key]; } return ''; };
-    const byCode={}; S.sites.forEach(s=>{ if(s.code) byCode[s.code.toUpperCase()]=s.id; });
-    const ok=[], bad=[]; const agg={};
-    rows.forEach((r,i)=>{ const code=String(pick(r,'site_code','รหัสโครงการ')).trim().toUpperCase(), cat=String(pick(r,'work_category','หมวดงาน')).trim(), mid=String(pick(r,'mat_id','รหัสวัสดุ')).trim().toUpperCase(), qty=Number(pick(r,'qty','จำนวน'));
-      if(!code&&!mid) return;
-      if(!byCode[code]) return bad.push(`แถว ${i+2}: ไม่พบรหัสโครงการ ${code||'(ว่าง)'}`);
-      if(!MAT.items.some(m=>m.id===mid)) return bad.push(`แถว ${i+2}: ไม่พบรหัสวัสดุ ${mid||'(ว่าง)'}`);
-      if(!cat||!(qty>=0)) return bad.push(`แถว ${i+2}: หมวดงานหรือจำนวนไม่ถูกต้อง`);
-      const k=`${byCode[code]}|${cat}|${mid}`, price=pick(r,'unit_price','ราคา');
-      if(agg[k]) agg[k].qty+=qty; else agg[k]={site_id:byCode[code],work_category:cat,material_id:mid,qty,...(price!==''?{unit_price:Number(price)}:{})}; });
-    Object.values(agg).forEach(x=>ok.push(x));
-    if(!ok.length) return toast(bad[0]||'ไม่พบข้อมูลในไฟล์',true);
-    if(!await confirmBox(`นำเข้างบ ${ok.length} รายการ${bad.length?` (ข้ามแถวที่ผิด ${bad.length} แถว: ${bad.slice(0,3).join(' / ')}${bad.length>3?' …':''})`:''} รายการเดิมที่ซ้ำจะถูกแทนที่`,'นำเข้า')) return;
-    for(let i=0;i<ok.length;i+=200){ const {error}=await sb.from('boq_budget').upsert(ok.slice(i,i+200),{onConflict:'site_id,work_category,material_id'}); if(error) throw error; }
-    toast(`นำเข้างบ BOQ แล้ว ${ok.length} รายการ`); done&&done();
-  }catch(e){ toast(errText(e),true); }
+const numOf = v => { if(typeof v==='number') return v; const n=Number(String(v??'').replace(/[,\s฿]/g,'')); return isFinite(n)?n:NaN; };
+async function boqImportRows(rows, done, siteHint){
+  const pick=(r,...k)=>{ for(const x of k){ const key=Object.keys(r).find(c=>c.trim().toLowerCase()===x); if(key&&String(r[key]).trim()!=='') return r[key]; } return ''; };
+  const byCode={}; S.sites.forEach(s=>{ if(s.code) byCode[s.code.trim().toUpperCase()]=s.id; });
+  const parsed=[], bad=[];
+  rows.forEach((r,i)=>{ const code=String(pick(r,'site_code','รหัสโครงการ')).trim().toUpperCase(), cat=String(pick(r,'work_category','หมวดงาน')).trim(),
+      mid=String(pick(r,'mat_id','รหัสวัสดุ','รหัส')).trim().toUpperCase(), qty=numOf(pick(r,'qty','จำนวน')), price=pick(r,'unit_price','ราคา','ราคา/หน่วย'),
+      name=String(pick(r,'ชื่อวัสดุ (อ้างอิง)','ชื่อวัสดุ','name','ชื่อ','รายการ')).trim(), unit=String(pick(r,'unit','หน่วย')).trim();
+    if(!mid&&!cat) return;
+    if(!mid) return bad.push(`แถว ${i+2}: ไม่มีรหัสวัสดุ`);
+    if(!cat) return bad.push(`แถว ${i+2}: ไม่มีหมวดงาน`);
+    if(!(qty>=0)) return bad.push(`แถว ${i+2}: จำนวน "${pick(r,'qty','จำนวน')}" ไม่ใช่ตัวเลข`);
+    parsed.push({code,cat,mid,qty,price:price===''?null:numOf(price),name,unit}); });
+  if(!parsed.length) return toast(bad[0]||'ไม่พบข้อมูลในแผ่น BOQ',true);
+  const codes=[...new Set(parsed.map(p=>p.code).filter(Boolean))], unknownCodes=codes.filter(c=>!byCode[c]);
+  const missing=[...new Map(parsed.filter(p=>!MAT.items.some(m=>m.id===p.mid)).map(p=>[p.mid,p])).values()];
+  const sites=S.sites.filter(s=>s.status==='active');
+  let site=siteHint||(codes.length===1&&byCode[codes[0]])||(S.site?+S.site:sites[0]?.id);
+  const ov=overlay(`<div class="modal" role="dialog" aria-modal="true" style="max-width:560px"><h3 class="h2" style="font-size:18px">นำเข้างบ BOQ</h3>
+    <div class="note n-info">${IC.info}<span>อ่านได้ ${parsed.length} แถว${bad.length?` · ข้าม ${bad.length} แถว (${esc(bad.slice(0,2).join(' / '))}${bad.length>2?' …':''})`:''}</span></div>
+    <div class="field"><label for="bi_site">นำเข้าเป็นงบของไซต์</label><select class="in" id="bi_site">${sites.map(s=>`<option value="${s.id}" ${s.id===site?'selected':''}>${esc(s.name)}${s.code?` (${esc(s.code)})`:''}</option>`).join('')}</select>
+      ${unknownCodes.length?`<span class="hint warn">ในไฟล์ใช้รหัสโครงการ ${esc(unknownCodes.join(', '))} ซึ่งยังไม่มีในระบบ ระบบจะนำเข้าเป็นงบของไซต์ที่เลือกนี้ (ตั้งรหัสโครงการได้ที่ จัดการ > ไซต์งาน)</span>`:'<span class="hint">ใช้ไซต์นี้กับทุกแถว</span>'}</div>
+    ${missing.length?`<label class="chk"><input type="checkbox" id="bi_new" checked><span>สร้างวัสดุที่ยังไม่มีในทะเบียนให้อัตโนมัติ ${missing.length} รายการ (${esc(missing.slice(0,4).map(p=>p.mid).join(', '))}${missing.length>4?' …':''}) ใช้ชื่อ หน่วย และราคาจากไฟล์</span></label>`:''}
+    <span class="xs muted">รายการเดิมที่หมวดงานและรหัสวัสดุซ้ำ จะถูกแทนที่ด้วยจำนวนในไฟล์</span>
+    <div class="row" style="gap:8px;justify-content:flex-end"><button class="btn" data-x>ยกเลิก</button><button class="btn btn-p" data-ok>นำเข้า</button></div></div>`);
+  $('[data-x]',ov.el).onclick=ov.close;
+  $('[data-ok]',ov.el).onclick=async ev=>{
+    site=+$('#bi_site',ov.el).value; const mk=$('#bi_new',ov.el)?.checked; const created=new Set();
+    busy(ev.target,true,'กำลังนำเข้า...');
+    try{
+      if(missing.length&&mk){ const cats=new Set(MAT.cats.map(c=>c.code));
+        const nm=missing.map(p=>({id:p.mid,name:(p.name||p.mid).slice(0,120),category_code:cats.has(p.mid.split('-')[0])?p.mid.split('-')[0]:catGuess(p.name||''),unit:p.unit||'หน่วย',unit_price:p.price||0,item_type:'consumable',status:'active'}));
+        const {error}=await sb.from('materials').upsert(nm,{onConflict:'id'}); if(error) throw error; await loadMat(true); nm.forEach(x=>created.add(x.id)); }
+      const known=new Set([...MAT.items.map(m=>m.id),...created]), agg={}; let skip=0;
+      parsed.forEach(p=>{ if(!known.has(p.mid)){ skip++; return; } const sid=(p.code&&byCode[p.code])||site, k=`${sid}|${p.cat}|${p.mid}`;
+        if(agg[k]) agg[k].qty+=p.qty; else agg[k]={site_id:sid,work_category:p.cat,material_id:p.mid,qty:p.qty,...(p.price!=null&&isFinite(p.price)?{unit_price:p.price}:{})}; });
+      const out=Object.values(agg).map(x=>({...x,qty:Math.round(x.qty*100)/100}));
+      if(!out.length) throw new Error('ไม่มีแถวที่นำเข้าได้ (รหัสวัสดุยังไม่มีในทะเบียน)');
+      for(let i=0;i<out.length;i+=200){ const {error}=await sb.from('boq_budget').upsert(out.slice(i,i+200),{onConflict:'site_id,work_category,material_id'}); if(error) throw error; }
+      ov.close(); toast(`นำเข้างบ BOQ แล้ว ${out.length} รายการ${skip?` · ข้าม ${skip} แถวที่ไม่มีรหัสวัสดุในทะเบียน`:''}`); done&&done(site);
+    }catch(e){ busy(ev.target,false); toast(errText(e),true); }
+  };
 }
 async function mgKits(){
   const host=$('#mg'); if(!await loadMat(true)){ host.innerHTML=needMat(); return; }
