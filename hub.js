@@ -1,6 +1,7 @@
 /* =====================================================================
    KTY Hub — โครงหน้า: แถบเมนูด้านข้าง / ลิ้นชักเมนูบนมือถือ / ตัวเลือกไซต์
    ===================================================================== */
+const HUB_VERSION = '1.5.2';
 const MOD = {
   att:      { t:'เช็คชื่อ',            hue:'#2E9E5B', i:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>' },
   daily:    { t:'รายงานประจำวัน',      hue:'#2F6FDB', i:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>' },
@@ -67,7 +68,7 @@ const keyOf = h => (h||'home').replace('#','') || 'home';
 function isActive(k, cur){ if(k===cur) return true; const [a]=k.split('/'), [b]=cur.split('/'); return !k.includes('/') && a===b && !['soon','manage','att','me'].includes(a) ? true : (k==='att'&&cur==='att'); }
 
 function navItemHTML(x, cur){
-  const meta=MOD[x.m]||MOD.home, t=x.t||meta.t, on=x.k===cur||(!x.sub&&!x.k.includes('/')&&cur.startsWith(x.k+'/')&&x.k!=='att');
+  const meta=MOD[x.m]||MOD.home, t=x.t||meta.t, on=x.k===cur||(!x.sub&&!x.k.includes('/')&&cur.startsWith(x.k+'/')&&x.k!=='att'&&cur!=='manage/sites');
   const b=x.b?`<span class="nbadge hidden" data-badge="${x.b}"></span>`:'';
   return `<a href="#${x.k}" class="nitem ${x.sub?'sub':''} ${on?'on':''}">${x.sub?'<span class="nsp"></span>':modIcon(x.m)}<span class="grow">${t}</span>${b}</a>`;
 }
@@ -75,7 +76,7 @@ function sitePickerHTML(){ return `<button class="sitepick" data-sitepick><span 
 function themeSegHTML(){ const th=curTheme(); return `<div class="seg" style="padding:3px">${[['auto','ตามเครื่อง'],['light','สว่าง'],['dark','มืด']].map(([k,t])=>`<button class="${th===k?'on':''}" data-th="${k}" style="min-height:34px">${t}</button>`).join('')}</div>`; }
 function navBodyHTML(cur){
   return `${sitePickerHTML()}${navSections().map(s=>`<div class="nsec">${s.t}</div>${s.items.map(x=>navItemHTML(x,cur)).join('')}`).join('')}
-    <div class="nfoot">${themeSegHTML()}<button class="linkbtn" data-logout style="color:var(--bad);text-decoration:none;font-weight:600;padding:8px 10px;text-align:left">ออกจากระบบ</button></div>`;
+    <div class="nfoot">${themeSegHTML()}<button class="linkbtn" data-logout style="color:var(--bad);text-decoration:none;font-weight:600;padding:8px 10px;text-align:left">ออกจากระบบ</button><span class="xs muted" style="padding:0 10px">KTY Hub เวอร์ชัน ${HUB_VERSION}</span></div>`;
 }
 function bindNav(root){
   $$('[data-sitepick]',root).forEach(b=>b.onclick=pickSite);
