@@ -8,7 +8,7 @@ const lineTag = r => r.line_status==='sent'?'<span class="tag t-ok">ส่ง LI
 const blobToB64 = b => new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(b); });
 const thumbOf = p => p.thumb || `https://drive.google.com/thumbnail?id=${p.id}&sz=w400`;
 const dayLongFull = iso => { const p=parseISO(iso); const dt=new Date(p.y,p.m-1,p.d); return `วัน${TH_DAYS[dt.getDay()]} ที่ ${p.d} ${TH_MONTHS[p.m-1]} พ.ศ. ${p.y+543}`; };
-const MIN_PHOTOS = 3;
+const minPhotos = () => Math.max(0, Math.min(30, Number(S.settings.daily_rules?.min_photos ?? 3)));
 const hasBridge = () => !!String(S.settings.bridge_url||'').trim();
 
 function dailyText(r, site){
@@ -106,7 +106,7 @@ async function dailyForm(o){
         <div class="field"><label>เครื่องจักร</label><div class="chips">${chips(L.machinery,F.machinery,'machinery')}<button type="button" class="chip" data-addeq="machinery">+ อื่น ๆ</button></div></div>
         <div class="field"><label>เครื่องมือ</label><div class="chips">${chips(L.tools,F.tools,'tools')}<button type="button" class="chip" data-addeq="tools">+ อื่น ๆ</button></div></div>`}
         <div class="field"><label for="df_prob">ปัญหา / อุปสรรค</label><textarea class="in" id="df_prob" rows="3" placeholder="ไม่มี เว้นว่างได้">${esc(F.problems)}</textarea></div>
-        <div class="field"><label>รูปถ่าย ${F.no_work?'':'*'} <span style="color:${!F.no_work&&F.photos.length+F.newPhotos.length<MIN_PHOTOS?'var(--bad)':'var(--ink2)'}">${F.photos.length+F.newPhotos.length} / 30${F.no_work?'':` · อย่างน้อย ${MIN_PHOTOS} รูป`}</span></label>
+        <div class="field"><label>รูปถ่าย ${F.no_work?'':'*'} <span style="color:${!F.no_work&&F.photos.length+F.newPhotos.length<minPhotos()?'var(--bad)':'var(--ink2)'}">${F.photos.length+F.newPhotos.length} / 30${F.no_work?'':` · อย่างน้อย ${minPhotos()} รูป`}</span></label>
           <div class="pgrid">${F.photos.map((p,i)=>`<div class="pthumb"><img src="${thumbOf(p)}" alt="" loading="lazy"><button type="button" data-delp="${i}" aria-label="ลบรูป">×</button></div>`).join('')}${F.newPhotos.map((p,i)=>`<div class="pthumb"><img src="${p.url}" alt=""><button type="button" data-delnp="${i}" aria-label="ลบรูป">×</button><span class="tag t-acc" style="position:absolute;left:4px;bottom:4px;height:18px;font-size:10px">ใหม่</span></div>`).join('')}
           ${F.photos.length+F.newPhotos.length<30?`<label class="pthumb padd">${IC.camera}<span class="xs">เพิ่มรูป</span><input type="file" accept="image/*" multiple data-photos hidden></label>`:''}</div>
           ${!hasBridge()?'<span class="hint warn">ยังไม่ได้ติดตั้ง Bridge รูปถ่ายและ PDF จะใช้ไม่ได้ (แจ้งแอดมิน)</span>':''}</div>
@@ -142,7 +142,7 @@ async function dailyForm(o){
     if(F.no_work&&!F.no_work_reason) return toast('เลือกเหตุผลที่ไม่มีการทำงาน',true);
     if(!F.no_work&&!F.work_items.trim()) return toast('กรอกงานที่ทำวันนี้',true);
     const ch=changed(); for(const t of ch){ if(!String(F.changes[t]?.reason||'').trim()) return toast(`ใส่เหตุผลที่ ${t} เปลี่ยนจากรอบเช้า`,true); }
-    if(!F.no_work&&F.photos.length+F.newPhotos.length<MIN_PHOTOS) return toast(`ต้องแนบรูปอย่างน้อย ${MIN_PHOTOS} รูป (ตอนนี้มี ${F.photos.length+F.newPhotos.length} รูป)`,true);
+    if(!F.no_work&&F.photos.length+F.newPhotos.length<minPhotos()) return toast(`ต้องแนบรูปอย่างน้อย ${minPhotos()} รูป (ตอนนี้มี ${F.photos.length+F.newPhotos.length} รูป)`,true);
     if(F.newPhotos.length&&!hasBridge()) return toast('ยังไม่ได้ติดตั้ง Bridge จึงอัปโหลดรูปไม่ได้',true);
     const crew={}; Object.entries(F.crew).forEach(([k,n])=>{ if(+n>0) crew[k]=+n; });
     const row={ site_id:F.site_id, report_date:F.date, weather:F.weather, no_work:F.no_work, no_work_reason:F.no_work?F.no_work_reason:null, work_items:F.no_work?null:F.work_items.trim(),
@@ -242,4 +242,18 @@ async function dailyView(id){
   const ed=$('[data-edit]'); if(ed) ed.onclick=()=>dailyForm({site_id:r.site_id,date:r.report_date});
   $('[data-resend]').onclick=()=>dailyPreview(r,null);
   const cm=$('#cm'); if(cm) cm.onsubmit=async ev=>{ ev.preventDefault(); const {error}=await sb.from('daily_reports').update({manager_comment:cm.c.value.trim()||null,comment_by_name:S.profile.display_name,comment_at:new Date().toISOString()}).eq('id',r.id); if(error) return toast(errText(error),true); toast('บันทึกความเห็นแล้ว'); };
+}
+
+/* ---------------- จัดการ: ตั้งค่ารายงานประจำวัน ---------------- */
+async function mgDaily(){
+  const host=$('#mg'), cur=minPhotos(), admin=isAdmin();
+  host.innerHTML=`<div class="card col" style="gap:12px"><b>รูปถ่ายในรายงานประจำวัน</b>
+    <div class="field"><label for="dr_min">จำนวนรูปขั้นต่ำที่ต้องแนบต่อวัน (0 = ไม่บังคับ)</label><div class="row" style="gap:8px"><button class="btn btn-sm" data-m="-1" style="width:44px;padding:0" ${admin?'':'disabled'}>−</button><input class="in num" id="dr_min" type="number" min="0" max="30" value="${cur}" style="width:90px;text-align:center" ${admin?'':'readonly'}><button class="btn btn-sm" data-m="1" style="width:44px;padding:0" ${admin?'':'disabled'}>+</button><span class="sm muted">รูป · สูงสุด 30 รูปต่อรายงาน</span></div>
+      <span class="hint">วันที่ "ไม่มีการทำงาน" ไม่บังคับรูป</span></div>
+    ${admin?'<button class="btn btn-p btn-sm" data-save style="align-self:flex-start">บันทึก</button>':'<span class="hint">เฉพาะแอดมินที่แก้ได้</span>'}</div>`;
+  const inp=$('#dr_min');
+  $$('[data-m]',host).forEach(b=>b.onclick=()=>{ inp.value=Math.max(0,Math.min(30,(+inp.value||0)+ +b.dataset.m)); });
+  const sv=$('[data-save]',host); if(sv) sv.onclick=async()=>{ const v=Math.max(0,Math.min(30,Math.round(+inp.value||0)));
+    const {error}=await sb.from('app_settings').upsert({key:'daily_rules',value:{...(S.settings.daily_rules||{}),min_photos:v},updated_at:new Date().toISOString()}); if(error) return toast(errText(error),true);
+    await loadRefs(); toast(`บันทึกแล้ว: ต้องแนบอย่างน้อย ${v} รูป`); mgDaily(); };
 }

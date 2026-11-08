@@ -3,16 +3,17 @@
    ===================================================================== */
 let listFilter={q:'',pos:'',st:'active'};
 async function pageEmployees(){
-  setPage(head('พนักงาน','<span id="cnt">กำลังโหลด</span>',{dActions:`<button class="btn btn-p" data-add>${IC.plus}เพิ่มพนักงาน</button>`}) +
+  setPage(head('พนักงาน','<span id="cnt">กำลังโหลด</span>',{dActions:`${isAdmin()?'<button class="btn" data-order>จัดลำดับ / รหัส</button>':''}<button class="btn btn-p" data-add>${IC.plus}เพิ่มพนักงาน</button>`, mActions:isAdmin()?'<button class="btn btn-sm btn-acc" data-order>จัดลำดับ</button>':''}) +
     `<div class="row" style="gap:10px"><label class="grow" style="position:relative;display:block"><span style="position:absolute;left:14px;top:13px;color:var(--ink2)">${IC.search}</span><input class="in" id="q" placeholder="ค้นหาชื่อ ชื่อเล่น รหัส หรือเลขบัตร" style="padding-left:46px" value="${esc(listFilter.q)}" aria-label="ค้นหา"></label>
       <select class="in" id="st" style="width:auto;flex:none" aria-label="สถานะ"><option value="active">ทำงานอยู่</option><option value="resigned">ลาออกแล้ว</option><option value="">ทั้งหมด</option></select></div>
     <div class="chips scroll" id="pc"></div><div id="el"><div class="loading"><div class="spin"></div></div></div>` +
     `<button class="fab" data-add>${IC.plus}เพิ่มพนักงาน</button>`);
   $('#st').value=listFilter.st;
   $$('[data-add]').forEach(b=>b.onclick=()=>openWizard(null));
+  $$('[data-order]').forEach(b=>b.onclick=staffOrderSheet);
   $('#q').addEventListener('input',e=>{ listFilter.q=e.target.value; drawList(); });
   $('#st').addEventListener('change',e=>{ listFilter.st=e.target.value; drawList(); });
-  const {data,error}=await sb.from('employees').select('*').order('first_name');
+  const {data,error}=await sb.from('employees').select('*').order('sort_order',{nullsFirst:false}).order('emp_code');
   if(error){ $('#el').innerHTML=`<div class="note n-bad">${esc(errText(error))}</div>`; return; }
   S.employees=data||[]; drawList();
 }
@@ -30,7 +31,7 @@ function drawList(){
   $('#el').innerHTML=`<div class="lgrid">${rows.map(e=>{
     const exp=daysUntil(e.id_expiry_date);
     const tags=[e.status==='resigned'?'<span class="tag t-bad">ลาออก</span>':'', e.employment_type==='probation'?'<span class="tag">ทดลองงาน</span>':'', exp!==null&&exp<=60?`<span class="tag ${exp<0?'t-bad':'t-warn'}">บัตร${exp<0?'หมดอายุ':'ใกล้หมด'}</span>`:''].join(' ');
-    return `<a href="#emp/${e.id}" class="lcard">${avatar(e)}<div class="grow"><b>${esc(shortName(e))}${e.nickname?` <span class="muted" style="font-weight:400">(${esc(e.nickname)})</span>`:''}</b>
+    return `<a href="#emp/${e.id}" class="lcard">${avatar(e)}<div class="grow"><span class="ecode">${esc(e.emp_code||'')}</span><b>${esc(shortName(e))}${e.nickname?` <span class="muted" style="font-weight:400">(${esc(e.nickname)})</span>`:''}</b>
       <div class="sm muted">${esc(posName(e.position_id))}${e.birth_date?` อายุ ${diffYM(e.birth_date).y} ปี`:''}</div>${tags.trim()?`<div class="row" style="gap:6px;margin-top:4px;flex-wrap:wrap">${tags}</div>`:''}</div>${starBadge(e.stars)}</a>`; }).join('')}</div>`;
   hydratePhotos($('#el'));
 }
@@ -321,7 +322,7 @@ async function pageAtt(){
 
 async function loadAttBase(from, to){
   const [e,a]=await Promise.all([
-    sb.from('employees').select('id,first_name,last_name,nickname,photo_path,position_id,status,resign_date,start_date').order('first_name'),
+    sb.from('employees').select('id,emp_code,first_name,last_name,nickname,photo_path,position_id,status,resign_date,start_date').order('sort_order',{nullsFirst:false}).order('emp_code'),
     sb.from('attendance').select('*').gte('work_date',from).lte('work_date',to)
   ]);
   if(e.error||a.error) throw (e.error||a.error);
@@ -528,17 +529,17 @@ function bindStarAdjust(root, empId, onDone){
    ===================================================================== */
 let mgTab='sites';
 function pageManage(){
-  const tabs=[...(isAdmin()?[['users','ผู้ใช้'],['perms','สิทธิ์รายระบบ']]:[]),['sites','ไซต์งาน'],['pos','ตำแหน่ง'],['stars','กติกาดาว'],['mat','วัสดุ'],['boq','งบ BOQ'],['kits','ชุดวัสดุ'],['money','ใครเห็นเงิน'],['storage','พื้นที่และสำรอง']];
+  const tabs=[...(isAdmin()?[['users','ผู้ใช้'],['perms','สิทธิ์รายระบบ']]:[]),['sites','ไซต์งาน'],['pos','ตำแหน่ง'],['stars','กติกาดาว'],['daily','รายงานประจำวัน'],['mat','วัสดุ'],['boq','งบ BOQ'],['kits','ชุดวัสดุ'],['money','ใครเห็นเงิน'],['storage','พื้นที่และสำรอง']];
   if(!tabs.some(t=>t[0]===mgTab)) mgTab=tabs[0][0];
   setPage(head('จัดการ','ใช้ร่วมกันทั้งระบบ') + `<div class="col" style="max-width:${['mat','boq'].includes(mgTab)?'1400px':'760px'}"><div class="chips scroll" style="margin:0">${tabs.map(([k,t])=>`<button class="chip ${mgTab===k?'on':''}" data-mg="${k}">${t}</button>`).join('')}</div><div id="mg" class="col"><div class="loading"><div class="spin"></div></div></div></div>`);
   $$('[data-mg]').forEach(b=>b.onclick=()=>{ mgTab=b.dataset.mg; history.replaceState(null,'','#manage/'+mgTab); pageManage(); });
-  ({users:mgUsers,perms:mgPerms,sites:mgSites,pos:mgPos,stars:mgStars,mat:mgMat,boq:mgBoq,kits:mgKits,money:mgMoney,storage:mgStorage})[mgTab]();
+  ({users:mgUsers,perms:mgPerms,sites:mgSites,pos:mgPos,stars:mgStars,daily:mgDaily,mat:mgMat,boq:mgBoq,kits:mgKits,money:mgMoney,storage:mgStorage})[mgTab]();
 }
 const mgAfter=async msg=>{ toast(msg); await loadRefs(); pageManage(); };
 
 let userTab='pending';
 async function mgUsers(){
-  const [u,e,a,cs]=await Promise.all([ sb.from('profiles').select('*').order('created_at',{ascending:false}), sb.from('employees').select('id,first_name,last_name,nickname,position_id,status').order('first_name'), sb.from('site_assignments').select('*'), sb.from('checker_scope').select('*') ]);
+  const [u,e,a,cs]=await Promise.all([ sb.from('profiles').select('*').order('created_at',{ascending:false}), sb.from('employees').select('id,emp_code,first_name,last_name,nickname,position_id,status').order('sort_order',{nullsFirst:false}).order('emp_code'), sb.from('site_assignments').select('*'), sb.from('checker_scope').select('*') ]);
   const has04=!cs.error, scopes=cs.data||[];
   if(u.error){ $('#mg').innerHTML=`<div class="note n-bad">${esc(errText(u.error))}</div>`; return; }
   const users=u.data||[], emps=e.data||[], assigns=a.data||[];
@@ -809,3 +810,39 @@ async function pageMe(){
 }
 
 
+
+/* =====================================================================
+   จัดลำดับ / รหัสพนักงาน (แอดมินเท่านั้น)
+   ===================================================================== */
+function staffOrderSheet(){
+  let list=[...S.employees].sort((x,y)=>(x.status==='resigned')-(y.status==='resigned')||(x.sort_order??1e9)-(y.sort_order??1e9)||String(x.emp_code).localeCompare(String(y.emp_code)));
+  const codes={}; list.forEach(e=>codes[e.id]=e.emp_code||'');
+  const m=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="จัดลำดับและรหัสพนักงาน"></div>`,false,false); const sh=$('.sheet',m.el);
+  function draw(){
+    sh.innerHTML=`<header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>จัดลำดับ / รหัสพนักงาน<small>${list.length} คน · ใช้กับทุกหน้า (รายชื่อ เช็คชื่อ เงินเดือน)</small></h1></header>
+      <div class="sheet-body"><div class="row" style="gap:8px;flex-wrap:wrap"><span class="sm muted grow">เรียงอัตโนมัติ:</span><button class="btn btn-sm" data-s="code">ตามรหัส</button><button class="btn btn-sm" data-s="pos">ตามตำแหน่ง</button><button class="btn btn-sm" data-s="name">ตามชื่อ</button></div>
+      <div class="card" style="padding:0;overflow-x:auto"><table class="tbl"><thead><tr><th style="width:56px">ลำดับ</th><th style="min-width:118px">รหัสพนักงาน</th><th>ชื่อ</th><th style="width:84px"></th></tr></thead><tbody>
+      ${list.map((e,i)=>`<tr style="${e.status==='resigned'?'opacity:.55':''}"><td><input class="in num" type="number" min="1" value="${i+1}" data-pos="${i}" style="height:38px;width:52px;padding:0 4px;text-align:center" aria-label="ลำดับ"></td>
+        <td><input class="in" value="${esc(codes[e.id])}" data-code="${e.id}" style="height:38px;min-width:108px;padding:0 8px;text-transform:uppercase" aria-label="รหัสพนักงาน"></td>
+        <td><b>${esc(shortName(e))}</b><div class="xs muted">${esc(posName(e.position_id))}${e.status==='resigned'?' · ลาออก':''}</div></td>
+        <td><div class="row" style="gap:4px"><button class="ibtn" data-up="${i}" ${i?'':'disabled'} aria-label="เลื่อนขึ้น">${svg('<path d="M6 15l6-6 6 6"/>')}</button><button class="ibtn" data-dn="${i}" ${i<list.length-1?'':'disabled'} aria-label="เลื่อนลง">${svg('<path d="M6 9l6 6 6-6"/>')}</button></div></td></tr>`).join('')}</tbody></table></div>
+      <span class="xs muted">แก้ช่อง "ลำดับ" เพื่อย้ายไปตำแหน่งนั้นทันที · รหัสห้ามซ้ำและห้ามว่าง</span></div>
+      <div class="sheet-foot"><button class="btn" data-x2>ยกเลิก</button><button class="btn btn-p" data-save>บันทึกลำดับและรหัส</button></div>`;
+    $('[data-x]',sh).onclick=m.close; $('[data-x2]',sh).onclick=m.close;
+    const move=(i,j)=>{ if(j<0||j>=list.length) return; const [x]=list.splice(i,1); list.splice(j,0,x); const y=$('.sheet-body',sh).scrollTop; draw(); $('.sheet-body',sh).scrollTop=y; };
+    $$('[data-up]',sh).forEach(b=>b.onclick=()=>move(+b.dataset.up,+b.dataset.up-1));
+    $$('[data-dn]',sh).forEach(b=>b.onclick=()=>move(+b.dataset.dn,+b.dataset.dn+1));
+    $$('[data-pos]',sh).forEach(inp=>inp.onchange=()=>move(+inp.dataset.pos,Math.max(1,Math.min(list.length,+inp.value||1))-1));
+    $$('[data-code]',sh).forEach(inp=>inp.oninput=()=>{ codes[inp.dataset.code]=inp.value.trim().toUpperCase(); });
+    $$('[data-s]',sh).forEach(b=>b.onclick=()=>{ const k=b.dataset.s; list.sort((x,y)=>(x.status==='resigned')-(y.status==='resigned')||(k==='code'?String(codes[x.id]).localeCompare(String(codes[y.id]),undefined,{numeric:true}):k==='pos'?(S.positions.find(p=>p.id===x.position_id)?.sort_order??99)-(S.positions.find(p=>p.id===y.position_id)?.sort_order??99)||shortName(x).localeCompare(shortName(y),'th'):shortName(x).localeCompare(shortName(y),'th'))); draw(); });
+    $('[data-save]',sh).onclick=async ev=>{
+      const vals=list.map(e=>codes[e.id]); if(vals.some(v=>!v)) return toast('รหัสพนักงานห้ามว่าง',true);
+      if(new Set(vals).size!==vals.length) return toast('มีรหัสพนักงานซ้ำกัน',true);
+      busy(ev.target,true,'กำลังบันทึก...');
+      const {error}=await sb.rpc('save_staff_order',{p_rows:list.map((e,i)=>({id:e.id,sort_order:(i+1)*10,emp_code:codes[e.id]}))});
+      if(error){ busy(ev.target,false); return toast(/save_staff_order/.test(error.message)?'ยังไม่ได้รันไฟล์ 11_staff_order.sql':errText(error),true); }
+      m.close(); toast('บันทึกลำดับและรหัสแล้ว'); pageEmployees();
+    };
+  }
+  draw();
+}
