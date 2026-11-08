@@ -8,6 +8,7 @@ const lineTag = r => r.line_status==='sent'?'<span class="tag t-ok">ส่ง LI
 const blobToB64 = b => new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(b); });
 const thumbOf = p => p.thumb || `https://drive.google.com/thumbnail?id=${p.id}&sz=w400`;
 const dayLongFull = iso => { const p=parseISO(iso); const dt=new Date(p.y,p.m-1,p.d); return `วัน${TH_DAYS[dt.getDay()]} ที่ ${p.d} ${TH_MONTHS[p.m-1]} พ.ศ. ${p.y+543}`; };
+const MIN_PHOTOS = 3;
 const hasBridge = () => !!String(S.settings.bridge_url||'').trim();
 
 function dailyText(r, site){
@@ -105,7 +106,7 @@ async function dailyForm(o){
         <div class="field"><label>เครื่องจักร</label><div class="chips">${chips(L.machinery,F.machinery,'machinery')}<button type="button" class="chip" data-addeq="machinery">+ อื่น ๆ</button></div></div>
         <div class="field"><label>เครื่องมือ</label><div class="chips">${chips(L.tools,F.tools,'tools')}<button type="button" class="chip" data-addeq="tools">+ อื่น ๆ</button></div></div>`}
         <div class="field"><label for="df_prob">ปัญหา / อุปสรรค</label><textarea class="in" id="df_prob" rows="3" placeholder="ไม่มี เว้นว่างได้">${esc(F.problems)}</textarea></div>
-        <div class="field"><label>รูปถ่าย <span class="muted">${F.photos.length+F.newPhotos.length} / 30</span></label>
+        <div class="field"><label>รูปถ่าย ${F.no_work?'':'*'} <span style="color:${!F.no_work&&F.photos.length+F.newPhotos.length<MIN_PHOTOS?'var(--bad)':'var(--ink2)'}">${F.photos.length+F.newPhotos.length} / 30${F.no_work?'':` · อย่างน้อย ${MIN_PHOTOS} รูป`}</span></label>
           <div class="pgrid">${F.photos.map((p,i)=>`<div class="pthumb"><img src="${thumbOf(p)}" alt="" loading="lazy"><button type="button" data-delp="${i}" aria-label="ลบรูป">×</button></div>`).join('')}${F.newPhotos.map((p,i)=>`<div class="pthumb"><img src="${p.url}" alt=""><button type="button" data-delnp="${i}" aria-label="ลบรูป">×</button><span class="tag t-acc" style="position:absolute;left:4px;bottom:4px;height:18px;font-size:10px">ใหม่</span></div>`).join('')}
           ${F.photos.length+F.newPhotos.length<30?`<label class="pthumb padd">${IC.camera}<span class="xs">เพิ่มรูป</span><input type="file" accept="image/*" multiple data-photos hidden></label>`:''}</div>
           ${!hasBridge()?'<span class="hint warn">ยังไม่ได้ติดตั้ง Bridge รูปถ่ายและ PDF จะใช้ไม่ได้ (แจ้งแอดมิน)</span>':''}</div>
@@ -141,6 +142,7 @@ async function dailyForm(o){
     if(F.no_work&&!F.no_work_reason) return toast('เลือกเหตุผลที่ไม่มีการทำงาน',true);
     if(!F.no_work&&!F.work_items.trim()) return toast('กรอกงานที่ทำวันนี้',true);
     const ch=changed(); for(const t of ch){ if(!String(F.changes[t]?.reason||'').trim()) return toast(`ใส่เหตุผลที่ ${t} เปลี่ยนจากรอบเช้า`,true); }
+    if(!F.no_work&&F.photos.length+F.newPhotos.length<MIN_PHOTOS) return toast(`ต้องแนบรูปอย่างน้อย ${MIN_PHOTOS} รูป (ตอนนี้มี ${F.photos.length+F.newPhotos.length} รูป)`,true);
     if(F.newPhotos.length&&!hasBridge()) return toast('ยังไม่ได้ติดตั้ง Bridge จึงอัปโหลดรูปไม่ได้',true);
     const crew={}; Object.entries(F.crew).forEach(([k,n])=>{ if(+n>0) crew[k]=+n; });
     const row={ site_id:F.site_id, report_date:F.date, weather:F.weather, no_work:F.no_work, no_work_reason:F.no_work?F.no_work_reason:null, work_items:F.no_work?null:F.work_items.trim(),
