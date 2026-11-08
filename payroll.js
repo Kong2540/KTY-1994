@@ -14,7 +14,8 @@ const PCOLS = {
 const DEF_PCOLS=['code','name','position','days','ot_hours','wage','ot','adds','sso','inst','net'];
 const payCols = () => { const c=(S.settings.payroll_columns?.period||DEF_PCOLS).filter(k=>PCOLS[k]); if(!c.includes('name')) c.unshift('name'); if(!c.includes('net')) c.push('net'); return c; };
 const otherDed = d => (+d.inst_sum||0)+(+d.advance||0)+(+d.deducts||0);
-const periodLabel = p => { const a=parseISO(p.start_date), b=parseISO(p.end_date); return `${a.d}–${b.d} ${TH_MONTHS[b.m-1].slice(0,3)}. ${b.y+543}`; };
+const TH_MON_S=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const periodLabel = p => { const a=parseISO(p.start_date), b=parseISO(p.end_date); return `${a.d}–${b.d} ${TH_MON_S[b.m-1]} ${b.y+543}`; };
 let payPid=null, payTab='period';
 
 async function pagePay(a,b){
@@ -45,7 +46,7 @@ async function payPeriod(periods){
       <button class="ibtn" data-pp="${periods[i+1]?.id||''}" ${periods[i+1]?'':'disabled'} aria-label="งวดก่อน">${IC.back}</button>
       <div class="grow"><b style="font-size:18px">งวด ${periodLabel(p)}</b> <span class="tag ${closed?'t-ok':'t-warn'}">${closed?'ปิดงวดแล้ว':'ร่าง'}</span><div class="xs muted">จ่ายวันที่ ${thaiDate(p.pay_date)}${p.calc_at?` · คำนวณล่าสุด ${new Date(p.calc_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}`:''}${closed?` · ปิดโดย ${esc(p.closed_by_name||'')}`:''}</div></div>
       <button class="ibtn" data-pp="${periods[i-1]?.id||''}" ${periods[i-1]?'':'disabled'} aria-label="งวดถัดไป">${IC.chev}</button></div>
-    <div class="row" style="gap:8px;flex-wrap:wrap">${closed?'':'<button class="btn btn-sm" data-recalc>คำนวณใหม่จากการเช็คชื่อ</button>'}${isAdmin()?'<button class="btn btn-sm" data-cols>ตั้งค่าคอลัมน์</button>':''}<button class="btn btn-sm" data-prev>ตัวอย่างก่อนพิมพ์ (PDF)</button><button class="btn btn-sm" data-sheet>ส่งออก Google Sheet</button>
+    <div class="row" style="gap:8px;flex-wrap:wrap">${closed?'':'<button class="btn btn-sm" data-recalc>คำนวณใหม่จากการเช็คชื่อ</button>'}${isAdmin()?'<button class="btn btn-sm" data-cols>ตั้งค่าคอลัมน์</button>':''}<button class="btn btn-sm" data-prev>ใบสรุปเงินเดือน (PDF)</button><button class="btn btn-sm" data-slips>สลิปรายคน (PDF)</button><button class="btn btn-sm" data-sheet>ส่งออก Google Sheet</button>
       <span class="grow"></span>${closed?(isAdmin()?'<button class="btn btn-sm" data-reopen>เปิดงวดเพื่อแก้</button>':''):'<button class="btn btn-sm btn-p" data-close>ตรวจแล้ว ปิดงวด</button>'}</div></div>
     <div class="statg" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><div class="stat"><b class="num" style="font-size:22px">${baht(sum('net'))}</b><span class="sm muted">จ่ายสุทธิ ${slips.length} คน</span></div><div class="stat"><b class="num" style="font-size:22px">${baht(sum('gross'))}</b><span class="sm muted">รวมก่อนหัก</span></div><div class="stat"><b class="num" style="font-size:22px">${baht(sum('ot'))}</b><span class="sm muted">OT ${fmtN(sum('ot_hours'))} ชม.</span></div><div class="stat"><b class="num" style="font-size:22px;color:var(--bad)">${baht(sum('sso'))}</b><span class="sm muted">ประกันสังคม</span></div><div class="stat"><b class="num" style="font-size:22px;color:var(--bad)">${baht(sum('inst_sum')+sum('advance')+sum('deducts'))}</b><span class="sm muted">หักอื่น ๆ</span></div></div>
     <div class="card" style="padding:0;overflow-x:auto"><table class="tbl paytbl"><thead><tr><th>#</th>${cols.map(k=>`<th class="${PCOLS[k].n?'num':''}">${PCOLS[k].t}</th>`).join('')}</tr></thead><tbody>
@@ -57,7 +58,8 @@ async function payPeriod(periods){
   const cl=$('[data-close]',C); if(cl) cl.onclick=async()=>{ if(!await confirmBox(`ปิดงวด ${periodLabel(p)}? ระบบจะคำนวณใหม่ครั้งสุดท้าย ตัดยอดผ่อน และพนักงานจะเห็นสลิปในแอป`,'ปิดงวด')) return; const r=await sb.rpc('close_period',{p_period:p.id}); if(r.error) return toast(errText(r.error),true); toast('ปิดงวดแล้ว'); pagePay(); };
   const ro=$('[data-reopen]',C); if(ro) ro.onclick=async()=>{ const why=await promptBox('เหตุผลที่เปิดงวด (บันทึกในประวัติ)',''); if(!why) return; const r=await sb.rpc('reopen_period',{p_period:p.id,p_reason:why}); if(r.error) return toast(errText(r.error),true); toast('เปิดงวดแล้ว'); pagePay(); };
   const co=$('[data-cols]',C); if(co) co.onclick=()=>payColsSheet(()=>pagePay());
-  $('[data-prev]',C).onclick=()=>payPreview(p,slips);
+  $('[data-prev]',C).onclick=()=>paySummaryPreview(p,slips);
+  $('[data-slips]',C).onclick=()=>paySlipsPreview(p,slips);
   $('[data-sheet]',C).onclick=ev=>paySheetExport(p,slips,ev.target);
   $$('[data-slip]',C).forEach(r=>r.onclick=()=>payDetail(p,slips.find(s=>s.id==r.dataset.slip),()=>pagePay()));
 }
@@ -111,18 +113,64 @@ function payDetail(p, s, done){
   $$('[data-deli]',ov.el).forEach(b=>b.onclick=async()=>{ if(!await confirmBox('ลบรายการนี้?','ลบ',true)) return; const {error}=await sb.from('pay_items').delete().eq('id',+b.dataset.deli); if(error) return toast(errText(error),true); try{ await recalc(); }catch(e){ toast(errText(e),true); } });
 }
 
-/* ---------------- ตัวอย่างก่อนพิมพ์: ใบสรุปรวม + สลิป 8 ใบ/A4 ---------------- */
-async function payPreview(p, slips){
-  const prog=overlay(`<div class="modal" role="dialog" aria-modal="true"><div class="row" style="gap:10px"><span class="spin" style="margin:0"></span><b>กำลังจัดหน้า</b></div></div>`,true,false);
-  try{ await loadScript(LIB.qr); }catch(e){ prog.close(); return toast(errText(e),true); }
-  prog.close();
-  const B=BR(), cols=payCols(), PER=24, logo=B.logo;
-  const pages=[];
-  const headHTML=t=>`<div class="pg-head">${logo?`<img src="${logo}" crossorigin="anonymous" alt="">`:`<span class="pg-mark">${esc(B.mark)}</span>`}<div class="grow"><b>${esc(B.company_th)}</b><span>${esc(B.company_en)}</span></div><div class="pg-ti"><b>${t}</b><span>งวด ${periodLabel(p)} · จ่าย ${thaiDate(p.pay_date)}</span></div></div>`;
-  for(let i=0;i<Math.max(1,slips.length);i+=PER){ const chunk=slips.slice(i,i+PER), last=i+PER>=slips.length;
-    pages.push(`<div class="a4">${headHTML('ใบสรุปเงินเดือน')}<table class="pg-tbl"><tr><th>#</th>${cols.map(k=>`<th class="${PCOLS[k].n?'r':''}">${PCOLS[k].t}</th>`).join('')}</tr>${chunk.map((s,j)=>`<tr><td>${i+j+1}</td>${cols.map(k=>`<td class="${PCOLS[k].n?'r':''}">${esc(PCOLS[k].f(s.data))}</td>`).join('')}</tr>`).join('')}
-      ${last?`<tr class="tt"><td></td>${cols.map(k=>`<td class="r">${PCOLS[k].m?fmtN(slips.reduce((a,s)=>a+(+String(PCOLS[k].f(s.data)).replace(/,/g,'')||0),0)):k==='name'?'รวมทั้งสิ้น':''}</td>`).join('')}</tr>`:''}</table>
-      ${last?`<div class="pg-sign"><div>ผู้จัดทำ ..............................</div><div>ผู้ตรวจสอบ ..............................</div><div>ผู้อนุมัติ ..............................</div></div>`:''}<div class="pg-foot">${esc(B.app)} · หน้า ${pages.length+1}</div></div>`); }
+/* ---------------- ตัวอย่างก่อนพิมพ์ ---------------- */
+const MM=3.7795;
+const PPRINT_DEF={margin:{t:12,r:10,b:12,l:10},font:11,sign:true,sign_w:34,widths:{}};
+const pprint = () => { const s=S.settings.payroll_print||{}; return {...PPRINT_DEF,...s,margin:{...PPRINT_DEF.margin,...(s.margin||{})},widths:{...(s.widths||{})}}; };
+function pgHead(p,t){ const B=BR(); return `<div class="pg-head">${B.logo?`<img src="${B.logo}" crossorigin="anonymous" alt="">`:`<span class="pg-mark">${esc(B.mark)}</span>`}<div class="grow"><b>${esc(B.company_th)}</b><span>${esc(B.company_en)}</span></div><div class="pg-ti"><b>${t}</b><span>งวด ${periodLabel(p)} · จ่ายวันที่ ${thaiDate(p.pay_date)}</span></div></div>`; }
+async function pdfFromPages(els, orient, name){
+  await Promise.all([loadScript(LIB.h2c),loadScript(LIB.pdf)]); await document.fonts?.ready;
+  const L=orient==='l', pdf=new jspdf.jsPDF({unit:'mm',format:'a4',orientation:L?'landscape':'portrait'});
+  for(let i=0;i<els.length;i++){ const clone=els[i].cloneNode(true); clone.classList.add('a4-render'); clone.style.zoom='1'; document.body.appendChild(clone);
+    const cv=await html2canvas(clone,{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false}); clone.remove();
+    if(i) pdf.addPage('a4',L?'landscape':'portrait'); pdf.addImage(cv.toDataURL('image/jpeg',.92),'JPEG',0,0,L?297:210,L?210:297); }
+  pdf.save(name);
+}
+/* ใบสรุปเงินเดือน: A4 แนวนอน ปรับขอบ ขนาดตัวอักษร ความกว้างคอลัมน์ และช่องลงชื่อรับเงิน */
+function paySummaryPreview(p, slips){
+  const cfg=pprint(), cols=payCols(), admin=isAdmin();
+  const ov=overlay(`<div class="sheet sheet-wide" role="dialog" aria-modal="true" aria-label="ใบสรุปเงินเดือน"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>ใบสรุปเงินเดือน<small>A4 แนวนอน · งวด ${periodLabel(p)}</small></h1></header>
+    <div class="sheet-body"><div class="prt-ctl card col" style="gap:10px">
+      <div class="row" style="gap:10px;flex-wrap:wrap;align-items:flex-end"><b class="sm" style="width:100%">ระยะขอบกระดาษ (มม.)</b>${[['t','บน'],['r','ขวา'],['b','ล่าง'],['l','ซ้าย']].map(([k,t])=>`<label class="field" style="width:78px"><span class="xs muted">${t}</span><input class="in num" type="number" min="0" max="40" data-m="${k}" value="${cfg.margin[k]}" style="height:38px"></label>`).join('')}
+        <label class="field" style="width:150px"><span class="xs muted">ขนาดตัวอักษร: <b data-fv>${cfg.font}</b> pt</span><input type="range" min="8" max="16" step="0.5" data-font value="${cfg.font}"></label>
+        <label class="row sm" style="gap:6px"><input type="checkbox" data-sign ${cfg.sign?'checked':''}>ช่องลงชื่อรับเงิน</label></div>
+      <details><summary class="sm" style="cursor:pointer"><b>ความกว้างคอลัมน์ (มม. · ว่าง = อัตโนมัติ)</b></summary><div class="row" style="gap:8px;flex-wrap:wrap;margin-top:8px">${['#',...cols,...(cfg.sign?['_sign']:[])].map(k=>`<label class="field" style="width:118px"><span class="xs muted">${k==='#'?'ลำดับ':k==='_sign'?'ลงชื่อรับเงิน':PCOLS[k].t}</span><input class="in num" type="number" min="5" max="120" data-w="${k}" value="${k==='_sign'?cfg.sign_w:(cfg.widths[k]??'')}" placeholder="อัตโนมัติ" style="height:36px"></label>`).join('')}</div></details>
+      ${admin?'<div class="row" style="gap:8px"><button class="btn btn-sm" data-def>คืนค่าเริ่มต้น</button><button class="btn btn-sm" data-savecfg>บันทึกเป็นค่าเริ่มต้นของบริษัท</button></div>':''}</div>
+      <div class="pg-wrap" id="pgw"></div></div>
+    <div class="sheet-foot" style="flex-wrap:wrap"><span class="sm muted grow" id="pgn"></span><button class="btn btn-p" data-pdf>ดาวน์โหลด PDF ใบสรุป</button></div></div>`,false,false);
+  const W=$('#pgw',ov.el);
+  const render=()=>{
+    const m=cfg.margin, colsAll=['#',...cols,...(cfg.sign?['_sign']:[])];
+    const th=k=>k==='#'?'#':k==='_sign'?'ลงชื่อรับเงิน':PCOLS[k].t, num=k=>k!=='#'&&k!=='_sign'&&PCOLS[k].n;
+    const wcss=k=>{ const w=k==='_sign'?cfg.sign_w:cfg.widths[k]; return w?`width:${w}mm`:''; };
+    const page=()=>{ const d=document.createElement('div'); d.className='a4 a4l'; d.style.padding=`${m.t}mm ${m.r}mm ${m.b}mm ${m.l}mm`; d.style.fontSize=cfg.font+'pt';
+      d.innerHTML=`${pgHead(p,'ใบสรุปเงินเดือน')}<table class="pg-tbl" style="font-size:${cfg.font}pt"><colgroup>${colsAll.map(k=>`<col style="${wcss(k)}">`).join('')}</colgroup><thead><tr>${colsAll.map(k=>`<th class="${num(k)?'r':''}">${th(k)}</th>`).join('')}</tr></thead><tbody></tbody></table><div class="pg-foot"></div>`; W.appendChild(d); return d; };
+    W.innerHTML=''; let pg=page(), body=$('tbody',pg); const pages=[pg];
+    const avail=()=>pg.clientHeight-m.b*MM-14;
+    const rowHTML=(s,i)=>`<tr>${colsAll.map(k=>k==='#'?`<td>${i+1}</td>`:k==='_sign'?'<td class="sgn"></td>':`<td class="${num(k)?'r':''}">${esc(PCOLS[k].f(s.data))}</td>`).join('')}</tr>`;
+    slips.forEach((s,i)=>{ body.insertAdjacentHTML('beforeend',rowHTML(s,i)); const tb=$('table',pg); if(tb.offsetTop+tb.offsetHeight>avail()&&body.rows.length>1){ body.lastElementChild.remove(); pg=page(); pages.push(pg); body=$('tbody',pg); body.insertAdjacentHTML('beforeend',rowHTML(s,i)); } });
+    const tot=`<tr class="tt">${colsAll.map(k=>`<td class="r">${k!=='#'&&k!=='_sign'&&PCOLS[k].m?fmtN(slips.reduce((a,s)=>a+(+String(PCOLS[k].f(s.data)).replace(/,/g,'')||0),0)):k==='name'?'รวมทั้งสิ้น':''}</td>`).join('')}</tr>`;
+    const sign=`<div class="pg-sign"><div>ผู้จัดทำ ..............................</div><div>ผู้ตรวจสอบ ..............................</div><div>ผู้อนุมัติ ..............................</div></div>`;
+    body.insertAdjacentHTML('beforeend',tot); pg.insertAdjacentHTML('beforeend',sign);
+    const over=()=>{ const sg=$('.pg-sign',pg); return sg.offsetTop+sg.offsetHeight>avail(); };
+    if(over()){ body.lastElementChild.remove(); $('.pg-sign',pg).remove(); pg=page(); pages.push(pg); body=$('tbody',pg); body.insertAdjacentHTML('beforeend',tot); pg.insertAdjacentHTML('beforeend',sign); }
+    pages.forEach((x,i)=>{ $('.pg-foot',x).textContent=`${BR().app} · หน้า ${i+1}/${pages.length}`; $('.pg-foot',x).style.right=m.r+'mm'; $('.pg-foot',x).style.bottom=Math.max(3,m.b/2)+'mm'; });
+    $('#pgn',ov.el).textContent=`${pages.length} หน้า · ${slips.length} คน`;
+  };
+  render();
+  $('[data-x]',ov.el).onclick=ov.close;
+  $$('[data-m]',ov.el).forEach(i=>i.oninput=()=>{ cfg.margin[i.dataset.m]=Math.max(0,Math.min(40,+i.value||0)); render(); });
+  $('[data-font]',ov.el).oninput=e=>{ cfg.font=+e.target.value; $('[data-fv]',ov.el).textContent=cfg.font; render(); };
+  $('[data-sign]',ov.el).onchange=e=>{ cfg.sign=e.target.checked; render(); };
+  $$('[data-w]',ov.el).forEach(i=>i.oninput=()=>{ const k=i.dataset.w, v=i.value===''?null:Math.max(5,Math.min(120,+i.value)); if(k==='_sign') cfg.sign_w=v||34; else if(v) cfg.widths[k]=v; else delete cfg.widths[k]; render(); });
+  const df=$('[data-def]',ov.el); if(df) df.onclick=()=>{ ov.close(); S.settings.payroll_print_tmp=null; const keep=S.settings.payroll_print; S.settings.payroll_print=null; paySummaryPreview(p,slips); S.settings.payroll_print=keep; };
+  const sc=$('[data-savecfg]',ov.el); if(sc) sc.onclick=async ev=>{ busy(ev.target,true); try{ await saveSetting('payroll_print',cfg); busy(ev.target,false); toast('บันทึกการตั้งค่าหน้ากระดาษแล้ว'); }catch(e){ busy(ev.target,false); toast(e.message,true); } };
+  $('[data-pdf]',ov.el).onclick=async ev=>{ busy(ev.target,true,'กำลังสร้าง PDF...'); try{ await pdfFromPages($$('.a4',W),'l',`ใบสรุปเงินเดือน_${p.start_date}_${p.end_date}.pdf`); busy(ev.target,false); toast('ดาวน์โหลดแล้ว'); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
+}
+/* สลิปรายคน: 8 ใบ/A4 แนวตั้ง พร้อม QR */
+async function paySlipsPreview(p, slips){
+  try{ await loadScript(LIB.qr); }catch(e){ return toast(errText(e),true); }
+  const B=BR(), logo=B.logo, pages=[];
   const qrSvg=t=>{ const q=qrcode(0,'M'); q.addData(t); q.make(); return q.createSvgTag({cellSize:2,margin:0,scalable:true}); };
   const base=`${location.origin}${location.pathname}#pay/s/`;
   for(let i=0;i<slips.length;i+=8){ const chunk=slips.slice(i,i+8);
@@ -134,27 +182,19 @@ async function payPreview(p, slips){
       <div class="sl-r"><span>หักประกันสังคม</span><b>−${fmtN(d.sso)}</b></div>
       <div class="sl-r"><span>หักอื่น ๆ</span><b>−${fmtN(otherDed(d))}</b></div>
       <div class="sl-net"><span>รับสุทธิ</span><b>${fmtN(d.net)}</b></div>
-      <div class="sl-f"><span>ผู้รับเงิน ......................</span><span>สแกน QR ดูรายละเอียด</span></div></div>`; }).join('')}</div>`); }
-  const ov=overlay(`<div class="sheet sheet-wide" role="dialog" aria-modal="true" aria-label="ตัวอย่างก่อนพิมพ์"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>ตัวอย่างก่อนพิมพ์<small>ใบสรุป ${Math.ceil(Math.max(1,slips.length)/PER)} หน้า · สลิป ${Math.ceil(slips.length/8)} หน้า (8 ใบ/A4)</small></h1></header>
-    <div class="sheet-body"><div class="pg-wrap">${pages.join('')}</div></div>
-    <div class="sheet-foot" style="flex-wrap:wrap"><button class="btn" data-sheet>ส่งออก Google Sheet</button><button class="btn btn-p" data-pdf>ดาวน์โหลด PDF</button></div></div>`,false,false);
+      <div class="sl-f"><span>โปรดตรวจสอบจำนวนเงินให้เรียบร้อยก่อนออกจากบริษัทฯ</span><span>สแกน QR ดูรายละเอียด</span></div></div>`; }).join('')}</div>`); }
+  const ov=overlay(`<div class="sheet sheet-wide" role="dialog" aria-modal="true" aria-label="สลิปรายคน"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>สลิปรายคน<small>${slips.length} ใบ · ${pages.length} หน้า A4 (8 ใบ/หน้า ตัดตามเส้นประ)</small></h1></header>
+    <div class="sheet-body"><div class="pg-wrap">${pages.join('')||'<div class="card empty"><b>ยังไม่มีสลิป</b></div>'}</div></div>
+    <div class="sheet-foot"><button class="btn btn-p" data-pdf ${slips.length?'':'disabled'}>ดาวน์โหลด PDF สลิป</button></div></div>`,false,false);
   $('[data-x]',ov.el).onclick=ov.close;
-  $('[data-sheet]',ov.el).onclick=ev=>paySheetExport(p,slips,ev.target);
-  $('[data-pdf]',ov.el).onclick=async ev=>{ busy(ev.target,true,'กำลังสร้าง PDF...');
-    try{ await Promise.all([loadScript(LIB.h2c),loadScript(LIB.pdf)]); await document.fonts?.ready;
-      const pdf=new jspdf.jsPDF({unit:'mm',format:'a4'}); const els=$$('.a4',ov.el);
-      for(let i=0;i<els.length;i++){ const clone=els[i].cloneNode(true); clone.classList.add('a4-render'); document.body.appendChild(clone);
-        const cv=await html2canvas(clone,{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false}); clone.remove();
-        if(i) pdf.addPage(); pdf.addImage(cv.toDataURL('image/jpeg',.92),'JPEG',0,0,210,297); }
-      pdf.save(`เงินเดือน_${p.start_date}_${p.end_date}.pdf`); busy(ev.target,false); toast('ดาวน์โหลด PDF แล้ว'); }
-    catch(e){ busy(ev.target,false); toast(errText(e),true); } };
+  $('[data-pdf]',ov.el).onclick=async ev=>{ busy(ev.target,true,'กำลังสร้าง PDF...'); try{ await pdfFromPages($$('.a4',ov.el),'p',`สลิปเงินเดือน_${p.start_date}_${p.end_date}.pdf`); busy(ev.target,false); toast('ดาวน์โหลดแล้ว'); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
 }
 async function paySheetExport(p, slips, btn){
   if(!hasBridge()) return toast('ต้องติดตั้ง Bridge ก่อน',true);
   const cols=payCols(); busy(btn,true,'กำลังสร้างชีต...');
   try{
     const r=await bridge('pay_sheet',{title:`เงินเดือน งวด ${periodLabel(p)} (จ่าย ${thaiDate(p.pay_date)})`, company:BR().company_th,
-      summary:{headers:['#',...cols.map(k=>PCOLS[k].t)], rows:slips.map((s,i)=>[i+1,...cols.map(k=>PCOLS[k].m||PCOLS[k].n?Number(String(PCOLS[k].f(s.data)).replace(/,/g,''))||0:PCOLS[k].f(s.data))])},
+      summary:{headers:['#',...cols.map(k=>PCOLS[k].t),'ลงชื่อรับเงิน'], rows:slips.map((s,i)=>[i+1,...cols.map(k=>PCOLS[k].m||PCOLS[k].n?Number(String(PCOLS[k].f(s.data)).replace(/,/g,''))||0:PCOLS[k].f(s.data)),''])},
       slips:{headers:['รหัส','ชื่อ-นามสกุล','ตำแหน่ง','อัตราค่าแรง','วันทำงาน','OT ชม.','รวมก่อนหัก','หักประกันสังคม','หักอื่น ๆ','รับสุทธิ','ลิงก์รายละเอียด'],
         rows:slips.map(s=>{ const d=s.data; return [d.emp_code||'',d.name,d.position||'',`${fmtN(d.rate)} /${d.wage_type==='monthly'?'เดือน':'วัน'}`,+d.days,+d.ot_hours,+d.gross,+d.sso,otherDed(d),+d.net,`${location.origin}${location.pathname}#pay/s/${s.id}`]; })}});
     busy(btn,false); window.open(r.url,'_blank'); toast('สร้าง Google Sheet แล้ว');

@@ -437,3 +437,8 @@ details.perm>summary::-webkit-details-marker{display:none}
 .sl-r{display:flex;justify-content:space-between;border-bottom:1px dotted #DDE3E1;padding:1px 0}.sl-r span{color:#5B6B73}
 .sl-net{display:flex;justify-content:space-between;align-items:center;background:#F1F3F2;border-radius:6px;padding:3px 10px;margin-top:3px}.sl-net b{font-size:17px;color:#1F3540}
 .sl-f{display:flex;justify-content:space-between;font-size:9.5px;color:#9AA6AA;margin-top:auto}
+
+.a4.a4l{width:1123px;height:794px}
+.a4l .pg-tbl{table-layout:auto}.a4l .pg-tbl td,.a4l .pg-tbl th{padding:.35em .45em;line-height:1.25}.a4l .pg-tbl td{white-space:nowrap}.pg-tbl td.sgn{min-width:30mm}
+.prt-ctl{position:sticky;top:0;z-index:2}
+@media (max-width:860px){.a4.a4l{zoom:.32}}
