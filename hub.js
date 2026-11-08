@@ -1,7 +1,7 @@
 /* =====================================================================
    KTY Hub — โครงหน้า: แถบเมนูด้านข้าง / ลิ้นชักเมนูบนมือถือ / ตัวเลือกไซต์
    ===================================================================== */
-const HUB_VERSION = '1.8.1';
+const HUB_VERSION = '1.8.2';
 const MOD = {
   att:      { t:'เช็คชื่อ',            hue:'#2E9E5B', i:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>' },
   daily:    { t:'รายงานประจำวัน',      hue:'#2F6FDB', i:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>' },
@@ -341,9 +341,15 @@ async function siteDetail(s){
 const fmtBytes = b => b>=1073741824?`${(b/1073741824).toFixed(2)} GB`:b>=1048576?`${(b/1048576).toFixed(1)} MB`:`${Math.round(b/1024)} KB`;
 async function bridge(action, extra={}){
   const url=String(S.settings.bridge_url||'').trim(); if(!url) throw new Error('ยังไม่ได้ตั้งค่า Bridge URL');
+  const call=async tok=>{ const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token:tok,...extra})}); return r.json(); };
   const {data}=await sb.auth.getSession();
-  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token:data.session?.access_token,...extra})});
-  const j=await r.json(); if(j.error) throw new Error(j.error); return j;
+  let j=await call(data.session?.access_token);
+  if(j.error&&/session|หมดอายุ|เข้าสู่ระบบใหม่/i.test(j.error)){ // เซสชันถูกยกเลิก/หมดอายุ: ต่ออายุแล้วลองใหม่ 1 ครั้ง
+    const rf=await sb.auth.refreshSession();
+    if(rf.data?.session){ S.session=rf.data.session; j=await call(rf.data.session.access_token); }
+    else { toast('การเข้าสู่ระบบหมดอายุ กรุณาเข้าสู่ระบบใหม่',true); setTimeout(()=>sb.auth.signOut(),1500); throw new Error('การเข้าสู่ระบบหมดอายุ'); }
+  }
+  if(j.error) throw new Error(j.error); return j;
 }
 function gaugeHTML(k,title,used,total,note){
   const pct=total?Math.min(100,Math.round(used/total*100)):0, warn=pct>=(S.settings.retention?.warn_pct||70);
