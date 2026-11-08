@@ -3,8 +3,8 @@
    ตั้งค่าการเชื่อมต่อ Supabase — Project Settings > API Keys
    ใส่ Project URL และ Publishable key (sb_publishable_...) เท่านั้น
    ===================================================================== */
-const SUPABASE_URL = (window.KTY_CONFIG&&window.KTY_CONFIG.url) || 'https://YOUR-PROJECT.supabase.co';
-const SUPABASE_ANON_KEY = (window.KTY_CONFIG&&window.KTY_CONFIG.key) || 'YOUR-ANON-KEY';
+const SUPABASE_URL = (window.KTY_CONFIG&&window.KTY_CONFIG.url) || 'https://mydytzlrevzjpqusaohu.supabase.co';
+const SUPABASE_ANON_KEY = (window.KTY_CONFIG&&window.KTY_CONFIG.key) || 'sb_publishable_btZKjUqx12VOyTnyMAZOGQ_jpmiLHfl';
 /* ---------- แบรนด์ (แอดมินแก้ได้ที่ ตั้งค่าระบบ > แบรนด์) ---------- */
 const BRAND_DEFAULT = { app:'KTY Hub', mark:'KTY', tagline:'ระบบบริหารงานก่อสร้าง', company_th:'ห้างหุ้นส่วนจำกัด กิตติยาก่อสร้าง 1994',
   company_short:'หจก.กิตติยาก่อสร้าง 1994', company_en:'KITTIYA CONSTRUCTION 1994 LIMITED PARTNERSHIP', logo:'', color:'#F2B705' };
