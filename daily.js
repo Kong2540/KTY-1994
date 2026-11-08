@@ -18,7 +18,7 @@ function dailyText(r, site){
   return [`📋 รายงานประจำวัน`, `${site?.code?site.code+' ':''}${site?.name||''}`, `${p.d} ${TH_MONTHS[p.m-1]} ${p.y+543}${r.late?' (ส่งย้อนหลัง)':''}`,
     `อากาศ: ${r.weather||'-'}`, r.no_work?`ไม่มีการทำงาน: ${r.no_work_reason||'-'}`:`คนงาน ${r.total} คน: ${crew}`, r.no_work?'':`งานที่ทำ:\n${work}`,
     (r.machinery||[]).length?`เครื่องจักร: ${r.machinery.join(', ')}`:'', r.problems?`ปัญหา: ${r.problems}`:'',
-    r.pdf_url?`PDF: ${r.pdf_url}`:'', r.photo_folder_url?`รูป ${(r.photos||[]).length} รูป: ${r.photo_folder_url}`:'', `ผู้รายงาน: ${r.submitted_name||S.profile.display_name}`].filter(Boolean).join('\n');
+    ...formAll('daily').filter(f=>!f.core&&f.show_line&&r.extra&&cfText(f,r.extra[f.key])&&!['photo','signature'].includes(f.type)).map(f=>`${f.label}: ${cfText(f,r.extra[f.key])}`), r.pdf_url?`PDF: ${r.pdf_url}`:'', r.photo_folder_url?`รูป ${(r.photos||[]).length} รูป: ${r.photo_folder_url}`:'', `ผู้รายงาน: ${r.submitted_name||S.profile.display_name}`].filter(Boolean).join('\n');
 }
 
 /* ---------------- รายการ ---------------- */
@@ -70,7 +70,8 @@ async function dailyForm(o){
   const ids=isManager()?mySiteIds():(S.mySites||[]);
   const siteList=S.sites.filter(s=>ids.includes(s.id)&&(s.status==='active'||s.id===o.site_id));
   if(!siteList.length) return toast('ยังไม่มีไซต์ที่รับผิดชอบ',true);
-  const F={ site_id:o.site_id||(S.site?+S.site:siteList[0].id), date:o.date||localISO(), weather:null, no_work:false, no_work_reason:null, work_items:'', machinery:[], tools:[], problems:'', crew:{}, crew_morning:null, changes:{}, photos:[], newPhotos:[], existing:null, morning:null };
+  const FIELDS=formOf('daily'), FX={};
+  const F={ site_id:o.site_id||(S.site?+S.site:siteList[0].id), date:o.date||localISO(), weather:null, no_work:false, no_work_reason:null, work_items:'', machinery:[], tools:[], problems:'', crew:{}, crew_morning:null, changes:{}, photos:[], newPhotos:[], existing:null, morning:null, extra:{} };
   const m=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="รายงานประจำวัน"></div>`, false, false);
   const sh=$('.sheet',m.el);
   async function load(){
@@ -79,8 +80,8 @@ async function dailyForm(o){
     F.existing=ex.data||null; F.morning=mo.data?.counts||null; F.newPhotos=[];
     const e=F.existing;
     if(e){ Object.assign(F,{weather:e.weather,no_work:e.no_work,no_work_reason:e.no_work_reason,work_items:e.work_items||'',machinery:e.machinery||[],tools:e.tools||[],problems:e.problems||'',crew:{...(e.crew||{})},crew_morning:e.crew_morning,photos:[...(e.photos||[])]});
-      F.changes={}; (e.crew_changes||[]).forEach(c=>F.changes[c.trade]={period:c.period,reason:c.reason}); }
-    else Object.assign(F,{weather:null,no_work:false,no_work_reason:null,work_items:'',machinery:[],tools:[],problems:'',crew:{},crew_morning:null,changes:{},photos:[]});
+      F.changes={}; (e.crew_changes||[]).forEach(c=>F.changes[c.trade]={period:c.period,reason:c.reason}); F.extra={...(e.extra||{})}; }
+    else Object.assign(F,{extra:{},weather:null,no_work:false,no_work_reason:null,work_items:'',machinery:[],tools:[],problems:'',crew:{},crew_morning:null,changes:{},photos:[]});
     draw();
   }
   const trades=()=>[...new Set([...(S.settings.site_trades||[]),...Object.keys(F.crew),...Object.keys(F.crew_morning||{})])];
@@ -89,27 +90,31 @@ async function dailyForm(o){
   function draw(){
     const y=$('.sheet-body',sh)?.scrollTop||0; const L=DL(), e=F.existing, site=S.sites.find(s=>s.id===F.site_id);
     const total=Object.values(F.crew).reduce((a,b)=>a+(+b||0),0);
+    const req=f=>f.required?' *':'', hlp=f=>f.help?`<span class="hint">${esc(f.help)}</span>`:'';
+    const B={
+      weather:f=>`<div class="field"><label>${esc(f.label)}${req(f)}</label><div class="chips">${chips(L.weather,F.weather,'weather',false)}</div>${hlp(f)}</div>`,
+      no_work:f=>`<div class="card row" style="padding:12px 14px"><div class="grow"><b>${esc(f.label)}</b>${f.help?`<div class="xs muted">${esc(f.help)}</div>`:''}</div><button type="button" class="sw ${F.no_work?'on':''}" data-nowork role="switch" aria-checked="${F.no_work}" aria-label="${esc(f.label)}"></button></div>${F.no_work?`<div class="field"><label>เหตุผล</label><div class="chips">${chips(L.no_work_reasons,F.no_work_reason,'reason',false)}</div></div>`:''}`,
+      crew:f=>F.no_work?'':`<div class="row" style="justify-content:space-between"><div class="sec" style="margin:0">${esc(f.label)} <span class="muted" style="font-weight:500">รวม ${total} คน</span></div><button type="button" class="btn btn-sm" data-pull ${F.morning?'':'disabled'}>${F.morning?'ดึงจากรอบเช้า':'ไม่มีข้อมูลรอบเช้า'}</button></div>
+        <div class="card card-l">${trades().map(t=>{ const v=+F.crew[t]||0, mv=F.crew_morning?(+F.crew_morning[t]||0):null, ch=mv!==null&&v!==mv, c=F.changes[t]||{};
+          return `<div class="li" style="flex-direction:column;align-items:stretch;gap:8px"><div class="row"><span class="grow" style="font-weight:600">${esc(t)} ${ch?`<span class="tag t-warn">${mv} → ${v}</span>`:''}</span><button type="button" class="btn btn-sm" data-dec="${esc(t)}" aria-label="ลด ${esc(t)}" style="width:42px;padding:0">−</button><b class="num" style="width:36px;text-align:center;font-size:17px;${v?'':'color:var(--ink2)'}">${v}</b><button type="button" class="btn btn-sm ${v?'btn-p':''}" data-inc="${esc(t)}" aria-label="เพิ่ม ${esc(t)}" style="width:42px;padding:0">+</button></div>
+            ${ch?`<div class="g2" style="gap:8px"><div class="seg" style="padding:3px">${['เช้า','บ่าย','ทั้งวัน'].map(p=>`<button type="button" class="${(c.period||'บ่าย')===p?'on':''}" data-per="${esc(t)}" data-v="${p}" style="min-height:34px">${p}</button>`).join('')}</div><input class="in" data-why="${esc(t)}" value="${esc(c.reason||'')}" placeholder="เหตุผล เช่น ช่างรับเหมาหามาเพิ่ม" style="height:42px"></div>`:''}</div>`; }).join('')}
+          <div class="li"><input class="in" id="df_trade" placeholder="เพิ่มประเภทช่างอื่น" style="height:40px"><button type="button" class="btn btn-sm" data-addtrade>เพิ่ม</button></div></div>`,
+      work_items:f=>F.no_work?'':`<div class="field"><label for="df_work">${esc(f.label)}${req(f)}</label><textarea class="in" id="df_work" rows="5" placeholder="เทคานรั้ว&#10;เดินท่อไฟชั้น 1">${esc(F.work_items)}</textarea>${hlp(f)}</div>`,
+      machinery:f=>F.no_work?'':`<div class="field"><label>${esc(f.label)}${req(f)}</label><div class="chips">${chips(L.machinery,F.machinery,'machinery')}<button type="button" class="chip" data-addeq="machinery">+ อื่น ๆ</button></div>${hlp(f)}</div>`,
+      tools:f=>F.no_work?'':`<div class="field"><label>${esc(f.label)}${req(f)}</label><div class="chips">${chips(L.tools,F.tools,'tools')}<button type="button" class="chip" data-addeq="tools">+ อื่น ๆ</button></div>${hlp(f)}</div>`,
+      problems:f=>`<div class="field"><label for="df_prob">${esc(f.label)}${req(f)}</label><textarea class="in" id="df_prob" rows="3" placeholder="${esc(f.help||'')}">${esc(F.problems)}</textarea></div>`,
+      photos:f=>`<div class="field"><label>${esc(f.label)} ${F.no_work?'':'*'} <span style="color:${!F.no_work&&F.photos.length+F.newPhotos.length<minPhotos()?'var(--bad)':'var(--ink2)'}">${F.photos.length+F.newPhotos.length} / 30${F.no_work?'':` · อย่างน้อย ${minPhotos()} รูป`}</span></label>
+          <div class="pgrid">${F.photos.map((p,i)=>`<div class="pthumb"><img src="${thumbOf(p)}" alt="" loading="lazy"><button type="button" data-delp="${i}" aria-label="ลบรูป">×</button></div>`).join('')}${F.newPhotos.map((p,i)=>`<div class="pthumb"><img src="${p.url}" alt=""><button type="button" data-delnp="${i}" aria-label="ลบรูป">×</button><span class="tag t-acc" style="position:absolute;left:4px;bottom:4px;height:18px;font-size:10px">ใหม่</span></div>`).join('')}
+          ${F.photos.length+F.newPhotos.length<30?`<label class="pthumb padd">${IC.camera}<span class="xs">เพิ่มรูป</span><input type="file" accept="image/*" multiple data-photos hidden></label>`:''}</div>
+          ${!hasBridge()?'<span class="hint warn">ยังไม่ได้ติดตั้ง Bridge รูปถ่ายและ PDF จะใช้ไม่ได้ (แจ้งแอดมิน)</span>':''}</div>`
+    };
+    const formBody=()=>FIELDS.map(f=>B[f.key]?B[f.key](f):(F.no_work&&f.hide_nowork?'':cfHTML(f,F.extra[f.key]))).join('');
     sh.innerHTML=`<header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>${e?'แก้ไขรายงานประจำวัน':'รายงานประจำวัน'}<small>${esc(site?.name||'')} · ${dayLong(F.date)}</small></h1></header>
       <div class="sheet-body">
         ${e?`<div class="note n-warn">${IC.info}<span>มีรายงานของวันนี้แล้ว การบันทึกจะสร้างแท็บฉบับแก้ไขใหม่ใน Google Sheet${e.sheet_tab?` (ต่อจาก ${esc(e.sheet_tab)})`:''}</span></div>`:''}
         <div class="g2"><div class="field"><label for="df_site">ไซต์</label><select class="in" id="df_site">${siteList.map(s=>`<option value="${s.id}" ${s.id===F.site_id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>
           <div class="field"><label for="df_date">วันที่</label><input class="in" type="date" id="df_date" value="${F.date}" max="${localISO()}"><span class="hint ${F.date<localISO()?'warn':''}">${F.date<localISO()?'ส่งย้อนหลัง จะติดป้ายให้ผู้บริหารเห็น':''}</span></div></div>
-        <div class="field"><label>สภาพอากาศ</label><div class="chips">${chips(L.weather,F.weather,'weather',false)}</div></div>
-        <div class="card row" style="padding:12px 14px"><div class="grow"><b>วันนี้ไม่มีการทำงาน</b><div class="xs muted">เช่น ฝนตกหนักทั้งวัน หรือวันหยุด</div></div><button type="button" class="sw ${F.no_work?'on':''}" data-nowork role="switch" aria-checked="${F.no_work}" aria-label="วันนี้ไม่มีการทำงาน"></button></div>
-        ${F.no_work?`<div class="field"><label>เหตุผล</label><div class="chips">${chips(L.no_work_reasons,F.no_work_reason,'reason',false)}</div></div>`:`
-        <div class="row" style="justify-content:space-between"><div class="sec" style="margin:0">คนงานหน้างาน <span class="muted" style="font-weight:500">รวม ${total} คน</span></div><button type="button" class="btn btn-sm" data-pull ${F.morning?'':'disabled'}>${F.morning?'ดึงจากรอบเช้า':'ไม่มีข้อมูลรอบเช้า'}</button></div>
-        <div class="card card-l">${trades().map(t=>{ const v=+F.crew[t]||0, mv=F.crew_morning?(+F.crew_morning[t]||0):null, ch=mv!==null&&v!==mv, c=F.changes[t]||{};
-          return `<div class="li" style="flex-direction:column;align-items:stretch;gap:8px"><div class="row"><span class="grow" style="font-weight:600">${esc(t)} ${ch?`<span class="tag t-warn">${mv} → ${v}</span>`:''}</span><button type="button" class="btn btn-sm" data-dec="${esc(t)}" aria-label="ลด ${esc(t)}" style="width:42px;padding:0">−</button><b class="num" style="width:36px;text-align:center;font-size:17px;${v?'':'color:var(--ink2)'}">${v}</b><button type="button" class="btn btn-sm ${v?'btn-p':''}" data-inc="${esc(t)}" aria-label="เพิ่ม ${esc(t)}" style="width:42px;padding:0">+</button></div>
-            ${ch?`<div class="g2" style="gap:8px"><div class="seg" style="padding:3px">${['เช้า','บ่าย','ทั้งวัน'].map(p=>`<button type="button" class="${(c.period||'บ่าย')===p?'on':''}" data-per="${esc(t)}" data-v="${p}" style="min-height:34px">${p}</button>`).join('')}</div><input class="in" data-why="${esc(t)}" value="${esc(c.reason||'')}" placeholder="เหตุผล เช่น ช่างรับเหมาหามาเพิ่ม" style="height:42px"></div>`:''}</div>`; }).join('')}
-          <div class="li"><input class="in" id="df_trade" placeholder="เพิ่มประเภทช่างอื่น" style="height:40px"><button type="button" class="btn btn-sm" data-addtrade>เพิ่ม</button></div></div>
-        <div class="field"><label for="df_work">งานที่ทำวันนี้ (บรรทัดละ 1 รายการ) *</label><textarea class="in" id="df_work" rows="5" placeholder="เทคานรั้ว&#10;เดินท่อไฟชั้น 1">${esc(F.work_items)}</textarea></div>
-        <div class="field"><label>เครื่องจักร</label><div class="chips">${chips(L.machinery,F.machinery,'machinery')}<button type="button" class="chip" data-addeq="machinery">+ อื่น ๆ</button></div></div>
-        <div class="field"><label>เครื่องมือ</label><div class="chips">${chips(L.tools,F.tools,'tools')}<button type="button" class="chip" data-addeq="tools">+ อื่น ๆ</button></div></div>`}
-        <div class="field"><label for="df_prob">ปัญหา / อุปสรรค</label><textarea class="in" id="df_prob" rows="3" placeholder="ไม่มี เว้นว่างได้">${esc(F.problems)}</textarea></div>
-        <div class="field"><label>รูปถ่าย ${F.no_work?'':'*'} <span style="color:${!F.no_work&&F.photos.length+F.newPhotos.length<minPhotos()?'var(--bad)':'var(--ink2)'}">${F.photos.length+F.newPhotos.length} / 30${F.no_work?'':` · อย่างน้อย ${minPhotos()} รูป`}</span></label>
-          <div class="pgrid">${F.photos.map((p,i)=>`<div class="pthumb"><img src="${thumbOf(p)}" alt="" loading="lazy"><button type="button" data-delp="${i}" aria-label="ลบรูป">×</button></div>`).join('')}${F.newPhotos.map((p,i)=>`<div class="pthumb"><img src="${p.url}" alt=""><button type="button" data-delnp="${i}" aria-label="ลบรูป">×</button><span class="tag t-acc" style="position:absolute;left:4px;bottom:4px;height:18px;font-size:10px">ใหม่</span></div>`).join('')}
-          ${F.photos.length+F.newPhotos.length<30?`<label class="pthumb padd">${IC.camera}<span class="xs">เพิ่มรูป</span><input type="file" accept="image/*" multiple data-photos hidden></label>`:''}</div>
-          ${!hasBridge()?'<span class="hint warn">ยังไม่ได้ติดตั้ง Bridge รูปถ่ายและ PDF จะใช้ไม่ได้ (แจ้งแอดมิน)</span>':''}</div>
+        ${formBody()}
       </div>
       <div class="sheet-foot"><button class="btn" data-x2>ยกเลิก</button><button class="btn btn-p" data-go>บันทึกและดูตัวอย่าง</button></div>`;
     $('.sheet-body',sh).scrollTop=y; bind();
@@ -136,18 +141,25 @@ async function dailyForm(o){
       for(const f of files){ try{ const b=await resizeImage(f,1600); F.newPhotos.push({blob:b,url:URL.createObjectURL(b),name:f.name}); }catch(_){ toast('อ่านไฟล์รูปไม่ได้บางรูป',true); } }
       draw(); };
     $('[data-go]',sh).onclick=()=>{ keep(); save(); };
+    cfBind(sh,F.extra,()=>{ keep(); draw(); },FX);
   }
   async function save(){
-    if(!F.weather) return toast('เลือกสภาพอากาศ',true);
+    cfCollectSignatures(F.extra);
+    const fd=k=>FIELDS.find(x=>x.key===k);
+    if(fd('weather')?.required&&!F.weather) return toast(`เลือก${fd('weather').label}`,true);
     if(F.no_work&&!F.no_work_reason) return toast('เลือกเหตุผลที่ไม่มีการทำงาน',true);
-    if(!F.no_work&&!F.work_items.trim()) return toast('กรอกงานที่ทำวันนี้',true);
+    if(!F.no_work&&!F.work_items.trim()) return toast(`กรอก${fd('work_items')?.label||'งานที่ทำวันนี้'}`,true);
+    if(!F.no_work&&fd('problems')?.required&&!F.problems.trim()) return toast(`กรอก${fd('problems').label}`,true);
+    if(!F.no_work&&fd('machinery')?.required&&!F.machinery.length) return toast(`เลือก${fd('machinery').label}`,true);
+    if(!F.no_work&&fd('tools')?.required&&!F.tools.length) return toast(`เลือก${fd('tools').label}`,true);
+    { const cv=cfValidate(FIELDS.filter(x=>!(F.no_work&&x.hide_nowork)),F.extra); if(cv) return toast(cv,true); }
     const ch=changed(); for(const t of ch){ if(!String(F.changes[t]?.reason||'').trim()) return toast(`ใส่เหตุผลที่ ${t} เปลี่ยนจากรอบเช้า`,true); }
     if(!F.no_work&&F.photos.length+F.newPhotos.length<minPhotos()) return toast(`ต้องแนบรูปอย่างน้อย ${minPhotos()} รูป (ตอนนี้มี ${F.photos.length+F.newPhotos.length} รูป)`,true);
     if(F.newPhotos.length&&!hasBridge()) return toast('ยังไม่ได้ติดตั้ง Bridge จึงอัปโหลดรูปไม่ได้',true);
     const crew={}; Object.entries(F.crew).forEach(([k,n])=>{ if(+n>0) crew[k]=+n; });
     const row={ site_id:F.site_id, report_date:F.date, weather:F.weather, no_work:F.no_work, no_work_reason:F.no_work?F.no_work_reason:null, work_items:F.no_work?null:F.work_items.trim(),
       machinery:F.no_work?[]:F.machinery, tools:F.no_work?[]:F.tools, problems:F.problems.trim()||null, crew:F.no_work?{}:crew, crew_morning:F.crew_morning,
-      crew_changes:ch.map(t=>({trade:t,from:+F.crew_morning[t]||0,to:+F.crew[t]||0,period:F.changes[t]?.period||'บ่าย',reason:F.changes[t]?.reason||''})), photos:F.photos };
+      extra:F.extra, form_version:S.settings.forms?.daily?.version||0, crew_changes:ch.map(t=>({trade:t,from:+F.crew_morning[t]||0,to:+F.crew[t]||0,period:F.changes[t]?.period||'บ่าย',reason:F.changes[t]?.reason||''})), photos:F.photos };
     const prog=overlay(`<div class="modal" role="dialog" aria-modal="true"><h3 class="h2" style="font-size:18px">กำลังบันทึกรายงาน</h3><div id="pg" class="col" style="gap:8px"></div></div>`,true,false);
     const step=(t,done)=>{ $('#pg',prog.el).insertAdjacentHTML('beforeend',`<div class="row sm" style="gap:8px">${done?svg('<path d="M5 12l5 5 9-10"/>','style="color:var(--ok);width:18px"'):'<span class="spin" style="width:16px;height:16px;margin:0;border-width:2px"></span>'}<span>${t}</span></div>`); };
     try{
@@ -162,6 +174,8 @@ async function dailyForm(o){
           const p=F.newPhotos[i]; const res=await bridge('upload_photo',{site_id:F.site_id,date:F.date,name:`${F.date}_${String(up.length+1).padStart(2,'0')}.jpg`,data:await blobToB64(p.blob)}); up.push({id:res.id,url:res.url,thumb:res.thumb,name:res.name}); }
         const r=await sb.from('daily_reports').update({photos:up}).eq('id',rep.id).select('*').single(); if(r.error) throw r.error; rep=r.data||{...rep,photos:up};
       }
+      for(const [k,bl] of Object.entries(FX)){ if(!hasBridge()) break; const r2=await bridge('upload_photo',{site_id:F.site_id,date:F.date,name:`${F.date}_${k}.jpg`,data:await blobToB64(bl)}); F.extra[k]={id:r2.id,url:r2.url,thumb:r2.thumb}; }
+      if(Object.keys(FX).length){ const r3=await sb.from('daily_reports').update({extra:F.extra}).eq('id',rep.id).select('*').single(); if(!r3.error&&r3.data) rep=r3.data; }
       let pdf=null;
       if(hasBridge()){ step('สร้าง Google Sheet และ PDF'); pdf=await bridge('render',{report_id:rep.id}); const r=await sb.from('daily_reports').select('*').eq('id',rep.id).single(); rep={...rep,pdf_url:pdf.pdf_url,pdf_id:pdf.pdf_id,sheet_url:pdf.sheet_url,sheet_tab:pdf.sheet_tab,photo_folder_url:pdf.folder_url,...(r.data||{})}; }
       prog.close(); m.close(); toast('บันทึกรายงานแล้ว');
@@ -185,6 +199,7 @@ async function dailyPreview(r, pdf){
           <div class="lr"><b class="ls">👷 กำลังคน</b><b>รวม ${r.total} คน</b></div><p class="lm">${esc(Object.entries(r.crew||{}).filter(([,n])=>n>0).map(([k,n])=>`${k} ${n} คน`).join(' · '))}</p>
           ${(r.crew_changes||[]).map(c=>`<p class="lw">↕ ${esc(c.trade)} ${c.from} → ${c.to} (${esc(c.period)}) ${esc(c.reason||'')}</p>`).join('')}<hr>
           <b class="ls">🚜 เครื่องจักร / เครื่องมือ</b><p>${esc([...(r.machinery||[]),...(r.tools||[])].join(', ')||'-')}</p>`}<hr>
+          ${formAll('daily').filter(f=>!f.core&&f.show_line&&r.extra&&cfText(f,r.extra[f.key])&&!['photo','signature'].includes(f.type)).map(f=>`<div class="lr"><span>${esc(f.label)}</span><span class="v">${esc(cfText(f,r.extra[f.key]))}</span></div>`).join('')}<hr>
           <b class="ls" style="color:#C0392B">⚠️ ปัญหา / อุปสรรค</b><p>${esc(r.problems||'-')}</p></div>
         <div class="lcf"><div class="lr"><span>ผู้รายงาน</span><span class="v">${esc(r.submitted_name||'')}</span></div><span class="lbtn p">📄 ดาวน์โหลด PDF</span>${(r.photos||[]).length?`<span class="lbtn">🖼️ ดูรูปถ่าย ${r.photos.length} รูป</span>`:''}</div></div>
       <div class="sec">ไฟล์ PDF</div>
@@ -234,6 +249,7 @@ async function dailyView(id){
       ${!r.no_work?kv('แยกประเภท',esc(Object.entries(r.crew||{}).map(([k,n])=>`${k} ${n}`).join(', '))):kv('เหตุผล',esc(r.no_work_reason))}${kv('เครื่องจักร',esc((r.machinery||[]).join(', ')))}${kv('เครื่องมือ',esc((r.tools||[]).join(', ')))}</div>
     ${(r.crew_changes||[]).length?`<div class="card col" style="gap:6px"><b class="sm">เปลี่ยนจากรอบเช้า</b>${r.crew_changes.map(c=>`<span class="sm" style="color:var(--warn)">${esc(c.trade)} ${c.from} → ${c.to} (${esc(c.period)}): ${esc(c.reason)}</span>`).join('')}</div>`:''}
     ${!r.no_work?`<div class="card"><b class="sm">งานที่ทำ</b><div style="margin-top:6px;white-space:pre-line">${esc(r.work_items||'')}</div></div>`:''}
+    ${(()=>{ const cf=formAll('daily').filter(f=>!f.core&&r.extra&&cfText(f,r.extra[f.key])); return cf.length?`<div class="card card-l">${cf.map(f=>`<div class="kv"><span>${esc(f.label)}</span><span>${f.type==='photo'&&r.extra[f.key]?.url?`<a href="${esc(r.extra[f.key].url)}" target="_blank" rel="noopener">ดูรูป</a>`:f.type==='signature'?`<img src="${r.extra[f.key]}" alt="" style="height:46px;background:#fff;border-radius:6px">`:esc(cfText(f,r.extra[f.key]))}</span></div>`).join('')}</div>`:''; })()}
     ${r.problems?`<div class="note n-bad"><span><b>ปัญหา / อุปสรรค</b><br>${esc(r.problems).replace(/\n/g,'<br>')}</span></div>`:''}
     ${(r.photos||[]).length?`<div class="card col" style="gap:8px"><div class="row" style="justify-content:space-between"><b class="sm">รูปถ่าย ${r.photos.length} รูป</b>${r.photo_folder_url?`<a href="${esc(r.photo_folder_url)}" target="_blank" rel="noopener" class="sm">เปิดโฟลเดอร์</a>`:''}</div><div class="pgrid">${r.photos.map(p=>`<a class="pthumb" href="${esc(p.url)}" target="_blank" rel="noopener"><img src="${thumbOf(p)}" alt="" loading="lazy"></a>`).join('')}</div></div>`:''}
     <div class="row" style="gap:8px;flex-wrap:wrap">${r.pdf_url?`<a class="btn" href="${esc(r.pdf_url)}" target="_blank" rel="noopener">${IC.history}เปิด PDF</a>`:''}${mgr&&r.sheet_url?`<a class="btn" href="${esc(r.sheet_url)}" target="_blank" rel="noopener">เปิด Google Sheet</a>`:''}<button class="btn" data-resend>ส่งเข้า LINE</button>${canEdit?'<button class="btn btn-p" data-edit>แก้ไขรายงาน</button>':''}</div>

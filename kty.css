@@ -395,3 +395,18 @@ details.perm>summary::-webkit-details-marker{display:none}
 .brand-prev{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px dashed var(--line);border-radius:14px}
 .lbl-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:8px 12px;align-items:center}.lbl-grid .in{height:40px}.lbl-grid .in.chg{background:#FFF4CC;color:#1B262C}
 .tbl.acc td,.tbl.acc th{padding:10px 12px}
+
+/* ================= ตัวสร้างฟอร์ม ================= */
+.studio.studio-wide{grid-template-columns:1fr}.studio-wide .studio-body{max-width:none}
+.fbgrid{display:grid;gap:14px}.fbgrid.wide{grid-template-columns:340px minmax(0,1fr) 360px;align-items:start}
+.fbrow{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--surface);margin-bottom:6px;cursor:pointer}
+.fbrow.on{box-shadow:inset 0 0 0 2px var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--surface))}
+.fbrow.off{opacity:.5}.fbrow.fixed{cursor:default;background:var(--surface2)}.fbrow.over{border-color:var(--accent);border-style:dashed}.fbrow.drag{opacity:.4}
+.fbrow .grip{color:var(--ink2);cursor:grab;font-size:16px;width:14px}.fbrow b{font-size:14px}
+.fbt{width:28px;height:28px;border-radius:8px;background:var(--surface2);display:grid;place-items:center;font-size:13px;flex:none}
+.fbmv{display:flex;gap:2px}.fbmv .ibtn{width:28px;height:28px;min-height:28px}
+.fbprev{position:sticky;top:16px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.phone-mini{width:100%;max-width:340px;border:8px solid #111;border-radius:30px;background:var(--bg);padding:14px 12px;max-height:640px;overflow:auto;pointer-events:none}
+.fbtypes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.fbtype{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);cursor:pointer;font:inherit;text-align:left}
+.fbtype.on{box-shadow:inset 0 0 0 2px var(--accent)}

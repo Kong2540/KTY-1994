@@ -4,6 +4,7 @@
 const STUDIO_SECS = [
   ['brand','🎨','แบรนด์และโลโก้','ชื่อแอป บริษัท โลโก้ สี'],
   ['labels','✏️','ข้อความและหัวข้อ','แก้ชื่อเมนูและหัวข้อทุกหน้า'],
+  ['forms','📋','ตัวสร้างฟอร์ม','รายงานประจำวัน · ลากจัดลำดับ เพิ่มช่องเอง'],
   ['lists','🗂️','รายการตัวเลือก','สภาพอากาศ เครื่องจักร ประเภทช่าง'],
   ['access','🔐','สิทธิ์เมนูและหน้า','บทบาทไหนเห็นเมนูไหน'],
   ['rules','📷','กติการายงาน','จำนวนรูปขั้นต่ำ']
@@ -15,12 +16,12 @@ async function saveSetting(key, value){
 }
 function pageStudio(sec){
   if(!isAdmin()) return setPage(head('ตั้งค่าระบบ')+'<div class="card empty"><b>เฉพาะแอดมิน</b></div>');
-  const cur=STUDIO_SECS.find(s=>s[0]===sec)?sec:null, wide=matchMedia('(min-width:900px)').matches, show=cur||(wide?'brand':null);
+  const cur=STUDIO_SECS.find(s=>s[0]===sec)?sec:null, wide=matchMedia('(min-width:900px)').matches, isForm=cur==='forms', show=cur||(wide?'brand':null);
   setPage(head(cur?STUDIO_SECS.find(s=>s[0]===cur)[2]:'ตั้งค่าระบบ', cur?'ตั้งค่าระบบ':'แอดมินเท่านั้น',{back:cur&&!wide?'#studio':null}) +
-    `<div class="studio">${wide||!cur?`<nav class="studio-nav card card-l">${STUDIO_SECS.map(([k,e,t,d])=>`<a href="#studio/${k}" class="li ${show===k?'on':''}" style="text-decoration:none"><span class="se">${e}</span><div class="grow"><b>${t}</b><span class="xs muted">${d}</span></div>${IC.chev}</a>`).join('')}
+    `<div class="studio ${isForm?'studio-wide':''}">${(wide&&!isForm)||!cur?`<nav class="studio-nav card card-l">${STUDIO_SECS.map(([k,e,t,d])=>`<a href="#studio/${k}" class="li ${show===k?'on':''}" style="text-decoration:none"><span class="se">${e}</span><div class="grow"><b>${t}</b><span class="xs muted">${d}</span></div>${IC.chev}</a>`).join('')}
       <a href="#manage" class="li" style="text-decoration:none"><span class="se">⚙️</span><div class="grow"><b>จัดการข้อมูลอื่น</b><span class="xs muted">ผู้ใช้ สิทธิ์รายระบบ ไซต์ ตำแหน่ง วัสดุ</span></div>${IC.chev}</a></nav>`:''}
       ${show?'<section class="studio-body col" id="sb" style="gap:14px"></section>':''}</div>`);
-  if(show) ({brand:stBrand,labels:stLabels,lists:stLists,access:stAccess,rules:stRules})[show]($('#sb'));
+  if(show) ({brand:stBrand,labels:stLabels,forms:stForms,lists:stLists,access:stAccess,rules:stRules})[show]($('#sb'));
 }
 
 /* ---------------- แบรนด์ ---------------- */
