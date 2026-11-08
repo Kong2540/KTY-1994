@@ -1,7 +1,7 @@
 /* =====================================================================
    KTY Hub — โครงหน้า: แถบเมนูด้านข้าง / ลิ้นชักเมนูบนมือถือ / ตัวเลือกไซต์
    ===================================================================== */
-const HUB_VERSION = '1.8';
+const HUB_VERSION = '1.8.1';
 const MOD = {
   att:      { t:'เช็คชื่อ',            hue:'#2E9E5B', i:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>' },
   daily:    { t:'รายงานประจำวัน',      hue:'#2F6FDB', i:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>' },
@@ -37,7 +37,7 @@ async function loadUserCtx(){
 /* เมนูทั้งหมดตามสิทธิ์ (ใช้ทั้งแถบด้านข้าง/ลิ้นชัก) */
 const ACCESS_MODS=['att','daily','materials','borrow','issues','people','payroll','sites'];
 const allowed = m => isAdmin() || !ACCESS_MODS.includes(m) || (S.settings.menu_access?.[m]?.[S.profile.role]!=='hide');
-const ROUTE_MOD={att:'att',roll:'att',report:'att',daily:'daily',mat:'materials',brw:'borrow',employees:'people',emp:'people',pay:'payroll'};
+const ROUTE_MOD={att:'att',roll:'att',report:'daily',daily:'daily',mat:'materials',brw:'borrow',employees:'people',emp:'people',pay:'payroll'};
 function navSections(){ return navSections0().map(s=>({...s,items:s.items.filter(x=>allowed(x.m))})).filter(s=>s.items.length); }
 function navSections0(){
   const p=S.profile, mgr=isManager(), out=[];
@@ -152,7 +152,7 @@ async function collectTasks(){
   const daily={}; (dly.error?[]:(dly.data||[])).forEach(r=>daily[r.site_id]=r);
   const sent=new Set((rep.data||[]).map(r=>r.site_id));
   const missing=siteIds.filter(id=>!sent.has(id)).map(id=>S.sites.find(s=>s.id===id)).filter(Boolean);
-  missing.forEach(s=>tasks.push({m:'daily',t:`${s.name} ยังไม่ส่งคนงานเช้า`,sub:mgr?'แตะเพื่อบันทึกแทน':'ส่งก่อนเริ่มงาน',tag:'ยังไม่ส่ง',c:'t-warn',href:mgr?'#att/site':'#report'}));
+  missing.forEach(s=>tasks.push({m:'daily',t:`${s.name} ยังไม่เช็คชื่อคนงานหน้าไซต์`,sub:mgr?'แตะเพื่อบันทึกแทน':'ส่งก่อนเริ่มงาน',tag:'ยังไม่ส่ง',c:'t-warn',href:mgr?'#att/site':'#report'}));
   if(!dly.error) siteIds.filter(id=>!daily[id]).map(id=>S.sites.find(s=>s.id===id)).filter(Boolean).forEach(s=>tasks.push({m:'daily',t:`${s.name} ยังไม่ส่งรายงานเย็น`,sub:mgr?'แตะเพื่อดูหรือเขียนแทน':'ส่งก่อนเลิกงาน',tag:'รอส่ง',c:'',href:'#daily'}));
   S.badges.daily=dly.error?0:siteIds.filter(id=>!daily[id]).length;
   if(hasMod('materials')){ try{
@@ -224,12 +224,12 @@ async function pageHome(){
   S.badges.tasks=d.tasks.length; S.badges.crew=Math.max(0,d.sites-d.sent);
   let top='';
   if(mgr){
-    top=`<div class="card sumstrip"><div><b class="num">${d.done}<small>/${d.act}</small></b><span>เช็คชื่อวันนี้</span></div><div><b class="num">${d.sent}<small>/${d.sites}</small></b><span>ไซต์ส่งคนงานเช้า</span></div><div><b class="num">${d.crew}</b><span>คนงานหน้างาน</span></div><div><b class="num" style="${d.tasks.length?'color:var(--warn)':''}">${d.tasks.length}</b><span>งานที่รอคุณ</span></div></div>`;
+    top=`<div class="card sumstrip"><div><b class="num">${d.done}<small>/${d.act}</small></b><span>เช็คชื่อวันนี้</span></div><div><b class="num">${d.sent}<small>/${d.sites}</small></b><span>ไซต์เช็คชื่อคนงานแล้ว</span></div><div><b class="num">${d.crew}</b><span>คนงานหน้างาน</span></div><div><b class="num" style="${d.tasks.length?'color:var(--warn)':''}">${d.tasks.length}</b><span>งานที่รอคุณ</span></div></div>`;
   } else if(p.role==='foreman'||hasMod('daily')){
     const sites=S.sites.filter(s=>(S.site?[+S.site]:S.mySites).includes(s.id)&&s.status==='active');
     const rep={}; (d.rep||[]).forEach(r=>rep[r.site_id]=r);
-    top=sites.length?`<div class="card col" style="gap:12px"><h3 class="h2">วันนี้ที่ไซต์ของคุณ</h3><div class="timeline">${sites.map(s=>{ const r=rep[s.id]; return `<div class="row"><span class="dot ${r?'done':'now'}">${r?svg('<path d="M5 12l5 5 9-10"/>','style="width:14px;height:14px;stroke-width:3"'):''}</span><div class="grow"><b>${esc(s.name)}</b><div class="sm muted">${r?`ส่งคนงานเช้าแล้ว ${r.total} คน · ${new Date(r.updated_at).toTimeString().slice(0,5)}`:'ยังไม่ส่งคนงานเช้า'}</div></div></div>`; }).join('')}
-      ${sites.map(s=>{ const r=d.daily[s.id]; return `<div class="row"><span class="dot ${r?'done':'now'}">${r?svg('<path d="M5 12l5 5 9-10"/>','style="width:14px;height:14px;stroke-width:3"'):''}</span><div class="grow"><b>รายงานเย็น ${sites.length>1?esc(s.name):''}</b><div class="sm muted">${r?`ส่งแล้ว ${new Date(r.updated_at).toTimeString().slice(0,5)}`:'ส่งก่อนเลิกงาน'}</div></div></div>`; }).join('')}</div><a href="#daily" class="btn btn-p">${d.sites>d.sent?'ส่งคนงานเช้า / รายงานเย็น':'เขียนหรือดูรายงานประจำวัน'}</a></div>`:`<div class="card empty"><b>ยังไม่ได้กำหนดไซต์ที่รับผิดชอบ</b>ติดต่อแอดมิน</div>`;
+    top=sites.length?`<div class="card col" style="gap:12px"><h3 class="h2">วันนี้ที่ไซต์ของคุณ</h3><div class="timeline">${sites.map(s=>{ const r=rep[s.id]; return `<div class="row"><span class="dot ${r?'done':'now'}">${r?svg('<path d="M5 12l5 5 9-10"/>','style="width:14px;height:14px;stroke-width:3"'):''}</span><div class="grow"><b>${esc(s.name)}</b><div class="sm muted">${r?`เช็คชื่อคนงานแล้ว ${r.total} คน · ${new Date(r.updated_at).toTimeString().slice(0,5)}`:'ยังไม่เช็คชื่อคนงานหน้าไซต์'}</div></div></div>`; }).join('')}
+      ${sites.map(s=>{ const r=d.daily[s.id]; return `<div class="row"><span class="dot ${r?'done':'now'}">${r?svg('<path d="M5 12l5 5 9-10"/>','style="width:14px;height:14px;stroke-width:3"'):''}</span><div class="grow"><b>รายงานเย็น ${sites.length>1?esc(s.name):''}</b><div class="sm muted">${r?`ส่งแล้ว ${new Date(r.updated_at).toTimeString().slice(0,5)}`:'ส่งก่อนเลิกงาน'}</div></div></div>`; }).join('')}</div><a href="#daily" class="btn btn-p">${d.sites>d.sent?'เช็คชื่อคนงาน / รายงานเย็น':'เขียนหรือดูรายงานประจำวัน'}</a></div>`:`<div class="card empty"><b>ยังไม่ได้กำหนดไซต์ที่รับผิดชอบ</b>ติดต่อแอดมิน</div>`;
   }
   $('#hb').outerHTML=`<div class="col" style="gap:16px">${top}<div class="tiles">${tiles}</div>
     ${!mgr&&hasMod('issues')?`<div class="note n-warn" style="align-items:center">${modIcon('issues',30)}<span>รายงานปัญหาหน้างาน จะส่งแจ้งเตือนถึงผู้บริหารทันที</span></div>`:''}
@@ -276,7 +276,7 @@ async function mgPerms(){
         ${mgr?'<p class="sm muted" style="margin:10px 0 0">บทบาทผู้บริหาร/แอดมิน ใช้ได้ทุกระบบ</p>':`<div class="col" style="gap:0;margin-top:8px">
           <div class="prow"><div class="row" style="gap:10px">${modIcon('att',30)}<b>เช็คชื่อ</b></div><div class="chips" style="gap:6px"><button class="chip ${p.can_check?'':'on'}" data-ck="0">ไม่มี</button><button class="chip ${p.can_check?'on':''}" data-ck="1">ผู้เช็คชื่อ</button></div></div>
           ${Object.entries(MROLES).map(([m,def])=>`<div class="prow"><div class="row" style="gap:10px">${modIcon(m,30)}<b>${def.t}</b></div><div class="chips" style="gap:6px">${def.o.map(([v,t])=>`<button class="chip ${get(p.id,m)===v?'on':''}" data-m="${m}" data-v="${v}">${t}</button>`).join('')}</div></div>`).join('')}
-          <div class="row" style="padding-top:12px"><span class="xs muted grow">${p.role==='foreman'?'โฟร์แมนส่งคนงานเช้าได้ตามไซต์ที่รับผิดชอบ':''}</span><button class="btn btn-p btn-sm" data-save>บันทึก</button></div></div>`}
+          <div class="row" style="padding-top:12px"><span class="xs muted grow">${p.role==='foreman'?'โฟร์แมนเช็คชื่อคนงานหน้าไซต์ได้ตามไซต์ที่รับผิดชอบ':''}</span><button class="btn btn-p btn-sm" data-save>บันทึก</button></div></div>`}
       </details>`; }).join('')}`;
   $$('details.perm').forEach(card=>{
     const id=card.dataset.u;

@@ -410,3 +410,5 @@ details.perm>summary::-webkit-details-marker{display:none}
 .fbtypes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .fbtype{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);cursor:pointer;font:inherit;text-align:left}
 .fbtype.on{box-shadow:inset 0 0 0 2px var(--accent)}
+
+.docslip .ds-total{width:120px;border:1px solid #C9D1D4;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px}.docslip .ds-total b{font-size:34px;color:#1F3540;line-height:1}.docslip .ds-total span{font-size:11px;color:#5B6B73}

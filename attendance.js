@@ -478,7 +478,7 @@ function reportEditor(box, site, date, existing, onSaved, canEdit=true){
 let repSite=null;
 async function pageReport(){
   const today=localISO();
-  setPage(head('รายงานประจำวัน',`ส่งคนงานเช้า · ${dayLong(today)}`) + `<div id="rb"><div class="loading"><div class="spin"></div></div></div>`);
+  setPage(head(T('เช็คชื่อคนงานหน้าไซต์งาน'),dayLong(today),{back:'#daily'}) + `<div id="rb"><div class="loading"><div class="spin"></div></div></div>`);
   if(!S.hasPhase2){ $('#rb').outerHTML=need03(); return; }
   const {data:asg}=await sb.from('site_assignments').select('site_id').eq('user_id',S.profile.id);
   const mine=(asg||[]).map(a=>S.sites.find(s=>s.id===a.site_id)).filter(s=>s&&s.status==='active'&&(!S.site||String(s.id)===S.site||true));
@@ -491,9 +491,11 @@ async function pageReport(){
   const hist=(reps||[]).filter(r=>r.site_id===repSite&&r.report_date!==today);
   host.innerHTML=`<div class="chips">${mine.map(s=>`<button class="chip ${s.id===repSite?'on':''}" data-rs="${s.id}">${esc(s.name)}${todayRep[s.id]?' <span class="tag t-ok" style="height:20px">ส่งแล้ว</span>':''}</button>`).join('')}</div>
     <div id="re"></div>
-    ${hist.length?`<h3 class="h2" style="margin-top:8px">ย้อนหลัง 7 วัน</h3><div class="card card-l">${hist.map(r=>`<div class="li"><div class="grow"><b>${dayLong(r.report_date)}</b><span class="xs muted">${Object.entries(r.counts||{}).map(([k,n])=>`${esc(k)} ${n}`).join(' · ')||'ไม่มีคนงาน'}</span></div><b class="num">${r.total} คน</b></div>`).join('')}</div>`:''}`;
+    ${hist.length?`<h3 class="h2" style="margin-top:8px">ย้อนหลัง 7 วัน</h3><div class="card card-l">${hist.map(r=>`<div class="li"><div class="grow"><b>${dayLong(r.report_date)}</b><span class="xs muted">${Object.entries(r.counts||{}).map(([k,n])=>`${esc(k)} ${n}`).join(' · ')||'ไม่มีคนงาน'}</span></div><b class="num">${r.total} คน</b><button class="btn btn-sm" data-slip="${r.id}">ใบสรุป</button></div>`).join('')}</div>`:''}`;
   $$('[data-rs]',host).forEach(b=>b.onclick=()=>{ repSite=+b.dataset.rs; pageReport(); });
-  reportEditor($('#re',host), site, today, todayRep[repSite], ()=>pageReport());
+  reportEditor($('#re',host), site, today, todayRep[repSite], d=>{ pageReport(); if(d) setTimeout(()=>crewSlip(d),300); });
+  if(todayRep[repSite]){ const b=document.createElement('button'); b.className='btn'; b.textContent='ดู / แชร์ใบสรุปคนงานวันนี้'; b.onclick=()=>crewSlip(todayRep[repSite]); $('#re',host).after(b); }
+  $$('[data-slip]',host).forEach(b=>b.onclick=()=>crewSlip((reps||[]).find(r=>r.id==b.dataset.slip)));
 }
 
 /* =====================================================================

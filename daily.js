@@ -41,7 +41,7 @@ async function pageDaily(arg, arg2){
       <div class="statg" style="grid-template-columns:repeat(3,minmax(0,1fr))"><div class="stat"><b>${Object.keys(rep).length}<small class="muted" style="font-size:15px">/${sites.length}</small></b><span class="sm muted">ส่งรายงานแล้ว</span></div><div class="stat"><b>${Object.values(rep).reduce((a,r)=>a+r.total,0)}</b><span class="sm muted">คนงานรวม (เย็น)</span></div><div class="stat"><b>${Object.values(rep).filter(r=>r.problems).length}</b><span class="sm muted">มีปัญหาหน้างาน</span></div></div>
       ${sites.length?`<div class="card card-l">${sites.map(s=>{ const r=rep[s.id];
         return r?`<a href="#daily/r/${r.id}" class="li" style="text-decoration:none">${modIcon('daily',40)}<div class="grow"><b>${esc(s.name)}</b><span class="xs muted">${esc(r.submitted_name||'')} · ${new Date(r.updated_at).toTimeString().slice(0,5)} · ${r.no_work?'ไม่มีการทำงาน':r.total+' คน'} · ${(r.photos||[]).length} รูป</span><div class="row" style="gap:6px;margin-top:4px;flex-wrap:wrap">${lineTag(r)}${r.late?'<span class="tag t-warn">ส่งย้อนหลัง</span>':''}${r.problems?'<span class="tag t-bad">มีปัญหา</span>':''}</div></div>${IC.chev}</a>`
-          :`<button class="li" data-new="${s.id}">${modIcon('daily',40)}<div class="grow"><b>${esc(s.name)}</b><span class="xs muted">${mor[s.id]?`คนงานเช้า ${mor[s.id].total} คน`:'ยังไม่ส่งคนงานเช้า'}</span></div><span class="tag t-warn">ยังไม่ส่ง</span>${IC.chev}</button>`; }).join('')}</div>`:`<div class="card empty"><b>ไม่มีไซต์ที่เปิดอยู่</b></div>`}
+          :`<button class="li" data-new="${s.id}">${modIcon('daily',40)}<div class="grow"><b>${esc(s.name)}</b><span class="xs muted">${mor[s.id]?`คนงานหน้าไซต์ ${mor[s.id].total} คน`:'ยังไม่เช็คชื่อคนงานหน้าไซต์'}</span></div><span class="tag t-warn">ยังไม่ส่ง</span>${IC.chev}</button>`; }).join('')}</div>`:`<div class="card empty"><b>ไม่มีไซต์ที่เปิดอยู่</b></div>`}
       <span class="xs muted">แตะไซต์ที่ยังไม่ส่งเพื่อเขียนรายงานแทนโฟร์แมนได้</span></div>`;
     $$('[data-new]').forEach(b=>b.onclick=()=>dailyForm({site_id:+b.dataset.new, date:dailyDate}));
     return;
@@ -57,7 +57,7 @@ async function pageDaily(arg, arg2){
   $('#db').outerHTML=`<div class="col" style="gap:14px;max-width:760px">
     ${sites.length?sites.map(s=>{ const r=rep[s.id], m=mor[s.id];
       return `<div class="card col" style="gap:12px"><div class="row"><div class="grow"><b style="font-size:16px">${esc(s.name)}</b><div class="xs muted">${esc(s.code||'')}</div></div></div>
-        <div class="timeline"><div class="row"><span class="dot ${m?'done':'now'}">${m?svg('<path d="M5 12l5 5 9-10"/>','style="width:14px;height:14px;stroke-width:3"'):''}</span><div class="grow"><b>คนงานรอบเช้า</b><div class="sm muted">${m?`ส่งแล้ว ${m.total} คน · ${new Date(m.updated_at).toTimeString().slice(0,5)}`:'ยังไม่ส่ง'}</div></div><a href="#report" class="btn btn-sm" onclick="repSite=${s.id}">${m?'แก้ไข':'ส่ง'}</a></div>
+        <div class="timeline"><div class="row"><span class="dot ${m?'done':'now'}">${m?svg('<path d="M5 12l5 5 9-10"/>','style="width:14px;height:14px;stroke-width:3"'):''}</span><div class="grow"><b>${esc(T('เช็คชื่อคนงานหน้าไซต์งาน'))}</b><div class="sm muted">${m?`ส่งแล้ว ${m.total} คน · ${new Date(m.updated_at).toTimeString().slice(0,5)}`:'ยังไม่ส่ง'}</div></div><a href="#report" class="btn btn-sm" onclick="repSite=${s.id}">${m?'แก้ไข':'ส่ง'}</a></div>
           <div class="row"><span class="dot ${r?'done':'now'}">${r?svg('<path d="M5 12l5 5 9-10"/>','style="width:14px;height:14px;stroke-width:3"'):''}</span><div class="grow"><b>รายงานเย็น</b><div class="sm muted">${r?`ส่งแล้ว ${new Date(r.updated_at).toTimeString().slice(0,5)} · ${r.no_work?'ไม่มีการทำงาน':r.total+' คน'}`:'ส่งก่อนเลิกงาน'}</div>${r?`<div style="margin-top:4px">${lineTag(r)}</div>`:''}</div>${r?`<a href="#daily/r/${r.id}" class="btn btn-sm">ดู</a>`:`<button class="btn btn-sm btn-p" data-new="${s.id}">เขียน</button>`}</div></div></div>`; }).join(''):`<div class="card empty"><b>ยังไม่ได้กำหนดไซต์ที่รับผิดชอบ</b>ติดต่อแอดมิน</div>`}
     ${canWriteDaily()?`<button class="btn" data-back>เขียนรายงานย้อนหลัง</button>`:''}
     ${(hist.data||[]).length?`<h3 class="h2">รายงานก่อนหน้า</h3><div class="card card-l">${hist.data.map(r=>`<a href="#daily/r/${r.id}" class="li" style="text-decoration:none"><div class="grow"><b>${dayLong(r.report_date)}</b><span class="xs muted">${esc(S.sites.find(s=>s.id===r.site_id)?.name||'')} · ${r.no_work?'ไม่มีการทำงาน':r.total+' คน'} · ${(r.photos||[]).length} รูป</span></div>${r.pdf_url?'<span class="tag">PDF</span>':''}${IC.chev}</a>`).join('')}</div>`:''}</div>`;
@@ -272,4 +272,50 @@ async function mgDaily(){
   const sv=$('[data-save]',host); if(sv) sv.onclick=async()=>{ const v=Math.max(0,Math.min(30,Math.round(+inp.value||0)));
     const {error}=await sb.from('app_settings').upsert({key:'daily_rules',value:{...(S.settings.daily_rules||{}),min_photos:v},updated_at:new Date().toISOString()}); if(error) return toast(errText(error),true);
     await loadRefs(); toast(`บันทึกแล้ว: ต้องแนบอย่างน้อย ${v} รูป`); mgDaily(); };
+}
+
+/* ---------------- ใบสรุปคนงานหน้าไซต์ (รูปแชร์ LINE + PDF ลงโฟลเดอร์ Drive ของวันนั้น) ---------------- */
+async function crewSlip(rep){
+  const prog=overlay(`<div class="modal" role="dialog" aria-modal="true"><div class="row" style="gap:10px"><span class="spin" style="margin:0"></span><b>กำลังสร้างใบสรุปคนงาน</b></div></div>`,true,false);
+  try{
+    await loadScript(LIB.h2c);
+    const site=S.sites.find(s=>s.id===rep.site_id), B=BR(), logo=B.logo||(S.settings.company_logo?.drive_id?`https://drive.google.com/thumbnail?id=${S.settings.company_logo.drive_id}&sz=w200`:'');
+    const rows=Object.entries(rep.counts||{}).filter(([,n])=>n>0); const p=parseISO(rep.report_date); const t=new Date(rep.updated_at||Date.now()).toTimeString().slice(0,5);
+    const yy=String(p.y+543).slice(-2), docNo=`CRW-${site?.code||'S'+rep.site_id}-${yy}${String(p.m).padStart(2,'0')}${String(p.d).padStart(2,'0')}`;
+    const el=document.createElement('div'); el.className='docslip';
+    el.innerHTML=`<div class="ds-head"><div class="ds-logo">${logo?`<img src="${logo}" crossorigin="anonymous" alt="">`:esc(B.mark)}</div><div class="ds-co"><b>${esc(B.company_th)}</b><span>${esc(B.company_en)}</span></div><div class="ds-ti"><b>ใบสรุปคนงานหน้าไซต์</b><span>SITE MANPOWER REPORT</span></div></div><div class="ds-rule"></div>
+      <div class="ds-no"><span>เลขที่ <b>${docNo}</b></span><span>${dayLong(rep.report_date)} · ${t} น.</span></div>
+      <div class="ds-info"><div>${[['โครงการ',(site?.code?site.code+' ':'')+(site?.contract_name||site?.name||'')],['สถานที่',site?.location||'-'],['ผู้รายงาน',rep.submitted_name||S.profile.display_name]].map(([a,b])=>`<p><span>${a}</span><b>${esc(b||'-')}</b></p>`).join('')}</div>
+        <div class="ds-total"><b>${rep.total||0}</b><span>คนงานรวม (คน)</span></div></div>
+      <table><tr><th>ที่</th><th>ประเภทช่าง / ตำแหน่ง</th><th class="r">จำนวน (คน)</th></tr>${rows.map(([k,n],i)=>`<tr><td>${i+1}</td><td><b>${esc(k)}</b></td><td class="r"><b>${n}</b></td></tr>`).join('')||'<tr><td></td><td>ไม่มีคนงาน</td><td class="r">0</td></tr>'}
+        <tr><td></td><td style="text-align:right"><b>รวมทั้งสิ้น</b></td><td class="r"><b>${rep.total||0}</b></td></tr></table>
+      ${rep.note?`<div class="ds-note">หมายเหตุ: ${esc(rep.note)}</div>`:''}
+      <div class="ds-sign" style="margin-top:22px"><div><b>${esc(rep.submitted_name||S.profile.display_name)}</b><span>ผู้รายงาน · ส่งในระบบ ${t} น.</span></div><div><b style="color:#5B6B73">............................</b><span>ผู้ตรวจสอบ</span></div></div>
+      <div class="ds-foot"><span>สร้างโดย ${esc(B.app)}</span><span>ข้อมูล ณ เวลาที่ส่ง</span></div>`;
+    document.body.appendChild(el); await document.fonts?.ready; await new Promise(r=>setTimeout(r,150));
+    const canvas=await html2canvas(el,{scale:1.8,backgroundColor:'#ffffff',useCORS:true,logging:false}); el.remove();
+    const png=await new Promise(r=>canvas.toBlob(r,'image/png')), url=URL.createObjectURL(png), name=`${docNo}.png`;
+    prog.close();
+    const m=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="ใบสรุปคนงานหน้าไซต์"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>ใบสรุปคนงานหน้าไซต์<small>${esc(site?.name||'')} · ${dayLong(rep.report_date)}</small></h1></header>
+      <div class="sheet-body"><img src="${url}" alt="ใบสรุปคนงาน" style="width:100%;max-width:520px;border-radius:10px;box-shadow:var(--shadow);align-self:center">
+        <div class="note n-info" id="cs_st">${hasBridge()?'<span class="spin" style="width:16px;height:16px;margin:0;border-width:2px"></span><span>กำลังบันทึก PDF และรูปลงโฟลเดอร์ของวันนี้ใน Google Drive...</span>':`${IC.info}<span>ยังไม่ได้ติดตั้ง Bridge จึงบันทึกลง Drive ไม่ได้ (แชร์รูปได้ตามปกติ)</span>`}</div></div>
+      <div class="sheet-foot" style="flex-wrap:wrap"><button class="btn" data-save>บันทึกรูป</button><a class="btn hidden" data-pdf target="_blank" rel="noopener">เปิด PDF</a><button class="btn btn-p" data-share style="background:#06C755;border-color:#06C755;color:#fff">แชร์รูปเข้า LINE</button></div></div>`, false, false);
+    $('[data-x]',m.el).onclick=()=>{ URL.revokeObjectURL(url); m.close(); };
+    $('[data-save]',m.el).onclick=()=>{ const a=document.createElement('a'); a.href=url; a.download=name; a.click(); };
+    $('[data-share]',m.el).onclick=async()=>{ const file=new File([png],name,{type:'image/png'});
+      try{ if(navigator.canShare&&navigator.canShare({files:[file]})) await navigator.share({files:[file],title:'ใบสรุปคนงานหน้าไซต์'}); else { const a=document.createElement('a'); a.href=url; a.download=name; a.click(); toast('อุปกรณ์นี้แชร์ไฟล์ไม่ได้ บันทึกรูปให้แล้ว'); } }catch(e){ if(e.name!=='AbortError') toast(errText(e),true); } };
+    if(hasBridge()){
+      try{
+        await loadScript(LIB.pdf);
+        const pdf=new jspdf.jsPDF({unit:'mm',format:'a4'}), W=190, H=W*canvas.height/canvas.width;
+        pdf.addImage(canvas.toDataURL('image/jpeg',.92),'JPEG',10,10,W,Math.min(H,277));
+        const pdfB64=pdf.output('datauristring').split(',')[1];
+        const [pd,im]=await Promise.all([ bridge('upload_doc',{site_id:rep.site_id,date:rep.report_date,name:`${docNo}.pdf`,mime:'application/pdf',data:pdfB64}),
+          bridge('upload_photo',{site_id:rep.site_id,date:rep.report_date,name:`${docNo}.jpg`,data:canvas.toDataURL('image/jpeg',.88).split(',')[1]}) ]);
+        await sb.from('site_reports').update({pdf_url:pd.url,image_url:im.url}).eq('id',rep.id);
+        $('#cs_st',m.el).innerHTML=`${IC.check}<span>บันทึก PDF และรูปลงโฟลเดอร์ของวันนี้แล้ว · <a href="${esc(pd.folder_url||pd.url)}" target="_blank" rel="noopener">เปิดโฟลเดอร์</a></span>`;
+        const a=$('[data-pdf]',m.el); a.href=pd.url; a.classList.remove('hidden');
+      }catch(e){ $('#cs_st',m.el).innerHTML=`${IC.info}<span>บันทึกลง Drive ไม่สำเร็จ: ${esc(errText(e))} (แชร์รูปได้ตามปกติ)</span>`; }
+    }
+  }catch(e){ prog.close(); toast(errText(e),true); }
 }
