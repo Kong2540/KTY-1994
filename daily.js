@@ -178,7 +178,7 @@ async function dailyPreview(r, pdf){
   const m=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="ดูตัวอย่างก่อนส่ง"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>ดูตัวอย่างก่อนส่ง<small>${esc(site?.name||'')} · ${dayLong(r.report_date)}</small></h1></header>
     <div class="sheet-body">
       <div class="sec">การ์ดที่จะส่งเข้ากลุ่ม LINE</div>
-      <div class="lcardp"><div class="lch"><b>🏗️ รายงานการปฏิบัติงานประจำวัน</b><span>หจก.กิตติยาก่อสร้าง 1994</span></div>
+      <div class="lcardp"><div class="lch"><b>🏗️ รายงานการปฏิบัติงานประจำวัน</b><span>${esc(BR().company_short)}</span></div>
         <div class="lcb"><div class="lr"><span>📍 หน้างาน</span><b>${esc((site?.code?site.code+' ':'')+(site?.name||''))}</b></div><div class="lr"><span>📅 วันที่</span><span class="v">${dayLongFull(r.report_date)}</span></div><div class="lr"><span>🌤️ อากาศ</span><span class="v">${esc(r.weather||'-')}</span></div>
           ${r.late?'<div class="llate">⏱ ส่งย้อนหลัง</div>':''}<hr>
           ${r.no_work?`<b class="ls" style="color:#C0392B">⛔ ไม่มีการทำงาน</b><p>${esc(r.no_work_reason||'-')}</p>`:`<b class="ls">🔨 งานที่ปฏิบัติ</b><p>${String(r.work_items||'').split('\n').filter(Boolean).map(w=>'- '+esc(w.replace(/^[-•]\s*/,''))).join('<br>')}</p><hr>

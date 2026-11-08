@@ -3,9 +3,20 @@
    ตั้งค่าการเชื่อมต่อ Supabase — Project Settings > API Keys
    ใส่ Project URL และ Publishable key (sb_publishable_...) เท่านั้น
    ===================================================================== */
-const SUPABASE_URL = 'https://mydytzlrevzjpqusaohu.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_btZKjUqx12VOyTnyMAZOGQ_jpmiLHfl';
-const COMPANY = 'หจก.กิตติยาก่อสร้าง 1994';
+const SUPABASE_URL = (window.KTY_CONFIG&&window.KTY_CONFIG.url) || 'https://YOUR-PROJECT.supabase.co';
+const SUPABASE_ANON_KEY = (window.KTY_CONFIG&&window.KTY_CONFIG.key) || 'YOUR-ANON-KEY';
+/* ---------- แบรนด์ (แอดมินแก้ได้ที่ ตั้งค่าระบบ > แบรนด์) ---------- */
+const BRAND_DEFAULT = { app:'KTY Hub', mark:'KTY', tagline:'ระบบบริหารงานก่อสร้าง', company_th:'ห้างหุ้นส่วนจำกัด กิตติยาก่อสร้าง 1994',
+  company_short:'หจก.กิตติยาก่อสร้าง 1994', company_en:'KITTIYA CONSTRUCTION 1994 LIMITED PARTNERSHIP', logo:'', color:'#F2B705' };
+const BR = () => ({ ...BRAND_DEFAULT, ...Object.fromEntries(Object.entries((typeof S!=='undefined'&&(S.settings?.brand||S.brand))||{}).filter(([,v])=>v!==''&&v!=null)) });
+const markHTML = (px) => { const b=BR(), st=px?`width:${px}px;height:${px}px;font-size:${Math.round(px*.3)}px`:''; return b.logo?`<div class="mark mark-img" style="${st}"><img src="${b.logo}" alt="${b.app}"></div>`:`<div class="mark" style="${st}"><span>${b.mark}</span></div>`; };
+const T = s => (typeof S!=='undefined'&&S.settings?.labels?.[s]) || s;
+function applyBrand(){
+  const b=BR(); document.title=b.app;
+  if(/^#[0-9a-f]{6}$/i.test(b.color)){ document.documentElement.style.setProperty('--accent',b.color); const r=parseInt(b.color.slice(1,3),16),g=parseInt(b.color.slice(3,5),16),bl=parseInt(b.color.slice(5,7),16); document.documentElement.style.setProperty('--accentInk',(r*299+g*587+bl*114)/1000>150?'#1B1B1B':'#FFFFFF'); }
+  if(b.logo){ ['icon','apple-touch-icon'].forEach(rel=>{ let l=document.querySelector(`link[rel="${rel}"]`); if(!l){ l=document.createElement('link'); l.rel=rel; document.head.appendChild(l); } l.href=b.logo; }); }
+}
+const COMPANY = 'หจก.กิตติยาก่อสร้าง 1994'; // ค่าเดิม (ใช้ BR().company_short แทน)
 const APP_VERSION = 'Hub 1.0';
 const PHOTO_BUCKET = 'employee-photos';
 
@@ -92,7 +103,7 @@ const errText = e => {
   if(/blood_needs_consent/.test(m)) return 'บันทึกหมู่เลือดได้เมื่อพนักงานยินยอมแล้วเท่านั้น';
   if(/Failed to fetch|NetworkError|Load failed/i.test(m)) return 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ต';
   if(/relation .*(attendance|site_reports|star_events|app_settings).* does not exist|Could not find the table/.test(m)) return 'ฐานข้อมูลยังไม่ได้อัปเดตช่วงที่ 2 กรุณารันไฟล์ 03_attendance.sql ใน Supabase';
-  if(/row-level security/.test(m)) return 'ไม่มีสิทธิ์ทำรายการนี้ (โฟร์แมนแก้รายงานได้เฉพาะของวันนี้)';
+  if(/row-level security/.test(m)) return 'ไม่มีสิทธิ์ทำรายการนี้ (ตรวจสิทธิ์ของบัญชี หรือรายงานเลยเวลาที่แก้ได้แล้ว)';
   if(/column .* does not exist/.test(m)) return 'ฐานข้อมูลยังไม่ได้อัปเดต กรุณารันไฟล์ 02_profile_update.sql ใน Supabase';
   return m;
 };
@@ -178,11 +189,12 @@ function watchOnline(){ const u=()=>$('#offline').classList.toggle('hidden',navi
 async function boot(){
   applyTheme(curTheme()); watchOnline();
   if(SUPABASE_URL.includes('YOUR-PROJECT')){
-    $('#app').innerHTML=`<div class="auth"><div class="auth-top"><div class="brand"><div class="mark"><span>KTY</span></div><b style="font-size:20px">KTY1994</b></div></div>
-      <div class="card auth-card"><h3 class="h2">ยังไม่ได้ตั้งค่าการเชื่อมต่อ</h3><p class="muted" style="margin:0">เปิดไฟล์ index.html แล้วใส่ SUPABASE_URL และ SUPABASE_ANON_KEY ตามคู่มือติดตั้ง</p></div></div>`;
+    $('#app').innerHTML=`<div class="auth"><div class="auth-top"><div class="brand"><div class="mark"><span>KTY</span></div><b style="font-size:20px">KTY Hub</b></div></div>
+      <div class="card auth-card"><h3 class="h2">ยังไม่ได้ตั้งค่าการเชื่อมต่อ</h3><p class="muted" style="margin:0">เปิดไฟล์ config.js แล้วใส่ url และ key ของ Supabase ตามคู่มือติดตั้ง</p></div></div>`;
     return;
   }
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  try{ const {data:bd}=await sb.from('app_settings').select('value').eq('key','brand').maybeSingle(); if(bd?.value) S.brand=bd.value; }catch(_){} applyBrand();
   sb.auth.onAuthStateChange((ev, session)=>{
     if(ev==='PASSWORD_RECOVERY'){ S.session=session; renderNewPassword(); }
     if(ev==='SIGNED_OUT'){ S.session=null; S.profile=null; renderAuth(); }
@@ -206,6 +218,7 @@ async function loadRefs(){
   S.settings={ star_rules:{absent:1,late_count:3,late_penalty:0.5,no_notice:0.5}, site_trades:['ช่างปูน','ช่างไฟ','ช่างเหล็ก','ช่างไม้','ช่างประปา','ช่างสี','คนงานทั่วไป'] };
   (st.data||[]).forEach(r=>{ S.settings[r.key]=r.value; });
   S.hasPhase2 = !st.error;
+  if(S.settings.brand) S.brand=S.settings.brand; applyBrand();
 }
 const isAdmin=()=>S.profile?.role==='admin';
 const isManager=()=>['admin','executive'].includes(S.profile?.role);
@@ -213,13 +226,13 @@ const isManager=()=>['admin','executive'].includes(S.profile?.role);
 /* =====================================================================
    เข้าสู่ระบบ / สมัคร / รอนุมัติ / ตั้งรหัสผ่าน
    ===================================================================== */
-function authTop(title, sub, lead=''){ return `<div class="auth-top"><div><div class="brand"><div class="mark" style="width:58px;height:58px;font-size:17px"><span>KTY</span></div><div><div style="font-size:24px;font-weight:700;line-height:1.2">${title}</div><div style="color:var(--barInk2);font-size:14px">${sub}</div></div></div>${lead?`<p>${lead}</p>`:''}</div></div>`; }
+function authTop(title, sub, lead=''){ return `<div class="auth-top"><div><div class="brand">${markHTML(58)}<div><div style="font-size:24px;font-weight:700;line-height:1.2">${title}</div><div style="color:var(--barInk2);font-size:14px">${sub}</div></div></div>${lead?`<p>${lead}</p>`:''}</div></div>`; }
 function pwField(id, auto){ return `<div class="inwrap"><input class="in" id="${id}" type="password" autocomplete="${auto}" minlength="6"><button type="button" class="eye" aria-label="แสดงรหัสผ่าน" data-eye="${id}">${IC.eye}</button></div>`; }
 function bindEyes(root){ $$('[data-eye]',root).forEach(b=>b.onclick=()=>{ const i=$('#'+b.dataset.eye); i.type=i.type==='password'?'text':'password'; }); }
 
 function renderAuth(mode='login'){
   const login=mode==='login';
-  $('#app').innerHTML=`<div class="auth">${authTop('KTY1994','ระบบเช็คชื่อพนักงาน', login?'ยินดีต้อนรับกลับ<br>เข้าสู่ระบบเพื่อเริ่มงานวันนี้':'สมัครใช้งานสำหรับพนักงาน<br>หจก.กิตติยาก่อสร้าง 1994')}
+  $('#app').innerHTML=`<div class="auth">${authTop(BR().app,BR().tagline, login?'ยินดีต้อนรับกลับ<br>เข้าสู่ระบบเพื่อเริ่มงานวันนี้':`สมัครใช้งานสำหรับพนักงาน<br>${BR().company_short}`)}
     <form class="card auth-card" id="af" novalidate>
       <div class="seg" role="tablist"><button type="button" class="${login?'on':''}" data-m="login">เข้าสู่ระบบ</button><button type="button" class="${login?'':'on'}" data-m="signup">สมัครใช้งาน</button></div>
       ${login?'':`<div class="field"><label for="dn">ชื่อ-นามสกุล</label><input class="in" id="dn" autocomplete="name"></div>
@@ -256,7 +269,7 @@ function renderAuth(mode='login'){
   };
 }
 function renderNewPassword(){
-  $('#app').innerHTML=`<div class="auth">${authTop('ตั้งรหัสผ่านใหม่','KTY1994')}<div class="card auth-card">
+  $('#app').innerHTML=`<div class="auth">${authTop('ตั้งรหัสผ่านใหม่',BR().app)}<div class="card auth-card">
     <div class="field"><label for="np">รหัสผ่านใหม่</label>${pwField('np','new-password')}</div><button class="btn btn-p btn-block" id="nb">บันทึกรหัสผ่าน</button></div></div>`;
   bindEyes($('#app'));
   $('#nb').onclick=async()=>{ const password=$('#np').value; if(password.length<6) return toast('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร',true);
@@ -266,7 +279,7 @@ function renderNewPassword(){
 function renderPending(){
   const p=S.profile, blocked=!p.is_active;
   $('#app').innerHTML=`<div class="auth"><div style="padding:48px 24px 24px;display:flex;flex-direction:column;gap:22px;max-width:460px;margin:0 auto;width:100%;flex:1">
-    <div class="brand"><div class="mark"><span>KTY</span></div><div><b>KTY1994</b><div class="sm muted">ระบบเช็คชื่อพนักงาน</div></div></div>
+    <div class="brand">${markHTML()}<div><b>${BR().app}</b><div class="sm muted">${BR().tagline}</div></div></div>
     <div style="width:96px;height:96px;border-radius:28px;background:${blocked?'var(--badBg)':'var(--warnBg)'};color:${blocked?'var(--bad)':'var(--warn)'};display:grid;place-items:center;margin-top:12px">${blocked?svg('<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>','style="width:46px;height:46px"'):svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>','style="width:46px;height:46px"')}</div>
     <div><h2 style="margin:0;font-size:26px;line-height:1.3">${blocked?'บัญชีนี้ถูกระงับ':'รอแอดมินอนุมัติ'}</h2><p class="muted" style="margin:8px 0 0">${blocked?'ติดต่อแอดมินของบริษัทเพื่อเปิดใช้งานอีกครั้ง':'สมัครเรียบร้อยแล้ว เมื่อแอดมินกำหนดสิทธิ์ให้ คุณจะเข้าใช้งานได้ทันที'}</p></div>
     ${blocked?'':`<div class="card timeline" style="padding:18px 18px 2px">

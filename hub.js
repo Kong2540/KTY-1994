@@ -1,7 +1,7 @@
 /* =====================================================================
    KTY Hub — โครงหน้า: แถบเมนูด้านข้าง / ลิ้นชักเมนูบนมือถือ / ตัวเลือกไซต์
    ===================================================================== */
-const HUB_VERSION = '1.6';
+const HUB_VERSION = '1.7';
 const MOD = {
   att:      { t:'เช็คชื่อ',            hue:'#2E9E5B', i:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>' },
   daily:    { t:'รายงานประจำวัน',      hue:'#2F6FDB', i:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>' },
@@ -11,6 +11,7 @@ const MOD = {
   people:   { t:'พนักงาน',             hue:'#7A5AF8', i:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><circle cx="17" cy="9" r="2.6"/><path d="M16 14.6c2.7-.2 4.8 1.5 5.5 4.4"/>' },
   payroll:  { t:'เงินเดือน',            hue:'#14918C', i:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/>' },
   sites:    { t:'ไซต์งาน',             hue:'#5B6B73', i:'<path d="M3 21h18M5 21V10l7-5 7 5v11M10 21v-5h4v5"/>' },
+  studio:   { t:'ตั้งค่าระบบ',          hue:'#C9A227', i:'<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>' },
   manage:   { t:'จัดการระบบ',          hue:'#5B6B73', i:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>' },
   home:     { t:'หน้าหลัก',            hue:'#5B6B73', i:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>' },
   tasks:    { t:'งานที่รอ',             hue:'#5B6B73', i:'<path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6l1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"/>' },
@@ -34,7 +35,11 @@ async function loadUserCtx(){
 }
 
 /* เมนูทั้งหมดตามสิทธิ์ (ใช้ทั้งแถบด้านข้าง/ลิ้นชัก) */
-function navSections(){
+const ACCESS_MODS=['att','daily','materials','borrow','issues','people','payroll','sites'];
+const allowed = m => isAdmin() || !ACCESS_MODS.includes(m) || (S.settings.menu_access?.[m]?.[S.profile.role]!=='hide');
+const ROUTE_MOD={att:'att',roll:'att',report:'att',daily:'daily',mat:'materials',brw:'borrow',employees:'people',emp:'people',pay:'payroll'};
+function navSections(){ return navSections0().map(s=>({...s,items:s.items.filter(x=>allowed(x.m))})).filter(s=>s.items.length); }
+function navSections0(){
   const p=S.profile, mgr=isManager(), out=[];
   if(mgr){
     out.push({t:'ภาพรวม', items:[{k:'home',m:'home'},{k:'tasks',m:'tasks',b:'tasks'}]});
@@ -42,7 +47,7 @@ function navSections(){
       {k:'att',m:'att',b:'att'}, {k:'roll',m:'att',t:'เช็คชื่อแบบติ๊ก',sub:1}, {k:'att/month',m:'att',t:'ตารางรายเดือน',sub:1}, {k:'att/site',m:'att',t:'คนงานหน้างาน',sub:1,b:'crew'},
       {k:'daily',m:'daily',b:'daily'}, {k:'mat',m:'materials',b:'mat'}, {k:'brw',m:'borrow',b:'brw'}, {k:'soon/issues',m:'issues'},
       {k:'employees',m:'people'}, {k:'soon/payroll',m:'payroll'} ]});
-    out.push({t:'ตั้งค่า', items:[{k:'manage/sites',m:'sites'},{k:'manage',m:'manage',b:'users'}]});
+    out.push({t:'ตั้งค่า', items:[{k:'manage/sites',m:'sites'},{k:'manage',m:'manage',b:'users'},...(isAdmin()?[{k:'studio',m:'studio'}]:[])]});
   } else {
     const it=[{k:'home',m:'home'}];
     if(p.can_check) it.push({k:'roll',m:'att',t:'เช็คชื่อหน้าไซต์งาน'});
@@ -55,7 +60,8 @@ function navSections(){
   }
   return out;
 }
-function bottomItems(){
+function bottomItems(){ return bottomItems0().filter(x=>allowed(x.m)); }
+function bottomItems0(){
   const p=S.profile;
   if(isManager()) return [{k:'home',m:'home',t:'หน้าหลัก'},{k:'att',m:'att',t:'เช็คชื่อ'},{k:'tasks',m:'tasks',t:'งานที่รอ',b:'tasks'},{k:'employees',m:'people',t:'พนักงาน'},{k:'me',m:'me',t:'ฉัน'}];
   const it=[{k:'home',m:'home',t:'หน้าหลัก'}];
@@ -68,7 +74,7 @@ const keyOf = h => (h||'home').replace('#','') || 'home';
 function isActive(k, cur){ if(k===cur) return true; const [a]=k.split('/'), [b]=cur.split('/'); return !k.includes('/') && a===b && !['soon','manage','att','me'].includes(a) ? true : (k==='att'&&cur==='att'); }
 
 function navItemHTML(x, cur){
-  const meta=MOD[x.m]||MOD.home, t=x.t||meta.t, on=x.k===cur||(!x.sub&&!x.k.includes('/')&&cur.startsWith(x.k+'/')&&x.k!=='att'&&cur!=='manage/sites');
+  const meta=MOD[x.m]||MOD.home, t=T(x.t||meta.t), on=x.k===cur||(!x.sub&&!x.k.includes('/')&&cur.startsWith(x.k+'/')&&x.k!=='att'&&cur!=='manage/sites');
   const b=x.b?`<span class="nbadge hidden" data-badge="${x.b}"></span>`:'';
   return `<a href="#${x.k}" class="nitem ${x.sub?'sub':''} ${on?'on':''}">${x.sub?'<span class="nsp"></span>':modIcon(x.m)}<span class="grow">${t}</span>${b}</a>`;
 }
@@ -76,7 +82,7 @@ function sitePickerHTML(){ return `<button class="sitepick" data-sitepick><span 
 function themeSegHTML(){ const th=curTheme(); return `<div class="seg" style="padding:3px">${[['auto','ตามเครื่อง'],['light','สว่าง'],['dark','มืด']].map(([k,t])=>`<button class="${th===k?'on':''}" data-th="${k}" style="min-height:34px">${t}</button>`).join('')}</div>`; }
 function navBodyHTML(cur){
   return `${sitePickerHTML()}${navSections().map(s=>`<div class="nsec">${s.t}</div>${s.items.map(x=>navItemHTML(x,cur)).join('')}`).join('')}
-    <div class="nfoot">${themeSegHTML()}<button class="linkbtn" data-logout style="color:var(--bad);text-decoration:none;font-weight:600;padding:8px 10px;text-align:left">ออกจากระบบ</button><span class="xs muted" style="padding:0 10px">KTY Hub เวอร์ชัน ${HUB_VERSION}</span></div>`;
+    <div class="nfoot">${themeSegHTML()}<button class="linkbtn" data-logout style="color:var(--bad);text-decoration:none;font-weight:600;padding:8px 10px;text-align:left">ออกจากระบบ</button><span class="xs muted" style="padding:0 10px">${esc(BR().app)} เวอร์ชัน ${HUB_VERSION}</span></div>`;
 }
 function bindNav(root){
   $$('[data-sitepick]',root).forEach(b=>b.onclick=pickSite);
@@ -91,19 +97,20 @@ function route(){
   const cur=keyOf(location.hash); const [k,id,id2]=cur.split('/');
   if(k==='users'){ mgTab='users'; } if(k==='settings'){ mgTab='sites'; }
   const mgr=isManager(), p=S.profile;
-  const can={ home:1, tasks:1, me:1, soon:1, att:mgr, employees:mgr, emp:mgr, manage:mgr, users:mgr, settings:mgr, roll:mgr||p.can_check, report:p.role==='foreman'||mgr||hasMod('daily'), mat:mgr||hasMod('materials'), brw:mgr||hasMod('borrow')||hasMod('materials',['store','admin']), daily:p.role==='foreman'||mgr||hasMod('daily') };
+  const can={ home:1, tasks:1, me:1, soon:1, att:mgr, employees:mgr, emp:mgr, manage:mgr, users:mgr, settings:mgr, roll:mgr||p.can_check, report:p.role==='foreman'||mgr||hasMod('daily'), mat:mgr||hasMod('materials'), brw:mgr||hasMod('borrow')||hasMod('materials',['store','admin']), daily:p.role==='foreman'||mgr||hasMod('daily'), studio:isAdmin() };
+  if(ROUTE_MOD[k]&&!allowed(ROUTE_MOD[k])) can[k]=0;
   const key=can[k]?k:'home';
   if(key==='att'&&id&&['day','month','site'].includes(id)) attTab=id;
   if(key==='manage'&&id) mgTab=id;
   if(key==='me'&&id==='stars') profTab='stars';
   renderShell(can[k]?cur:'home');
-  ({home:pageHome, tasks:pageTasks, att:pageAtt, employees:pageEmployees, emp:()=>pageProfile(id), manage:pageManage, users:pageManage, settings:pageManage, report:pageReport, mat:()=>pageMat(id,id2), brw:()=>pageBrw(id,id2), daily:()=>pageDaily(id,id2), roll:pageRoll, me:()=>id==='stars'?pageMyStars():pageMe(), soon:()=>pageSoon(id)})[key]();
+  ({home:pageHome, tasks:pageTasks, att:pageAtt, employees:pageEmployees, emp:()=>pageProfile(id), manage:pageManage, users:pageManage, settings:pageManage, report:pageReport, mat:()=>pageMat(id,id2), brw:()=>pageBrw(id,id2), daily:()=>pageDaily(id,id2), roll:pageRoll, studio:()=>pageStudio(id), me:()=>id==='stars'?pageMyStars():pageMe(), soon:()=>pageSoon(id)})[key]();
   scrollTo(0,0);
 }
 function renderShell(cur){
   const bi=bottomItems();
   $('#app').innerHTML=`<div class="app">
-    <aside class="side"><div class="brand" style="margin:0 6px 14px"><div class="mark"><span>KTY</span></div><div><b>KTY Hub</b><div class="xs muted">${COMPANY}</div></div></div>${navBodyHTML(cur)}</aside>
+    <aside class="side"><div class="brand" style="margin:0 6px 14px">${markHTML()}<div><b>${esc(BR().app)}</b><div class="xs muted">${esc(BR().company_short)}</div></div></div>${navBodyHTML(cur)}</aside>
     <div class="appwrap"><div id="page"><div class="loading"><div><div class="spin"></div>กำลังโหลด</div></div></div></div>
     <nav class="bnav" aria-label="เมนูหลัก">${bi.map(x=>`<a href="#${x.k}" class="${(x.k===cur||(x.k!=='home'&&cur.startsWith(x.k)))?'on':''}"><span class="pill" style="position:relative">${svg(MOD[x.m].i)}${x.b?`<span class="ndot hidden" data-badge="${x.b}"></span>`:''}</span>${x.t}</a>`).join('')}</nav></div>`;
   bindNav($('.side'));
@@ -126,6 +133,7 @@ async function pickSite(){
 async function logout(){ if(await confirmBox('ออกจากระบบตอนนี้?','ออกจากระบบ')) sb.auth.signOut(); }
 function head(title, sub='', o={}){
   const menuBtn=o.back?`<a href="${o.back}" class="ibtn" aria-label="ย้อนกลับ">${IC.back}</a>`:`<button class="ibtn" data-drawer aria-label="เปิดเมนู">${svg('<path d="M4 7h16M4 12h16M4 17h16"/>')}</button>`;
+  title=T(title);
   return `<header class="appbar stripe">${menuBtn}${o.lead||''}<h1>${title}${sub?`<small>${sub}</small>`:''}</h1>${o.mActions||''}</header>
     <div class="main">${o.noDesk?'':`<div class="phead"><div>${o.back?`<a href="${o.back}" class="linkbtn" style="text-decoration:none">‹ ย้อนกลับ</a>`:''}<h1>${title}</h1>${sub?`<p>${sub}</p>`:''}</div><div class="row">${o.dActions||''}</div></div>`}`;
 }
@@ -186,7 +194,8 @@ async function collectTasks(){
 const taskHTML = x => `<a href="${x.href}" class="li" style="text-decoration:none">${modIcon(x.m,40)}<div class="grow"><b style="font-size:14.5px">${esc(x.t)}</b><span class="xs muted">${esc(x.sub||'')}</span></div>${x.tag?`<span class="tag ${x.c}">${esc(x.tag)}</span>`:''}${svg('<path d="M9 6l6 6-6 6"/>','style="width:18px;color:var(--ink2)"')}</a>`;
 
 function tileHTML(k, href, label, badgeKey, soon){
-  return `<a href="${href}" class="tile ${soon?'soon':''}">${modIcon(k,64)}${badgeKey?`<span class="tbadge hidden" data-badge="${badgeKey}"></span>`:''}<span class="tl">${label||MOD[k].t}</span>${soon?'<span class="tag" style="height:18px;font-size:10.5px">เร็ว ๆ นี้</span>':''}</a>`;
+  if(!allowed(k)) return '';
+  return `<a href="${href}" class="tile ${soon?'soon':''}">${modIcon(k,64)}${badgeKey?`<span class="tbadge hidden" data-badge="${badgeKey}"></span>`:''}<span class="tl">${T(label||MOD[k].t)}</span>${soon?'<span class="tag" style="height:18px;font-size:10.5px">เร็ว ๆ นี้</span>':''}</a>`;
 }
 
 /* =====================================================================
@@ -200,7 +209,7 @@ async function pageHome(){
   $$('[data-site]').forEach(b=>b.onclick=()=>{ S.site=b.dataset.site; try{ localStorage.setItem('kty-site',S.site); }catch(_){} route(); });
   let tiles='';
   if(mgr){
-    tiles=[tileHTML('att','#att','เช็คชื่อ','att'), tileHTML('daily','#daily',null,'daily'), tileHTML('materials','#mat',null,'mat'), tileHTML('borrow','#brw',null,'brw'), tileHTML('issues','#soon/issues',null,null,true), tileHTML('people','#employees'), tileHTML('payroll','#soon/payroll',null,null,true), tileHTML('sites','#manage/sites'), tileHTML('manage','#manage','จัดการ','users')].join('');
+    tiles=[tileHTML('att','#att','เช็คชื่อ','att'), tileHTML('daily','#daily',null,'daily'), tileHTML('materials','#mat',null,'mat'), tileHTML('borrow','#brw',null,'brw'), tileHTML('issues','#soon/issues',null,null,true), tileHTML('people','#employees'), tileHTML('payroll','#soon/payroll',null,null,true), tileHTML('sites','#manage/sites'), tileHTML('manage','#manage','จัดการ','users'), ...(isAdmin()?[tileHTML('studio','#studio')]:[])].filter(x=>x).join('');
   } else {
     const t=[];
     if(p.can_check) t.push(tileHTML('att','#roll','เช็คชื่อหน้าไซต์งาน'));
