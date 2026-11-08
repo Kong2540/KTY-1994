@@ -7,7 +7,9 @@ const STUDIO_SECS = [
   ['forms','📋','ตัวสร้างฟอร์ม','รายงานประจำวัน · ลากจัดลำดับ เพิ่มช่องเอง'],
   ['lists','🗂️','รายการตัวเลือก','สภาพอากาศ เครื่องจักร ประเภทช่าง'],
   ['access','🔐','สิทธิ์เมนูและหน้า','บทบาทไหนเห็นเมนูไหน'],
-  ['rules','📷','กติการายงาน','จำนวนรูปขั้นต่ำ']
+  ['rules','📷','กติการายงาน','จำนวนรูปขั้นต่ำ'],
+  ['holidays','📅','วันหยุดบริษัท','ประเภท ตัวย่อ ปฏิทินวันหยุด'],
+  ['payroll','💰','กติกาเงินเดือน','การลา ประกันสังคม การผ่อน']
 ];
 async function saveSetting(key, value){
   const {error}=await sb.from('app_settings').upsert({key,value,updated_at:new Date().toISOString()});
@@ -21,7 +23,7 @@ function pageStudio(sec){
     `<div class="studio ${isForm?'studio-wide':''}">${(wide&&!isForm)||!cur?`<nav class="studio-nav card card-l">${STUDIO_SECS.map(([k,e,t,d])=>`<a href="#studio/${k}" class="li ${show===k?'on':''}" style="text-decoration:none"><span class="se">${e}</span><div class="grow"><b>${t}</b><span class="xs muted">${d}</span></div>${IC.chev}</a>`).join('')}
       <a href="#manage" class="li" style="text-decoration:none"><span class="se">⚙️</span><div class="grow"><b>จัดการข้อมูลอื่น</b><span class="xs muted">ผู้ใช้ สิทธิ์รายระบบ ไซต์ ตำแหน่ง วัสดุ</span></div>${IC.chev}</a></nav>`:''}
       ${show?'<section class="studio-body col" id="sb" style="gap:14px"></section>':''}</div>`);
-  if(show) ({brand:stBrand,labels:stLabels,forms:stForms,lists:stLists,access:stAccess,rules:stRules})[show]($('#sb'));
+  if(show) ({brand:stBrand,labels:stLabels,forms:stForms,lists:stLists,access:stAccess,rules:stRules,holidays:stHolidays,payroll:stPayroll})[show]($('#sb'));
 }
 
 /* ---------------- แบรนด์ ---------------- */
