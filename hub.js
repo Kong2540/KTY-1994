@@ -1,7 +1,7 @@
 /* =====================================================================
    KTY Hub — โครงหน้า: แถบเมนูด้านข้าง / ลิ้นชักเมนูบนมือถือ / ตัวเลือกไซต์
    ===================================================================== */
-const HUB_VERSION = '2.1';
+const HUB_VERSION = '2.2';
 const MOD = {
   att:      { t:'เช็คชื่อ',            hue:'#2E9E5B', i:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>' },
   daily:    { t:'รายงานประจำวัน',      hue:'#2F6FDB', i:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>' },
@@ -56,7 +56,7 @@ function navSections0(){
     if(hasMod('borrow')||hasMod('materials')) it.push({k:'ret',m:'borrow',t:'คืน วัสดุ/อุปกรณ์',b:'brw'});
     if(hasMod('issues')) it.push({k:'soon/issues',m:'issues',t:'รายงานปัญหาหน้างาน'});
     out.push({t:'งานของฉัน', items:it});
-    out.push({t:'ของฉัน', items:[{k:'pay',m:'payroll',t:'สลิปเงินเดือน'},{k:'pay/shop',m:'payroll',t:'สินค้าบริษัท'},{k:'me/stars',m:'stars'},{k:'me',m:'me'}]});
+    out.push({t:'ของฉัน', items:[{k:'pay',m:'payroll',t:'การเงินของฉัน'},{k:'me/stars',m:'stars'},{k:'me',m:'me'}]});
   }
   return out;
 }
@@ -218,7 +218,7 @@ async function pageHome(){
     if(hasMod('materials')) t.push(tileHTML('materials','#mat','เบิก วัสดุ/อุปกรณ์','mat'));
     if(hasMod('borrow')||hasMod('materials')) t.push(tileHTML('borrow','#ret','คืน วัสดุ/อุปกรณ์','brw'));
     if(hasMod('issues')) t.push(tileHTML('issues','#soon/issues','รายงานปัญหาหน้างาน',null,true));
-    t.push(tileHTML('payroll','#pay','สลิปเงินเดือน'), tileHTML('stars','#me/stars','ดาวของฉัน'), tileHTML('me','#me','ข้อมูลของฉัน'));
+    t.push(tileHTML('payroll','#pay','การเงินของฉัน'), tileHTML('stars','#me/stars','ดาวของฉัน'), tileHTML('me','#me','ข้อมูลของฉัน'));
     tiles=t.join('');
   }
   let d; try{ d=await collectTasks(); }catch(err){ $('#hb').outerHTML=`<div class="note n-bad">${esc(errText(err))}</div>`; return; }

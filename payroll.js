@@ -17,6 +17,16 @@ const otherDed = d => (+d.inst_sum||0)+(+d.advance||0)+(+d.deducts||0);
 const TH_MON_S=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 const periodLabel = p => { const a=parseISO(p.start_date), b=parseISO(p.end_date); return `${a.d}–${b.d} ${TH_MON_S[b.m-1]} ${b.y+543}`; };
 let payPid=null, payTab='period';
+/* ข้อมูลประจำตัวล่าสุดจากทะเบียนพนักงาน (ชื่อ รหัส ตำแหน่ง บัญชี ลำดับ) ทับข้อมูลในสลิป ให้ทุกหน้าตรงกันเสมอ */
+async function liveIdentity(slips){
+  const ids=[...new Set(slips.map(s=>s.employee_id))]; if(!ids.length) return slips;
+  const {data}=await sb.from('employees').select('id,emp_code,title,first_name,last_name,position_id,bank_name,bank_account_no,sort_order,photo_path').in('id',ids);
+  const map={}; (data||[]).forEach(e=>map[e.id]=e);
+  slips.forEach(s=>{ const e=map[s.employee_id]; if(!e) return; s.emp=e;
+    s.data={...s.data, emp_code:e.emp_code||s.data.emp_code, name:[e.title&&e.title!=='อื่น ๆ'?e.title:'',e.first_name,e.last_name].filter(Boolean).join(' ').replace(/^(นาย|นาง|นางสาว) /,'$1 ')||s.data.name,
+      position:posName(e.position_id)||s.data.position, bank:[e.bank_name,e.bank_account_no].filter(Boolean).join(' ')||s.data.bank, sort_order:e.sort_order??s.data.sort_order}; });
+  return slips;
+}
 
 async function pagePay(a,b){
   if(a==='s') return paySlipView(+b);
@@ -39,14 +49,14 @@ async function pagePay(a,b){
 async function payPeriod(periods){
   const C=$('#pyc'), p=periods.find(x=>x.id===payPid), i=periods.indexOf(p);
   let {data:slips}=await sb.from('pay_slips').select('*').eq('period_id',p.id);
-  if(p.status==='draft'&&!(slips||[]).length){ const r=await sb.rpc('calc_period',{p_period:p.id}); if(r.error) return C.innerHTML=`<div class="note n-bad">${esc(errText(r.error))}</div>`; ({data:slips}=await sb.from('pay_slips').select('*').eq('period_id',p.id)); }
-  slips=(slips||[]).sort((a,b)=>(a.data.sort_order??1e9)-(b.data.sort_order??1e9)||String(a.data.emp_code).localeCompare(String(b.data.emp_code)));
+  if(p.status==='draft'){ const r=await sb.rpc('calc_period',{p_period:p.id}); if(r.error) return C.innerHTML=`<div class="note n-bad">${esc(errText(r.error))}</div>`; ({data:slips}=await sb.from('pay_slips').select('*').eq('period_id',p.id)); }
+  slips=(await liveIdentity(slips||[])).sort((a,b)=>(a.data.sort_order??1e9)-(b.data.sort_order??1e9)||String(a.data.emp_code).localeCompare(String(b.data.emp_code)));
   const cols=payCols(), sum=k=>slips.reduce((a,s)=>a+(+s.data[k]||0),0), closed=p.status==='closed';
   C.innerHTML=`<div class="card col" style="gap:8px"><div class="row" style="gap:8px;flex-wrap:wrap">
       <button class="ibtn" data-pp="${periods[i+1]?.id||''}" ${periods[i+1]?'':'disabled'} aria-label="งวดก่อน">${IC.back}</button>
-      <div class="grow"><b style="font-size:18px">งวด ${periodLabel(p)}</b> <span class="tag ${closed?'t-ok':'t-warn'}">${closed?'ปิดงวดแล้ว':'ร่าง'}</span><div class="xs muted">จ่ายวันที่ ${thaiDate(p.pay_date)}${p.calc_at?` · คำนวณล่าสุด ${new Date(p.calc_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}`:''}${closed?` · ปิดโดย ${esc(p.closed_by_name||'')}`:''}${p.drive?.published_at?` · <a href="${esc(p.drive.folder?.url||'#')}" target="_blank" rel="noopener">เผยแพร่ลง Drive แล้ว ${new Date(p.drive.published_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}</a>`:''}</div></div>
+      <div class="grow"><b style="font-size:18px">งวด ${periodLabel(p)}</b> <span class="tag ${closed?'t-ok':'t-warn'}">${closed?'ปิดงวดแล้ว':'ร่าง'}</span><div class="xs muted">จ่ายวันที่ ${thaiDate(p.pay_date)}${p.calc_at?` · คำนวณล่าสุด ${new Date(p.calc_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}`:''}${closed?` · ปิดโดย ${esc(p.closed_by_name||'')}`:''}</div></div>
       <button class="ibtn" data-pp="${periods[i-1]?.id||''}" ${periods[i-1]?'':'disabled'} aria-label="งวดถัดไป">${IC.chev}</button></div>
-    <div class="row" style="gap:8px;flex-wrap:wrap">${closed?'':'<button class="btn btn-sm" data-recalc>คำนวณใหม่จากการเช็คชื่อ</button>'}${isAdmin()?'<button class="btn btn-sm" data-cols>ตั้งค่าคอลัมน์</button>':''}<button class="btn btn-sm" data-prev>ใบสรุปเงินเดือน (PDF)</button><button class="btn btn-sm" data-slips>สลิปรายคน (PDF)</button><button class="btn btn-sm" data-sheet>ส่งออก Google Sheet</button><button class="btn btn-sm" data-pub>${p.drive?.published_at?'เผยแพร่ลง Drive อีกครั้ง':'เผยแพร่ลง Google Drive (สร้าง QR)'}</button>
+    <div class="row" style="gap:8px;flex-wrap:wrap">${closed?'':'<button class="btn btn-sm" data-recalc>คำนวณใหม่จากการเช็คชื่อ</button>'}${isAdmin()?'<button class="btn btn-sm" data-cols>ตั้งค่าคอลัมน์</button>':''}<button class="btn btn-sm" data-prev>ใบสรุปเงินเดือน (PDF)</button><button class="btn btn-sm" data-slips>สลิปรายคน (PDF)</button><button class="btn btn-sm" data-sheet>ส่งออก Google Sheet</button>
       <span class="grow"></span>${closed?(isAdmin()?'<button class="btn btn-sm" data-reopen>เปิดงวดเพื่อแก้</button>':''):'<button class="btn btn-sm btn-p" data-close>ตรวจแล้ว ปิดงวด</button>'}</div></div>
     <div class="statg" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><div class="stat"><b class="num" style="font-size:22px">${baht(sum('net'))}</b><span class="sm muted">จ่ายสุทธิ ${slips.length} คน</span></div><div class="stat"><b class="num" style="font-size:22px">${baht(sum('gross'))}</b><span class="sm muted">รวมก่อนหัก</span></div><div class="stat"><b class="num" style="font-size:22px">${baht(sum('ot'))}</b><span class="sm muted">OT ${fmtN(sum('ot_hours'))} ชม.</span></div><div class="stat"><b class="num" style="font-size:22px;color:var(--bad)">${baht(sum('sso'))}</b><span class="sm muted">ประกันสังคม</span></div><div class="stat"><b class="num" style="font-size:22px;color:var(--bad)">${baht(sum('inst_sum')+sum('advance')+sum('deducts'))}</b><span class="sm muted">หักอื่น ๆ</span></div></div>
     <div class="card" style="padding:0;overflow-x:auto"><table class="tbl paytbl"><thead><tr><th>#</th>${cols.map(k=>`<th class="${PCOLS[k].n?'num':''}">${PCOLS[k].t}</th>`).join('')}</tr></thead><tbody>
@@ -61,7 +71,6 @@ async function payPeriod(periods){
   $('[data-prev]',C).onclick=()=>paySummaryPreview(p,slips);
   $('[data-slips]',C).onclick=()=>paySlipsPreview(p,slips);
   $('[data-sheet]',C).onclick=ev=>paySheetExport(p,slips,ev.target);
-  $('[data-pub]',C).onclick=()=>payPublish(p,slips,()=>pagePay());
   $$('[data-slip]',C).forEach(r=>r.onclick=()=>payDetail(p,slips.find(s=>s.id==r.dataset.slip),()=>pagePay()));
 }
 function payColsSheet(done){
@@ -142,7 +151,7 @@ async function paySummaryPreview(p, slips){
       <div class="pg-wrap" id="pgw"></div></div>
     <div class="sheet-foot" style="flex-wrap:wrap"><span class="sm muted grow" id="pgn"></span><button class="btn btn-p" data-pdf>ดาวน์โหลด PDF ใบสรุป</button></div></div>`,false,false);
   const W=$('#pgw',ov.el);
-  const render=()=>{ renderSummary(W,p,slips,cfg,cols); $('#pgn',ov.el).textContent=`${$$('.a4',W).length} หน้า · ${slips.length} คน${p.drive?.summary?.url?'':' · ยังไม่เผยแพร่ลง Drive (ไม่มี QR)'}`; };
+  const render=()=>{ renderSummary(W,p,slips,cfg,cols); $('#pgn',ov.el).textContent=`${$$('.a4',W).length} หน้า · ${slips.length} คน`; };
   render();
   $('[data-x]',ov.el).onclick=ov.close;
   $$('[data-m]',ov.el).forEach(i=>i.oninput=()=>{ cfg.margin[i.dataset.m]=Math.max(0,Math.min(40,+i.value||0)); render(); });
@@ -158,7 +167,7 @@ function renderSummary(W,p,slips,cfg,cols){
     const th=k=>k==='#'?'#':k==='_sign'?'ลงชื่อรับเงิน':PCOLS[k].t, num=k=>k!=='#'&&k!=='_sign'&&PCOLS[k].n;
     const wcss=k=>{ const w=k==='_sign'?cfg.sign_w:cfg.widths[k]; return w?`width:${w}mm`:''; };
     const page=()=>{ const d=document.createElement('div'); d.className='a4 a4l'; d.style.padding=`${m.t}mm ${m.r}mm ${m.b}mm ${m.l}mm`; d.style.fontSize=cfg.font+'pt';
-      d.innerHTML=`${pgHead(p,'ใบสรุปเงินเดือน',p.drive?.summary?.url)}<table class="pg-tbl" style="font-size:${cfg.font}pt"><colgroup>${colsAll.map(k=>`<col style="${wcss(k)}">`).join('')}</colgroup><thead><tr>${colsAll.map(k=>`<th class="${num(k)?'r':''}">${th(k)}</th>`).join('')}</tr></thead><tbody></tbody></table><div class="pg-foot"></div>`; W.appendChild(d); return d; };
+      d.innerHTML=`${pgHead(p,'ใบสรุปเงินเดือน',`${location.origin}${location.pathname}#pay/p/${p.id}`,true)}<table class="pg-tbl" style="font-size:${cfg.font}pt"><colgroup>${colsAll.map(k=>`<col style="${wcss(k)}">`).join('')}</colgroup><thead><tr>${colsAll.map(k=>`<th class="${num(k)?'r':''}">${th(k)}</th>`).join('')}</tr></thead><tbody></tbody></table><div class="pg-foot"></div>`; W.appendChild(d); return d; };
     W.innerHTML=''; let pg=page(), body=$('tbody',pg); const pages=[pg];
     const avail=()=>pg.clientHeight-m.b*MM-14;
     const rowHTML=(s,i)=>`<tr>${colsAll.map(k=>k==='#'?`<td>${i+1}</td>`:k==='_sign'?'<td class="sgn"></td>':`<td class="${num(k)?'r':''}">${esc(PCOLS[k].f(s.data))}</td>`).join('')}</tr>`;
@@ -177,7 +186,7 @@ async function paySlipsPreview(p, slips){
   try{ await loadScript(LIB.qr); }catch(e){ return toast(errText(e),true); }
   const B=BR(), logo=B.logo, pages=[];
   const qrSvg=t=>{ const q=qrcode(0,'M'); q.addData(t); q.make(); return q.createSvgTag({cellSize:2,margin:0,scalable:true}); };
-  const base=`${location.origin}${location.pathname}#pay/s/`, qrOf=s=>p.drive?.emps?.[s.employee_id]?.url||(base+s.id);
+  const base=`${location.origin}${location.pathname}#pay/s/`, qrOf=s=>base+s.id;
   for(let i=0;i<slips.length;i+=8){ const chunk=slips.slice(i,i+8);
     pages.push(`<div class="a4 a4slips">${chunk.map(s=>{ const d=s.data; return `<div class="slip"><div class="sl-h">${logo?`<img src="${logo}" crossorigin="anonymous" alt="">`:`<span class="pg-mark sm">${esc(B.mark)}</span>`}<div class="grow"><b>${esc(B.company_short)}</b><span>สลิปเงินเดือน · งวด ${periodLabel(p)}</span></div><div class="sl-qr">${qrSvg(qrOf(s))}</div></div>
       <div class="sl-n"><b>${esc(d.name)}</b><span>${esc(d.emp_code||'')}${d.position?' · '+esc(d.position):''}</span></div>
@@ -189,7 +198,7 @@ async function paySlipsPreview(p, slips){
       <div class="sl-net"><span>รับสุทธิ</span><b>${fmtN(d.net)}</b></div>
       <div class="sl-f"><span>โปรดตรวจสอบจำนวนเงินให้เรียบร้อยก่อนออกจากบริษัทฯ</span><span>สแกน QR ดูรายละเอียด</span></div></div>`; }).join('')}</div>`); }
   const ov=overlay(`<div class="sheet sheet-wide" role="dialog" aria-modal="true" aria-label="สลิปรายคน"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>สลิปรายคน<small>${slips.length} ใบ · ${pages.length} หน้า A4 (8 ใบ/หน้า ตัดตามเส้นประ)</small></h1></header>
-    <div class="sheet-body">${p.drive?.emps?'':`<div class="note n-warn">${IC.info}<span>ยังไม่เผยแพร่ลง Google Drive: QR จะเปิดหน้าสลิปในแอปแทน (ต้องเข้าสู่ระบบ) · กด "เผยแพร่ลง Google Drive" ในหน้างวดก่อนพิมพ์ เพื่อให้สแกนดูรูปและ PDF ได้ตลอด</span></div>`}<div class="pg-wrap">${pages.join('')||'<div class="card empty"><b>ยังไม่มีสลิป</b></div>'}</div></div>
+    <div class="sheet-body"><div class="note n-info">${IC.info}<span>QR บนสลิปเปิดหน้าการเงินของพนักงานในแอป (ต้องเข้าสู่ระบบ · พนักงานเห็นเฉพาะของตัวเอง ผู้บริหารเห็นทุกคน)</span></div><div class="pg-wrap">${pages.join('')||'<div class="card empty"><b>ยังไม่มีสลิป</b></div>'}</div></div>
     <div class="sheet-foot"><button class="btn btn-p" data-pdf ${slips.length?'':'disabled'}>ดาวน์โหลด PDF สลิป</button></div></div>`,false,false);
   $('[data-x]',ov.el).onclick=ov.close;
   $('[data-pdf]',ov.el).onclick=async ev=>{ busy(ev.target,true,'กำลังสร้าง PDF...'); try{ const dd=await slipsDoc(p,slips,qrOf); pdfMake.createPdf(dd).download(`สลิปเงินเดือน_${p.start_date}_${p.end_date}.pdf`); busy(ev.target,false); toast('ดาวน์โหลด PDF (เวกเตอร์) แล้ว'); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
@@ -208,26 +217,40 @@ async function paySheetExport(p, slips, btn){
 
 /* ---------------- สลิป (QR / พนักงานดูของตัวเอง) ---------------- */
 async function paySlipView(id){
-  setPage(head('สลิปเงินเดือน','',{back:isManager()?'#pay':'#pay'})+'<div id="psv"><div class="loading"><div class="spin"></div></div></div>');
+  setPage(head('การเงินของพนักงาน','',{back:'#pay'})+'<div id="psv"><div class="loading"><div class="spin"></div></div></div>');
   const {data:s,error}=await sb.from('pay_slips').select('*, pay_periods(*)').eq('id',id).maybeSingle();
-  if(error||!s){ $('#psv').outerHTML='<div class="card empty"><b>ไม่พบสลิป หรือไม่มีสิทธิ์ดู</b>พนักงานเห็นเฉพาะสลิปของตัวเองหลังปิดงวด</div>'; return; }
-  const p=s.pay_periods, d=s.data;
-  $('#psv').outerHTML=`<div class="col" style="gap:12px;max-width:640px"><div class="card col" style="gap:4px"><b style="font-size:18px">${esc(d.name)}</b><span class="sm muted">${esc(d.emp_code||'')}${d.position?' · '+esc(d.position):''} · งวด ${periodLabel(p)} · จ่าย ${thaiDate(p.pay_date)}</span>${p.status==='closed'?'':'<span class="tag t-warn" style="align-self:flex-start">ร่าง (ยังไม่ปิดงวด)</span>'}</div>${payBreak(d)}</div>`;
+  if(error||!s){ $('#psv').outerHTML='<div class="card empty"><b>ไม่พบสลิป หรือไม่มีสิทธิ์ดู</b>พนักงานเห็นเฉพาะสลิปของตัวเองหลังปิดงวด · ผู้บริหารเห็นทุกคน</div>'; return; }
+  await liveIdentity([s]); $('#psv').outerHTML='<div id="psv"></div>'; payFinance($('#psv'), s.employee_id, s);
 }
 async function payMine(){
-  setPage(head('สลิปเงินเดือนของฉัน','',{dActions:'<a href="#pay/shop" class="btn">สินค้าบริษัท</a>'})+'<div id="pm"><div class="loading"><div class="spin"></div></div></div>');
-  const [sl,ins,od]=await Promise.all([ sb.from('pay_slips').select('id,net,data,pay_periods(start_date,end_date,pay_date,status)').order('id',{ascending:false}).limit(24),
-    sb.from('installments').select('*').eq('status','active'), sb.from('emp_orders').select('*').order('created_at',{ascending:false}).limit(10) ]);
-  if(sl.error){ $('#pm').outerHTML='<div class="card empty"><b>ระบบเงินเดือนยังไม่เปิดใช้งาน</b></div>'; return; }
-  const slips=(sl.data||[]).filter(s=>s.pay_periods?.status==='closed').sort((a,b)=>b.pay_periods.start_date.localeCompare(a.pay_periods.start_date));
-  $('#pm').outerHTML=`<div class="col" style="gap:12px;max-width:640px"><a href="#pay/shop" class="btn hide-desk">สินค้าบริษัท (หักเงินเดือน)</a>
-    ${slips.length?`<div class="card card-l">${slips.map(s=>`<a href="#pay/s/${s.id}" class="li" style="text-decoration:none">${modIcon('payroll',40)}<div class="grow"><b>งวด ${periodLabel(s.pay_periods)}</b><span class="xs muted">จ่าย ${thaiDate(s.pay_periods.pay_date)}</span></div><b class="num">${baht(s.net)}</b>${IC.chev}</a>`).join('')}</div>`:'<div class="card empty"><b>ยังไม่มีสลิป</b>สลิปจะแสดงหลังผู้บริหารปิดงวด</div>'}
-    ${(ins.data||[]).length?`<h3 class="h2">ยอดผ่อนคงเหลือ</h3><div class="card card-l">${ins.data.map(i=>`<div class="li"><div class="grow"><b>${esc(i.title)}</b><span class="xs muted">${i.kind==='advance'?'เบิกล่วงหน้า':'สินค้าบริษัท'} · งวดละ ${baht(i.per_period)}</span></div><b class="num">${baht(i.total-i.paid)}</b></div>`).join('')}</div>`:''}
-    ${(od.data||[]).length?`<h3 class="h2">คำสั่งซื้อของฉัน</h3><div class="card card-l">${od.data.map(o=>`<div class="li"><div class="grow"><b>${esc(o.items.map(x=>x.name+' ×'+x.qty).join(', '))}</b><span class="xs muted">${baht(o.total)} · ผ่อน ${o.n_periods} งวด</span></div><span class="tag ${o.status==='approved'?'t-ok':o.status==='pending'?'t-warn':'t-bad'}">${{pending:'รออนุมัติ',approved:'อนุมัติแล้ว',rejected:'ไม่อนุมัติ',cancelled:'ยกเลิก'}[o.status]}</span></div>`).join('')}</div>`:''}</div>`;
+  setPage(head('การเงินของฉัน','สลิปเงินเดือน · เงินเบิก · ประวัติการจ่ายเงิน')+'<div id="psv"><div class="loading"><div class="spin"></div></div></div>');
+  const eid=S.profile.employee_id;
+  if(!eid){ $('#psv').outerHTML='<div class="card empty"><b>บัญชีนี้ยังไม่ได้ผูกกับทะเบียนพนักงาน</b>แจ้งแอดมินให้ผูกบัญชีกับข้อมูลพนักงานของคุณ</div>'; return; }
+  $('#psv').outerHTML='<div id="psv"></div>'; payFinance($('#psv'), eid, null);
 }
-
+async function payFinance(host, eid, cur){
+  const [emp,sl,ins,od]=await Promise.all([ sb.from('employees').select('id,emp_code,title,first_name,last_name,nickname,position_id,photo_path,bank_name,bank_account_no,start_date,wage_type,wage_rate').eq('id',eid).maybeSingle(),
+    sb.from('pay_slips').select('id,net,gross,data,pay_periods(start_date,end_date,pay_date,status)').eq('employee_id',eid).order('id',{ascending:false}).limit(60),
+    sb.from('installments').select('*').eq('employee_id',eid).order('created_at',{ascending:false}), sb.from('emp_orders').select('*').eq('employee_id',eid).order('created_at',{ascending:false}).limit(20) ]);
+  if(sl.error){ host.innerHTML='<div class="card empty"><b>ระบบเงินเดือนยังไม่เปิดใช้งาน</b></div>'; return; }
+  const e=emp.data||{}, mgr=isManager();
+  const slips=(sl.data||[]).filter(x=>x.pay_periods&&(mgr||x.pay_periods.status==='closed')).sort((a,b)=>b.pay_periods.start_date.localeCompare(a.pay_periods.start_date));
+  const shown=cur||slips[0]||null; if(shown&&!shown.emp) await liveIdentity([shown]);
+  const paid=slips.filter(x=>x.pay_periods.status==='closed'), yr=String(new Date().getFullYear());
+  const ytd=paid.filter(x=>x.pay_periods.pay_date.startsWith(yr)).reduce((a,x)=>a+(+x.net||0),0), ssoY=paid.filter(x=>x.pay_periods.pay_date.startsWith(yr)).reduce((a,x)=>a+(+x.data.sso||0),0);
+  const act=(ins.data||[]).filter(i=>i.status==='active');
+  host.innerHTML=`<div class="col" style="gap:12px;max-width:760px">
+    <div class="card row" style="gap:14px">${typeof avatar==='function'&&e.id?avatar(e):''}<div class="grow"><b style="font-size:18px">${esc([e.first_name,e.last_name].filter(Boolean).join(' ')||shown?.data?.name||'')}</b><div class="sm muted">${esc(e.emp_code||'')}${e.position_id?' · '+esc(posName(e.position_id)):''}${e.start_date?` · เริ่มงาน ${thaiDate(e.start_date)}`:''}</div><div class="xs muted">${esc([e.bank_name,e.bank_account_no].filter(Boolean).join(' ')||'')}</div></div>${!mgr?'<a href="#me/stars" class="btn btn-sm">ดาวของฉัน</a>':''}</div>
+    <div class="statg" style="grid-template-columns:repeat(3,minmax(0,1fr))"><div class="stat"><b class="num" style="font-size:20px">${baht(ytd)}</b><span class="sm muted">รับสุทธิปี ${+yr+543}</span></div><div class="stat"><b class="num" style="font-size:20px">${baht(ssoY)}</b><span class="sm muted">ประกันสังคมปีนี้</span></div><div class="stat"><b class="num" style="font-size:20px;${act.length?'color:var(--warn)':''}">${baht(act.reduce((a,i)=>a+(i.total-i.paid),0))}</b><span class="sm muted">ยอดเบิก/ผ่อนคงเหลือ</span></div></div>
+    ${shown?`<div class="card col" style="gap:6px"><div class="row"><b class="grow">สลิปงวด ${periodLabel(shown.pay_periods)}</b>${shown.pay_periods.status==='closed'?`<span class="tag t-ok">จ่ายแล้ว ${thaiDate(shown.pay_periods.pay_date)}</span>`:'<span class="tag t-warn">ร่าง</span>'}</div></div>${payBreak(shown.data)}`:'<div class="card empty"><b>ยังไม่มีสลิป</b>สลิปจะแสดงหลังผู้บริหารปิดงวด</div>'}
+    <h3 class="h2">ประวัติการจ่ายเงิน</h3>${slips.length?`<div class="card card-l">${slips.map(x=>`<a href="#pay/s/${x.id}" class="li" style="text-decoration:none;${shown&&x.id===shown.id?'background:color-mix(in srgb,var(--accent) 10%,transparent)':''}"><div class="grow"><b>งวด ${periodLabel(x.pay_periods)}</b><span class="xs muted">${x.pay_periods.status==='closed'?`จ่าย ${thaiDate(x.pay_periods.pay_date)}`:'ร่าง (ยังไม่ปิดงวด)'} · ก่อนหัก ${fmtN(x.gross)}</span></div><b class="num">${baht(x.net)}</b>${IC.chev}</a>`).join('')}</div>`:'<div class="card empty"><b>ยังไม่มีประวัติ</b></div>'}
+    <h3 class="h2">เงินเบิกล่วงหน้า / ผ่อนสินค้า</h3>${(ins.data||[]).length?`<div class="card card-l">${ins.data.map(i=>`<div class="li"><div class="grow"><b>${esc(i.title)}</b><span class="xs muted">${i.kind==='advance'?'เบิกล่วงหน้า':'สินค้าบริษัท'} · ${baht(i.total)} / ${i.n_periods} งวด · หักแล้ว ${baht(i.paid)}</span></div><b class="num sm">${baht(i.total-i.paid)}</b><span class="tag ${i.status==='active'?'t-acc':i.status==='done'?'t-ok':''}">${{active:'กำลังหัก',done:'ครบแล้ว',cancelled:'ยกเลิก'}[i.status]}</span></div>`).join('')}</div>`:'<div class="card empty"><b>ไม่มีรายการ</b></div>'}
+    ${(od.data||[]).length?`<h3 class="h2">คำสั่งซื้อสินค้าบริษัท</h3><div class="card card-l">${od.data.map(o=>`<div class="li"><div class="grow"><b>${esc(o.items.map(x=>x.name+' ×'+x.qty).join(', '))}</b><span class="xs muted">${baht(o.total)} · ผ่อน ${o.n_periods} งวด · ${new Date(o.created_at).toLocaleDateString('th-TH')}</span></div><span class="tag ${o.status==='approved'?'t-ok':o.status==='pending'?'t-warn':'t-bad'}">${{pending:'รออนุมัติ',approved:'อนุมัติแล้ว',rejected:'ไม่อนุมัติ',cancelled:'ยกเลิก'}[o.status]}</span></div>`).join('')}</div>`:''}
+    ${!mgr&&S.profile.role!=='employee'?'<a href="#pay/shop" class="btn">สั่งสินค้าบริษัท (หักเงินเดือน)</a>':''}</div>`;
+}
 /* ---------------- สินค้าบริษัท ---------------- */
 async function payShop(){
+  if(S.profile.role==='employee'){ location.hash='#pay'; return; }
   setPage(head('สินค้าบริษัท','สั่งแล้วหักเงินเดือน',{back:'#pay'})+'<div id="psh"><div class="loading"><div class="spin"></div></div></div>');
   const {data:items,error}=await sb.rpc('shop_items');
   if(error){ $('#psh').outerHTML='<div class="card empty"><b>ยังไม่ได้อัปเดตฐานข้อมูล</b>รันไฟล์ 13_payroll.sql</div>'; return; }
@@ -332,23 +355,18 @@ function detailPageHTML(p,s){
 }
 async function payPublish(p, slips, done){
   if(!hasBridge()) return toast('ต้องติดตั้ง Bridge ก่อน',true);
-  if(!slips.length) return toast('ยังไม่มีสลิปในงวดนี้',true);
-  if(!await confirmBox(`เผยแพร่เอกสารงวด ${periodLabel(p)} ลง Google Drive? ระบบจะสร้างสลิปละเอียด (PDF เวกเตอร์ + รูปความละเอียดสูง) ของแต่ละคนและใบสรุป ใครมี QR ของสลิปจะเปิดดูรายละเอียดของคนนั้นได้`,'เผยแพร่')) return;
-  const prog=overlay(`<div class="modal" role="dialog" aria-modal="true"><b>กำลังเผยแพร่ลง Google Drive</b><div class="sm muted" id="pubst">เตรียมโฟลเดอร์...</div><div class="bar"><i id="pubbar" style="width:0%"></i></div></div>`,true,false);
+  if(!slips.length) return toast('ยังไม่มีข้อมูลในงวดนี้',true);
+  if(!await confirmBox(`บันทึกใบสรุปเงินเดือนงวด ${periodLabel(p)} ลง Google Drive (PDF เวกเตอร์ + รูป) และเปิด QR บนใบสรุป?`,'บันทึกลง Drive')) return;
+  const prog=overlay(`<div class="modal" role="dialog" aria-modal="true"><b>กำลังบันทึกลง Google Drive</b><div class="sm muted" id="pubst">เตรียมโฟลเดอร์...</div><div class="bar"><i id="pubbar" style="width:10%"></i></div></div>`,true,false);
   const st=(t,pc)=>{ $('#pubst',prog.el).textContent=t; if(pc!=null) $('#pubbar',prog.el).style.width=pc+'%'; };
   try{
-    await pdfReady();
-    const drive=await bridge('pay_folders',{title:`งวด ${p.start_date} ถึง ${p.end_date}`,emps:slips.map(s=>({id:s.employee_id,label:`${s.data.emp_code||''} ${s.data.name}`.trim()}))});
-    p.drive={...drive};
-    for(let i=0;i<slips.length;i++){ const s=slips[i], f=drive.emps[s.employee_id]; st(`สลิปละเอียด ${i+1}/${slips.length}: ${s.data.name}`, Math.round(i/(slips.length+1)*100));
-      const dd=await detailDoc(p,s), blob=await pdfBlob(dd), b64=await pdfB64(dd), png=(await pdfToPngs(blob,3))[0], nm=`${s.data.emp_code||''}_สลิปเงินเดือน_${p.start_date}_${p.end_date}`;
-      await Promise.all([ bridge('pay_upload',{folder_id:f.id,name:nm+'.pdf',mime:'application/pdf',data:b64}), bridge('pay_upload',{folder_id:f.id,name:nm+'.png',mime:'image/png',data:png}) ]); }
-    st('ใบสรุปเงินเดือน...', 95);
-    const sd=await summaryDoc(p,slips,pprint(),payCols()), sblob=await pdfBlob(sd), sb64=await pdfB64(sd), pngs=await pdfToPngs(sblob,2.5), nm=`ใบสรุปเงินเดือน_${p.start_date}_${p.end_date}`;
+    const drive=await bridge('pay_folders',{title:`งวด ${p.start_date} ถึง ${p.end_date}`,emps:[]});
+    p.drive={...drive}; st('สร้างใบสรุป (PDF เวกเตอร์)...',40);
+    const nm=`ใบสรุปเงินเดือน_${p.start_date}_${p.end_date}`, sd=await summaryDoc(p,slips,pprint(),payCols()), sblob=await pdfBlob(sd), sb64=await pdfB64(sd), pngs=await pdfToPngs(sblob,3);
+    st('อัปโหลด...',70);
     await bridge('pay_upload',{folder_id:drive.summary.id,name:nm+'.pdf',mime:'application/pdf',data:sb64});
     for(let i=0;i<pngs.length;i++) await bridge('pay_upload',{folder_id:drive.summary.id,name:`${nm}_หน้า${i+1}.png`,mime:'image/png',data:pngs[i]});
-    const info={...drive,published_at:new Date().toISOString(),by:S.profile.display_name};
-    const {error}=await sb.rpc('set_period_drive',{p_period:p.id,p_drive:info}); if(error) throw error;
-    prog.close(); toast('เผยแพร่ลง Google Drive แล้ว QR บนใบสรุปและสลิปพร้อมใช้งาน'); done&&done();
+    const {error}=await sb.rpc('set_period_drive',{p_period:p.id,p_drive:{folder:drive.folder,summary:drive.summary,published_at:new Date().toISOString(),by:S.profile.display_name}}); if(error) throw error;
+    prog.close(); toast('บันทึกใบสรุปลง Google Drive แล้ว'); done&&done();
   }catch(e){ prog.close(); toast(/set_period_drive/.test(e.message||'')?'ยังไม่ได้รันไฟล์ 13b_payroll_drive.sql':errText(e),true); }
 }
