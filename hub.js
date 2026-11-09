@@ -1,7 +1,7 @@
 /* =====================================================================
    KTY Hub — โครงหน้า: แถบเมนูด้านข้าง / ลิ้นชักเมนูบนมือถือ / ตัวเลือกไซต์
    ===================================================================== */
-const HUB_VERSION = '2.3';
+const HUB_VERSION = '2.4';
 const MOD = {
   att:      { t:'เช็คชื่อ',            hue:'#2E9E5B', i:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>' },
   daily:    { t:'รายงานประจำวัน',      hue:'#2F6FDB', i:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>' },
@@ -56,7 +56,7 @@ function navSections0(){
     if(hasMod('borrow')||hasMod('materials')) it.push({k:'ret',m:'borrow',t:'คืน วัสดุ/อุปกรณ์',b:'brw'});
     if(hasMod('issues')) it.push({k:'soon/issues',m:'issues',t:'รายงานปัญหาหน้างาน'});
     out.push({t:'งานของฉัน', items:it});
-    out.push({t:'ของฉัน', items:[{k:'pay',m:'payroll',t:'การเงินของฉัน'},{k:'me/stars',m:'stars'},{k:'me',m:'me'}]});
+    out.push({t:'ของฉัน', items:[{k:'my',m:'payroll',t:'ข้อมูลของฉัน'},{k:'me/stars',m:'stars'},{k:'me',m:'me'}]});
   }
   return out;
 }
@@ -97,14 +97,14 @@ function route(){
   const cur=keyOf(location.hash); const [k,id,id2]=cur.split('/');
   if(k==='users'){ mgTab='users'; } if(k==='settings'){ mgTab='sites'; }
   const mgr=isManager(), p=S.profile;
-  const can={ home:1, tasks:1, me:1, soon:1, att:mgr, employees:mgr, emp:mgr, manage:mgr, users:mgr, settings:mgr, roll:mgr||p.can_check, report:p.role==='foreman'||mgr||hasMod('daily'), mat:mgr||hasMod('materials'), pay:1, brw:mgr||hasMod('borrow')||hasMod('materials'), ret:mgr||hasMod('borrow')||hasMod('materials'), daily:p.role==='foreman'||mgr||hasMod('daily'), studio:isAdmin() };
+  const can={ home:1, tasks:1, me:1, soon:1, att:mgr, employees:mgr, emp:mgr, manage:mgr, users:mgr, settings:mgr, roll:mgr||p.can_check, report:p.role==='foreman'||mgr||hasMod('daily'), mat:mgr||hasMod('materials'), pay:1, id:1, my:1, reqs:mgr, brw:mgr||hasMod('borrow')||hasMod('materials'), ret:mgr||hasMod('borrow')||hasMod('materials'), daily:p.role==='foreman'||mgr||hasMod('daily'), studio:isAdmin() };
   if(ROUTE_MOD[k]&&!allowed(ROUTE_MOD[k])) can[k]=0;
   const key=can[k]?k:'home';
   if(key==='att'&&id&&['day','month','site'].includes(id)) attTab=id;
   if(key==='manage'&&id) mgTab=id;
   if(key==='me'&&id==='stars') profTab='stars';
   renderShell(can[k]?cur:'home');
-  ({home:pageHome, tasks:pageTasks, att:pageAtt, employees:pageEmployees, emp:()=>pageProfile(id), manage:pageManage, users:pageManage, settings:pageManage, report:pageReport, mat:()=>pageMat(id,id2), pay:()=>pagePay(id,id2), brw:()=>pageBrw(id,id2), ret:pageRet, daily:()=>pageDaily(id,id2), roll:pageRoll, studio:()=>pageStudio(id), me:()=>id==='stars'?pageMyStars():pageMe(), soon:()=>pageSoon(id)})[key]();
+  ({home:pageHome, tasks:pageTasks, att:pageAtt, employees:pageEmployees, emp:()=>pageProfile(id), manage:pageManage, users:pageManage, settings:pageManage, report:pageReport, mat:()=>pageMat(id,id2), pay:()=>pagePay(id,id2), id:()=>pageQR(id), my:()=>pageMy(id||null), reqs:pageReqs, brw:()=>pageBrw(id,id2), ret:pageRet, daily:()=>pageDaily(id,id2), roll:pageRoll, studio:()=>pageStudio(id), me:()=>id==='stars'?pageMyStars():pageMe(), soon:()=>pageSoon(id)})[key]();
   scrollTo(0,0);
 }
 function renderShell(cur){
@@ -166,6 +166,9 @@ async function collectTasks(){
     (res.rc||[]).forEach(d=>tasks.push({m:'materials',t:`รับของ ${d.doc_no}`,sub:sn(d.site_id),tag:'รอรับ',c:'t-acc',href:`#mat/d/${d.id}`}));
     S.badges.mat=(res.ap||[]).length+(res.is||[]).length+(res.rc||[]).length;
   }catch(_){} }
+  if(mgr){ try{ const [c1,c2]=await Promise.all([sb.from('emp_change_requests').select('id',{count:'exact',head:true}).eq('status','pending'), isAdmin()?sb.from('link_requests').select('id',{count:'exact',head:true}).eq('status','pending'):Promise.resolve({count:0})]);
+    if(c1.count) tasks.push({m:'people',t:`คำขอแก้ไขข้อมูลพนักงาน ${c1.count} รายการ`,sub:'ตรวจค่าเดิม → ค่าใหม่ แล้วอนุมัติ',tag:'รออนุมัติ',c:'t-warn',href:'#reqs'});
+    if(c2.count) tasks.push({m:'people',t:`คำขอผูกบัญชีกับพนักงาน ${c2.count} รายการ`,sub:'จากการสแกน QR บนสลิป',tag:'รออนุมัติ',c:'t-warn',href:'#reqs'}); }catch(_){} }
   if(mgr){ try{ const {data:eo}=await sb.from('emp_orders').select('id,total,requested_name').eq('status','pending'); (eo||[]).forEach(o=>tasks.push({m:'payroll',t:`อนุมัติคำสั่งซื้อสินค้าบริษัท ${baht(o.total)}`,sub:o.requested_name||'',tag:'รออนุมัติ',c:'t-warn',href:'#pay'})); }catch(_){} }
   if(mgr||hasMod('borrow')||hasMod('materials',['store','admin'])){ try{
     const appr=mgr||hasMod('borrow',['approver']), store=appr||hasMod('materials',['store','admin']);
@@ -218,7 +221,7 @@ async function pageHome(){
     if(hasMod('materials')) t.push(tileHTML('materials','#mat','เบิก วัสดุ/อุปกรณ์','mat'));
     if(hasMod('borrow')||hasMod('materials')) t.push(tileHTML('borrow','#ret','คืน วัสดุ/อุปกรณ์','brw'));
     if(hasMod('issues')) t.push(tileHTML('issues','#soon/issues','รายงานปัญหาหน้างาน',null,true));
-    t.push(tileHTML('payroll','#pay','การเงินของฉัน'), tileHTML('stars','#me/stars','ดาวของฉัน'), tileHTML('me','#me','ข้อมูลของฉัน'));
+    t.push(tileHTML('payroll','#my','ข้อมูลของฉัน'), tileHTML('stars','#me/stars','ดาวของฉัน'), tileHTML('me','#me','ข้อมูลของฉัน'));
     tiles=t.join('');
   }
   let d; try{ d=await collectTasks(); }catch(err){ $('#hb').outerHTML=`<div class="note n-bad">${esc(errText(err))}</div>`; return; }

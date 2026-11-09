@@ -59,7 +59,7 @@ async function liveIdentity(slips){
 async function pagePay(a,b){
   if(a==='s') return paySlipView(+b);
   if(a==='shop') return payShop();
-  if(!isManager()) return payMine();
+  if(!isManager()) return pageMy();
   if(a==='p'&&b) payPid=+b;
   setPage(head('เงินเดือน','',{dActions:'<a href="#pay/shop" class="btn">สินค้าบริษัท</a>'})+'<div id="pyb"><div class="loading"><div class="spin"></div></div></div>');
   const e=await sb.rpc('ensure_period',{p_date:localISO()});
@@ -226,7 +226,7 @@ async function paySlipsPreview(p, slips){
   try{ await loadScript(LIB.qr); }catch(e){ return toast(errText(e),true); }
   const B=BR(), logo=B.logo, pages=[];
   const qrSvg=t=>{ const q=qrcode(0,'M'); q.addData(t); q.make(); return q.createSvgTag({cellSize:2,margin:0,scalable:true}); };
-  const base=`${location.origin}${location.pathname}#pay/s/`, qrOf=s=>base+s.id;
+  const base=`${location.origin}${location.pathname}#pay/s/`, qrOf=s=>s.data.__emp?.qr_token?`${location.origin}${location.pathname}#id/${s.data.__emp.qr_token}`:base+s.id;
   for(let i=0;i<slips.length;i+=8){ const chunk=slips.slice(i,i+8);
     pages.push(`<div class="a4 a4slips">${chunk.map(s=>{ const d=s.data; return `<div class="slip"><div class="sl-h">${logo?`<img src="${logo}" crossorigin="anonymous" alt="">`:`<span class="pg-mark sm">${esc(B.mark)}</span>`}<div class="grow"><b>${esc(B.company_short)}</b><span>สลิปเงินเดือน · งวด ${periodLabel(p)}</span></div><div class="sl-qr">${qrSvg(qrOf(s))}</div></div>
       <div class="sl-n"><b>${esc(d.name)}</b><span>${esc(d.emp_code||'')}${d.position?' · '+esc(d.position):''}</span></div>
