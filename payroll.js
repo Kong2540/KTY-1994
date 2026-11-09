@@ -119,7 +119,7 @@ const MM=3.7795;
 const PPRINT_DEF={margin:{t:12,r:10,b:12,l:10},font:11,sign:true,sign_w:34,widths:{}};
 const pprint = () => { const s=S.settings.payroll_print||{}; return {...PPRINT_DEF,...s,margin:{...PPRINT_DEF.margin,...(s.margin||{})},widths:{...(s.widths||{})}}; };
 const qrSvgOf = t => { const q=qrcode(0,'M'); q.addData(t); q.make(); return q.createSvgTag({cellSize:2,margin:0,scalable:true}); };
-function pgHead(p,t,qrUrl){ const B=BR(); return `<div class="pg-head">${B.logo?`<img src="${B.logo}" crossorigin="anonymous" alt="">`:`<span class="pg-mark">${esc(B.mark)}</span>`}<div class="grow"><b>${esc(B.company_th)}</b><span>${esc(B.company_en)}</span></div><div class="pg-ti"><b>${t}</b><span>งวด ${periodLabel(p)} · จ่ายวันที่ ${thaiDate(p.pay_date)}</span></div>${qrUrl&&window.qrcode?`<div class="pg-qr">${qrSvgOf(qrUrl)}<small>สแกนดูย้อนหลัง</small></div>`:''}</div>`; }
+function pgHead(p,t,qrUrl){ const B=BR(); return `<div class="pg-head">${B.logo?`<img src="${B.logo}" crossorigin="anonymous" alt="">`:`<span class="pg-mark">${esc(B.mark)}</span>`}<div class="grow"><b>${esc(B.company_th)}</b><span>${esc(B.company_en)}</span></div><div class="pg-ti"><b>${t}</b><span>งวดวันที่ ${periodLabel(p)}</span></div>${qrUrl&&window.qrcode?`<div class="pg-qr">${qrSvgOf(qrUrl)}<small>สแกนดูย้อนหลัง</small></div>`:''}</div>`; }
 async function pdfFromPages(els, orient, name){
   await Promise.all([loadScript(LIB.h2c),loadScript(LIB.pdf)]); await document.fonts?.ready;
   const L=orient==='l', pdf=new jspdf.jsPDF({unit:'mm',format:'a4',orientation:L?'landscape':'portrait'});
@@ -151,7 +151,7 @@ async function paySummaryPreview(p, slips){
   $$('[data-w]',ov.el).forEach(i=>i.oninput=()=>{ const k=i.dataset.w, v=i.value===''?null:Math.max(5,Math.min(120,+i.value)); if(k==='_sign') cfg.sign_w=v||34; else if(v) cfg.widths[k]=v; else delete cfg.widths[k]; render(); });
   const df=$('[data-def]',ov.el); if(df) df.onclick=()=>{ ov.close(); S.settings.payroll_print_tmp=null; const keep=S.settings.payroll_print; S.settings.payroll_print=null; paySummaryPreview(p,slips); S.settings.payroll_print=keep; };
   const sc=$('[data-savecfg]',ov.el); if(sc) sc.onclick=async ev=>{ busy(ev.target,true); try{ await saveSetting('payroll_print',cfg); busy(ev.target,false); toast('บันทึกการตั้งค่าหน้ากระดาษแล้ว'); }catch(e){ busy(ev.target,false); toast(e.message,true); } };
-  $('[data-pdf]',ov.el).onclick=async ev=>{ busy(ev.target,true,'กำลังสร้าง PDF...'); try{ await pdfFromPages($$('.a4',W),'l',`ใบสรุปเงินเดือน_${p.start_date}_${p.end_date}.pdf`); busy(ev.target,false); toast('ดาวน์โหลดแล้ว'); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
+  $('[data-pdf]',ov.el).onclick=async ev=>{ busy(ev.target,true,'กำลังสร้าง PDF...'); try{ const dd=await summaryDoc(p,slips,cfg,cols); pdfMake.createPdf(dd).download(`ใบสรุปเงินเดือน_${p.start_date}_${p.end_date}.pdf`); busy(ev.target,false); toast('ดาวน์โหลด PDF (เวกเตอร์) แล้ว'); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
 }
 function renderSummary(W,p,slips,cfg,cols){
     const m=cfg.margin, colsAll=['#',...cols,...(cfg.sign?['_sign']:[])];
@@ -192,7 +192,7 @@ async function paySlipsPreview(p, slips){
     <div class="sheet-body">${p.drive?.emps?'':`<div class="note n-warn">${IC.info}<span>ยังไม่เผยแพร่ลง Google Drive: QR จะเปิดหน้าสลิปในแอปแทน (ต้องเข้าสู่ระบบ) · กด "เผยแพร่ลง Google Drive" ในหน้างวดก่อนพิมพ์ เพื่อให้สแกนดูรูปและ PDF ได้ตลอด</span></div>`}<div class="pg-wrap">${pages.join('')||'<div class="card empty"><b>ยังไม่มีสลิป</b></div>'}</div></div>
     <div class="sheet-foot"><button class="btn btn-p" data-pdf ${slips.length?'':'disabled'}>ดาวน์โหลด PDF สลิป</button></div></div>`,false,false);
   $('[data-x]',ov.el).onclick=ov.close;
-  $('[data-pdf]',ov.el).onclick=async ev=>{ busy(ev.target,true,'กำลังสร้าง PDF...'); try{ await pdfFromPages($$('.a4',ov.el),'p',`สลิปเงินเดือน_${p.start_date}_${p.end_date}.pdf`); busy(ev.target,false); toast('ดาวน์โหลดแล้ว'); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
+  $('[data-pdf]',ov.el).onclick=async ev=>{ busy(ev.target,true,'กำลังสร้าง PDF...'); try{ const dd=await slipsDoc(p,slips,qrOf); pdfMake.createPdf(dd).download(`สลิปเงินเดือน_${p.start_date}_${p.end_date}.pdf`); busy(ev.target,false); toast('ดาวน์โหลด PDF (เวกเตอร์) แล้ว'); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
 }
 async function paySheetExport(p, slips, btn){
   if(!hasBridge()) return toast('ต้องติดตั้ง Bridge ก่อน',true);
@@ -333,28 +333,22 @@ function detailPageHTML(p,s){
 async function payPublish(p, slips, done){
   if(!hasBridge()) return toast('ต้องติดตั้ง Bridge ก่อน',true);
   if(!slips.length) return toast('ยังไม่มีสลิปในงวดนี้',true);
-  if(!await confirmBox(`เผยแพร่เอกสารงวด ${periodLabel(p)} ลง Google Drive? ระบบจะสร้างสลิปละเอียด (รูป + PDF) ของแต่ละคนและใบสรุป ใครมี QR ของสลิปจะเปิดดูรายละเอียดของคนนั้นได้`,'เผยแพร่')) return;
+  if(!await confirmBox(`เผยแพร่เอกสารงวด ${periodLabel(p)} ลง Google Drive? ระบบจะสร้างสลิปละเอียด (PDF เวกเตอร์ + รูปความละเอียดสูง) ของแต่ละคนและใบสรุป ใครมี QR ของสลิปจะเปิดดูรายละเอียดของคนนั้นได้`,'เผยแพร่')) return;
   const prog=overlay(`<div class="modal" role="dialog" aria-modal="true"><b>กำลังเผยแพร่ลง Google Drive</b><div class="sm muted" id="pubst">เตรียมโฟลเดอร์...</div><div class="bar"><i id="pubbar" style="width:0%"></i></div></div>`,true,false);
   const st=(t,pc)=>{ $('#pubst',prog.el).textContent=t; if(pc!=null) $('#pubbar',prog.el).style.width=pc+'%'; };
   try{
-    await Promise.all([loadScript(LIB.h2c),loadScript(LIB.pdf),loadScript(LIB.qr)]); await document.fonts?.ready;
+    await pdfReady();
     const drive=await bridge('pay_folders',{title:`งวด ${p.start_date} ถึง ${p.end_date}`,emps:slips.map(s=>({id:s.employee_id,label:`${s.data.emp_code||''} ${s.data.name}`.trim()}))});
     p.drive={...drive};
-    const shot=async(html,orient)=>{ const w=document.createElement('div'); w.innerHTML=html; const el=w.firstElementChild; el.classList.add('a4-render'); document.body.appendChild(el);
-      const cv=await html2canvas(el,{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false}); el.remove(); return cv; };
-    const toPdf=(cvs,orient)=>{ const L=orient==='l', pdf=new jspdf.jsPDF({unit:'mm',format:'a4',orientation:L?'landscape':'portrait'}); cvs.forEach((cv,i)=>{ if(i) pdf.addPage('a4',L?'landscape':'portrait'); pdf.addImage(cv.toDataURL('image/jpeg',.9),'JPEG',0,0,L?297:210,L?210:297); }); return pdf.output('datauristring').split(',')[1]; };
     for(let i=0;i<slips.length;i++){ const s=slips[i], f=drive.emps[s.employee_id]; st(`สลิปละเอียด ${i+1}/${slips.length}: ${s.data.name}`, Math.round(i/(slips.length+1)*100));
-      const cv=await shot(detailPageHTML(p,s)); const nm=`${s.data.emp_code||''}_สลิปเงินเดือน_${p.start_date}_${p.end_date}`;
-      await Promise.all([ bridge('pay_upload',{folder_id:f.id,name:nm+'.jpg',mime:'image/jpeg',data:cv.toDataURL('image/jpeg',.9).split(',')[1]}), bridge('pay_upload',{folder_id:f.id,name:nm+'.pdf',mime:'application/pdf',data:toPdf([cv],'p')}) ]); }
+      const dd=await detailDoc(p,s), blob=await pdfBlob(dd), b64=await pdfB64(dd), png=(await pdfToPngs(blob,3))[0], nm=`${s.data.emp_code||''}_สลิปเงินเดือน_${p.start_date}_${p.end_date}`;
+      await Promise.all([ bridge('pay_upload',{folder_id:f.id,name:nm+'.pdf',mime:'application/pdf',data:b64}), bridge('pay_upload',{folder_id:f.id,name:nm+'.png',mime:'image/png',data:png}) ]); }
     st('ใบสรุปเงินเดือน...', 95);
-    const box=document.createElement('div'); box.style.cssText='position:fixed;left:-20000px;top:0'; document.body.appendChild(box);
-    const pages=renderSummary(box,p,slips,pprint(),payCols()); const cvs=[];
-    for(const pg of pages){ cvs.push(await html2canvas(pg,{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false})); } box.remove();
-    const nm=`ใบสรุปเงินเดือน_${p.start_date}_${p.end_date}`;
-    await bridge('pay_upload',{folder_id:drive.summary.id,name:nm+'.pdf',mime:'application/pdf',data:toPdf(cvs,'l')});
-    for(let i=0;i<cvs.length;i++) await bridge('pay_upload',{folder_id:drive.summary.id,name:`${nm}_หน้า${i+1}.jpg`,mime:'image/jpeg',data:cvs[i].toDataURL('image/jpeg',.9).split(',')[1]});
+    const sd=await summaryDoc(p,slips,pprint(),payCols()), sblob=await pdfBlob(sd), sb64=await pdfB64(sd), pngs=await pdfToPngs(sblob,2.5), nm=`ใบสรุปเงินเดือน_${p.start_date}_${p.end_date}`;
+    await bridge('pay_upload',{folder_id:drive.summary.id,name:nm+'.pdf',mime:'application/pdf',data:sb64});
+    for(let i=0;i<pngs.length;i++) await bridge('pay_upload',{folder_id:drive.summary.id,name:`${nm}_หน้า${i+1}.png`,mime:'image/png',data:pngs[i]});
     const info={...drive,published_at:new Date().toISOString(),by:S.profile.display_name};
     const {error}=await sb.rpc('set_period_drive',{p_period:p.id,p_drive:info}); if(error) throw error;
     prog.close(); toast('เผยแพร่ลง Google Drive แล้ว QR บนใบสรุปและสลิปพร้อมใช้งาน'); done&&done();
-  }catch(e){ prog.close(); toast(/set_period_drive|drive/.test(e.message||'')&&/function|column/.test(e.message||'')?'ยังไม่ได้รันไฟล์ 13b_payroll_drive.sql':errText(e),true); }
+  }catch(e){ prog.close(); toast(/set_period_drive/.test(e.message||'')?'ยังไม่ได้รันไฟล์ 13b_payroll_drive.sql':errText(e),true); }
 }
