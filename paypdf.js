@@ -81,8 +81,8 @@ async function slipsDoc(p, slips, qrOf){
       kv('รวมก่อนหัก',num(d.gross)), kv('หักประกันสังคม',`−${num(d.sso)}`), kv('หักอื่น ๆ',`−${num(otherDed(d))}`),
       {table:{widths:['*','auto'],body:[[{text:'รับสุทธิ',color:C_LAB,fontSize:9,margin:[4,3,0,0]},{text:num(d.net),bold:true,fontSize:14,color:C_DARK,margin:[0,0,4,0]}]]},layout:{fillColor:()=>C_BAND,hLineWidth:()=>0,vLineWidth:()=>0},margin:[0,2,0,3]},
       {columns:[{text:'โปรดตรวจสอบจำนวนเงินให้เรียบร้อยก่อนออกจากบริษัทฯ',fontSize:6.3,color:'#8A979C'},{text:'สแกน QR ดูรายละเอียด',fontSize:6.3,color:'#8A979C',alignment:'right',width:'auto'}]}
-    ], width:iw, absolutePosition:{x,y} };
-    content.push(node); });
+    ] };
+    content.push({table:{widths:[iw],body:[[node]]},layout:{hLineWidth:()=>0,vLineWidth:()=>0,paddingLeft:()=>0,paddingRight:()=>0,paddingTop:()=>0,paddingBottom:()=>0},absolutePosition:{x,y}}); });
   const cut={canvas:[{type:'line',x1:W,y1:0,x2:W,y2:841.89,lineWidth:.5,dash:{length:3,space:3},lineColor:'#9AA6AA'},...[1,2,3].map(r=>({type:'line',x1:0,y1:r*H,x2:595.28,y2:r*H,lineWidth:.5,dash:{length:3,space:3},lineColor:'#9AA6AA'}))]};
   return { pageSize:'A4', pageMargins:[0,0,0,0], defaultStyle:{font:'Sarabun',fontSize:9,color:'#1B262C',lineHeight:1.12},
     info:{title:`สลิปเงินเดือน ${periodText(p)}`}, background:()=>({...cut,absolutePosition:{x:0,y:0}}), content };
