@@ -33,7 +33,7 @@ async function pageMat(a, b){
   if(a==='d') return matDoc(+b);
   if(a==='stock') return matStock();
   if(a==='post') return matPost(b);
-  setPage(head('เบิกจ่ายวัสดุ', siteLabel(), {dActions:`<a href="#mat/stock" class="btn">สต็อก</a>${isMatRole(['store','admin'])?'<a href="#mat/post" class="btn">รับเข้า / โอน / ปรับยอด</a>':''}${isMatRole()?'<a href="#mat/new" class="btn btn-p">+ ขอเบิกวัสดุ</a>':''}`}) + `<div id="mb"><div class="loading"><div class="spin"></div></div></div>`);
+  setPage(head('เบิก วัสดุ/อุปกรณ์', siteLabel(), {dActions:`<a href="#mat/stock" class="btn">สต็อก</a>${isMatRole(['store','admin'])?'<a href="#mat/post" class="btn">รับเข้า / โอน / ปรับยอด</a>':''}<a href="#ret" class="btn">คืน วัสดุ/อุปกรณ์</a><a href="#brw/where" class="btn">อุปกรณ์อยู่ที่ไหน</a>${isMatRole()?'<a href="#mat/new" class="btn btn-p">+ เบิก วัสดุ/อุปกรณ์</a>':''}`}) + `<div id="mb"><div class="loading"><div class="spin"></div></div></div>`);
   if(!await loadMat()) { $('#mb').outerHTML=needMat(); return; }
   const tabs=[];
   if(isMatRole(['approver','admin'])) tabs.push(['approve','รออนุมัติ']);
@@ -50,7 +50,7 @@ async function pageMat(a, b){
   };
   const counts=await Promise.all(tabs.map(([k])=>q[k]()));
   const host=$('#mb'); host.outerHTML=`<div class="col" id="mb" style="gap:12px;max-width:820px">
-    ${isMatRole()?`<a href="#mat/new" class="btn btn-p hide-desk" style="min-height:52px">+ ขอเบิกวัสดุ</a>`:''}
+    ${isMatRole()?`<div class="row hide-desk" style="gap:8px"><a href="#mat/new" class="btn btn-p grow" style="min-height:52px">+ เบิก วัสดุ/อุปกรณ์</a><a href="#ret" class="btn grow" style="min-height:52px">คืน วัสดุ/อุปกรณ์</a></div>`:''}
     <div class="chips scroll" style="margin:0 -16px">${tabs.map(([k,t],i)=>`<button class="chip ${matTab===k?'on':''}" data-mt="${k}">${t} ${(counts[i].data||[]).length?`<b>${counts[i].data.length}</b>`:''}</button>`).join('')}</div>
     <div id="mlist"></div>
     <div class="row hide-desk" style="gap:8px"><a href="#mat/stock" class="btn grow">ดูสต็อก</a>${isMatRole(['store','admin'])?'<a href="#mat/post" class="btn grow">รับเข้า / โอน</a>':''}</div></div>`;
@@ -66,33 +66,33 @@ function docRow(d){
 /* ---------------- ตะกร้าขอเบิก ---------------- */
 let CART = { site:null, cat:'', items:{} };
 async function matCart(){
-  setPage(head('ขอเบิกวัสดุ','เลือกวัสดุใส่ตะกร้า',{back:'#mat'}) + `<div id="cb"><div class="loading"><div class="spin"></div></div></div>`);
+  setPage(head('เบิก วัสดุ/อุปกรณ์','เลือกของใส่ตะกร้า (วัสดุและอุปกรณ์ในใบเดียว)',{back:'#mat'}) + `<div id="cb"><div class="loading"><div class="spin"></div></div></div>`);
   if(!await loadMat()) { $('#cb').outerHTML=needMat(); return; }
   const ids=mySiteIds(); const sites=S.sites.filter(s=>ids.includes(s.id)&&s.status==='active');
   if(!sites.length){ $('#cb').outerHTML=`<div class="card empty"><b>ยังไม่มีไซต์ที่รับผิดชอบ</b></div>`; return; }
   if(!CART.site||!sites.some(s=>s.id===CART.site)) CART={ site:S.site?+S.site:sites[0].id, cat:'', items:{} };
-  let boq=[], freq=[], view='all', cat='', q='';
-  const loadSite=async()=>{ const [b,f]=await Promise.all([sb.rpc('boq_status',{p_site:CART.site}), sb.rpc('frequent_materials',{p_site:CART.site})]); boq=b.data||[]; freq=(f.data||[]).map(x=>x.material_id); };
+  let boq=[], freq=[], view='all', cat='', q='', typ='', avail={};
+  const loadSite=async()=>{ const [b,f,t]=await Promise.all([sb.rpc('boq_status',{p_site:CART.site}), sb.rpc('frequent_materials',{p_site:CART.site}), sb.rpc('tool_status')]); boq=b.data||[]; freq=(f.data||[]).map(x=>x.material_id); avail={}; const c=centralLoc()?.id; (t.data||[]).forEach(x=>{ if(x.location_id===c) avail[x.material_id]=+x.qty; }); };
   await loadSite();
   const host=$('#cb'); host.outerHTML='<div id="cb" class="col" style="gap:12px;max-width:820px"></div>';
   const cats=()=>[...new Set(boq.map(b=>b.work_category))];
   const boqOf=id=>boq.find(b=>b.material_id===id&&(!CART.cat||b.work_category===CART.cat));
   function rowHTML(m){
-    const n=CART.items[m.id]||0, bq=boqOf(m.id), left=bq?bq.budget-bq.used-n:null;
-    return `<div class="li">${m.image_url?`<img class="mthumb" src="${esc(m.image_url)}" alt="" loading="lazy">`:''}<div class="grow"><b style="font-size:14.5px">${esc(m.name)}</b><span class="xs muted">${esc([m.id,m.spec].filter(Boolean).join(' · '))}${bq?` · <span style="color:${left<0?'var(--bad)':'inherit'}">งบเหลือ ${fmtN(left)} ${esc(m.unit)}</span>`:''}</span></div>
+    const n=CART.items[m.id]||0, bq=boqOf(m.id), left=bq?bq.budget-bq.used-n:null, tool=m.item_type==='tool', av=avail[m.id]||0;
+    return `<div class="li">${m.image_url?`<img class="mthumb" src="${esc(m.image_url)}" alt="" loading="lazy">`:''}<div class="grow"><b style="font-size:14.5px">${esc(m.name)}</b><span class="xs muted">${tool?`<span class="tag t-acc" style="height:18px;font-size:10px">อุปกรณ์ · ว่าง ${fmtN(av)}</span> `:''}${esc([m.id,m.spec].filter(Boolean).join(' · '))}${bq?` · <span style="color:${left<0?'var(--bad)':'inherit'}">งบเหลือ ${fmtN(left)} ${esc(m.unit)}</span>`:''}</span></div>
       ${MAT.price[m.id]!==undefined?`<span class="xs muted num" style="margin-right:4px">${baht(MAT.price[m.id])}</span>`:''}
       ${n?`<button class="btn btn-sm" data-d="${m.id}" style="width:36px;padding:0" aria-label="ลด">−</button><button class="linkbtn num" data-q="${m.id}" style="width:44px;text-align:center;font-weight:700;font-size:16px;text-decoration:none">${fmtN(n)}</button>`:''}
-      <button class="btn btn-sm ${n?'btn-p':''}" data-i="${m.id}" style="width:36px;padding:0" aria-label="เพิ่ม">+</button></div>`;
+      <button class="btn btn-sm ${n?'btn-p':''}" data-i="${m.id}" ${tool&&n>=av?'disabled':''} style="width:36px;padding:0" aria-label="เพิ่ม">+</button></div>`;
   }
   function draw(){
     const site=S.sites.find(s=>s.id===CART.site), cnt=Object.keys(CART.items).length;
     const total=Object.entries(CART.items).reduce((a,[id,n])=>a+(MAT.price[id]||0)*n,0);
-    const consum=MAT.items.filter(m=>m.status==='active'&&m.item_type==='consumable');
+    const consum=MAT.items.filter(m=>m.status==='active'&&(m.item_type==='consumable'||m.item_type==='tool')&&(!typ||m.item_type===typ));
     let list=view==='kits'?null:view==='freq'?freq.map(matById).filter(m=>m.name):consum.filter(m=>(!cat||m.category_code===cat)&&(!q||(m.name+m.id+(m.spec||'')).toLowerCase().includes(q)));
     host2.innerHTML=`<div class="g2"><div class="field"><label for="c_site">ไซต์</label><select class="in" id="c_site">${sites.map(s=>`<option value="${s.id}" ${s.id===CART.site?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>
         <div class="field"><label for="c_cat">หมวดงาน (ใช้เทียบงบ BOQ)</label><input class="in" id="c_cat" list="c_cats" value="${esc(CART.cat)}" placeholder="เช่น งานพื้น"><datalist id="c_cats">${cats().map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div></div>
       <div class="seg"><button class="${view==='all'?'on':''}" data-v="all">รายการทั้งหมด</button><button class="${view==='kits'?'on':''}" data-v="kits">ชุดวัสดุ</button><button class="${view==='freq'?'on':''}" data-v="freq">เบิกบ่อย</button></div>
-      ${view==='all'?`<input class="in" id="c_q" placeholder="ค้นหารหัส / ชื่อวัสดุ" value="${esc(q)}"><div class="chips scroll" style="margin:0 -16px"><button class="chip ${!cat?'on':''}" data-c="">ทั้งหมด</button>${MAT.cats.filter(c=>c.code!=='TL').map(c=>`<button class="chip ${cat===c.code?'on':''}" data-c="${c.code}">${esc(c.name)}</button>`).join('')}</div>`:''}
+      ${view==='all'?`<input class="in" id="c_q" placeholder="ค้นหารหัส / ชื่อวัสดุ / อุปกรณ์" value="${esc(q)}"><div class="chips">${[['','ทั้งหมด'],['consumable','วัสดุ'],['tool','อุปกรณ์ (ยืม-คืน)']].map(([k,t])=>`<button class="chip ${typ===k?'on':''}" data-ty="${k}">${t}</button>`).join('')}</div><div class="chips scroll" style="margin:0 -16px"><button class="chip ${!cat?'on':''}" data-c="">ทุกหมวด</button>${MAT.cats.map(c=>`<button class="chip ${cat===c.code?'on':''}" data-c="${c.code}">${esc(c.name)}</button>`).join('')}</div>`:''}
       ${view==='kits'?(MAT.kits.length?MAT.kits.map(k=>`<div class="card col" style="gap:8px"><div class="row"><div class="grow"><b>${esc(k.name)}</b><div class="xs muted">${esc(k.work_category||'')} · ${k.items.length} รายการ</div></div><button class="btn btn-sm btn-p" data-kit="${k.id}">ใส่ตะกร้า</button></div><div class="sm muted">${k.items.map(x=>`${esc(matById(x.material_id).name)} ${fmtN(x.qty)} ${esc(matById(x.material_id).unit)}`).join(' · ')}</div></div>`).join(''):'<div class="card empty"><b>ยังไม่มีชุดวัสดุ</b>แอดมินสร้างได้ที่ จัดการ > ชุดวัสดุ</div>')
         :`<div class="card card-l">${list.length?list.slice(0,150).map(rowHTML).join(''):'<div class="empty"><b>ไม่พบวัสดุ</b></div>'}</div>`}
       ${!canMoney()?`<div class="note n-info">${IC.info}<span>แสดงงบคงเหลือเป็นจำนวน ไม่แสดงราคา</span></div>`:''}
@@ -106,6 +106,7 @@ async function matCart(){
     const cq=$('#c_q'); if(cq) cq.oninput=e=>{ q=e.target.value.trim().toLowerCase(); const pos=cq.selectionStart; draw(); const n=$('#c_q'); n.focus(); n.setSelectionRange(pos,pos); };
     $$('[data-v]',host2).forEach(b=>b.onclick=()=>{ view=b.dataset.v; draw(); });
     $$('[data-c]',host2).forEach(b=>b.onclick=()=>{ cat=b.dataset.c; draw(); });
+    $$('[data-ty]',host2).forEach(b=>b.onclick=()=>{ typ=b.dataset.ty; draw(); });
     $$('[data-i]',host2).forEach(b=>b.onclick=()=>{ CART.items[b.dataset.i]=(CART.items[b.dataset.i]||0)+1; draw(); });
     $$('[data-d]',host2).forEach(b=>b.onclick=()=>{ const v=(CART.items[b.dataset.d]||0)-1; if(v>0) CART.items[b.dataset.d]=v; else delete CART.items[b.dataset.d]; draw(); });
     $$('[data-q]',host2).forEach(b=>b.onclick=async()=>{ const m=matById(b.dataset.q); const v=await promptBox(`จำนวน ${m.name} (${m.unit})`,String(CART.items[m.id]||'')); if(v===null) return; const n=Number(v); if(n>0) CART.items[m.id]=n; else delete CART.items[m.id]; draw(); });
@@ -114,9 +115,10 @@ async function matCart(){
   }
   function review(){
     const ids=Object.keys(CART.items); const site=S.sites.find(s=>s.id===CART.site);
-    const over=ids.filter(id=>{ const bq=boqOf(id); return bq&&bq.budget-bq.used-CART.items[id]<0; });
+    const over=ids.filter(id=>{ const bq=boqOf(id); return bq&&bq.budget-bq.used-CART.items[id]<0; }), hasTool=ids.some(id=>matById(id).item_type==='tool');
     const m=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="ตรวจสอบใบเบิก"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>ตรวจสอบใบเบิก<small>${esc(site?.name||'')} · ${ids.length} รายการ</small></h1></header>
-      <div class="sheet-body"><div class="card card-l">${ids.map(id=>{ const mm=matById(id); return `<div class="li"><div class="grow"><b>${esc(mm.name)}</b><span class="xs muted">${esc(mm.spec||mm.id)}</span></div><b class="num">${fmtN(CART.items[id])}</b><span class="sm muted" style="width:44px">${esc(mm.unit)}</span></div>`; }).join('')}</div>
+      <div class="sheet-body"><div class="card card-l">${ids.map(id=>{ const mm=matById(id); return `<div class="li"><div class="grow"><b>${esc(mm.name)}</b><span class="xs muted">${esc(mm.spec||mm.id)}</span></div>${mm.item_type==='tool'?'<span class="tag t-acc" style="height:20px;font-size:10.5px">อุปกรณ์</span>':''}<b class="num">${fmtN(CART.items[id])}</b><span class="sm muted" style="width:44px">${esc(mm.unit)}</span></div>`; }).join('')}</div>
+        ${hasTool?`<div class="field"><label for="r_due">กำหนดคืนอุปกรณ์ *</label><input class="in" type="date" id="r_due" min="${localISO()}" value="${addDays(localISO(),4)}"><span class="hint">มีอุปกรณ์ ${ids.filter(id=>matById(id).item_type==='tool').length} รายการ ต้องคืนภายในวันที่กำหนด (ขอขยายเวลาได้)</span></div>`:''}
         ${over.length?`<div class="note n-warn">${IC.info}<span>เกินงบ BOQ: ${over.map(id=>esc(matById(id).name)).join(', ')} ผู้อนุมัติจะเห็นแจ้งเตือน</span></div>`:''}
         <div class="g2"><div class="field"><label for="r_date">ต้องการใช้วันที่</label><input class="in" type="date" id="r_date" min="${localISO()}" value="${localISO()}"></div><div class="field"><label for="r_time">เวลา / หมายเหตุสั้น</label><input class="in" id="r_time" placeholder="เช่น ก่อน 13:00 น."></div></div>
         <div class="field"><label for="r_note">หมายเหตุถึงผู้อนุมัติ</label><textarea class="in" id="r_note" rows="2"></textarea></div></div>
@@ -124,7 +126,9 @@ async function matCart(){
     $('[data-x]',m.el).onclick=m.close; $('[data-x2]',m.el).onclick=m.close;
     $('[data-go]',m.el).onclick=async ev=>{
       busy(ev.target,true,'กำลังส่ง...');
-      const {data,error}=await sb.rpc('create_req',{p_site:CART.site,p_cat:CART.cat,p_need:$('#r_date',m.el).value||null,p_need_note:$('#r_time',m.el).value.trim(),p_note:$('#r_note',m.el).value.trim(),p_lines:ids.map(id=>({material_id:id,qty:CART.items[id]}))});
+      if(hasTool&&!$('#r_due',m.el).value){ busy(ev.target,false); return toast('ระบุกำหนดคืนอุปกรณ์',true); }
+      const {data,error}=await sb.rpc('create_req2',{p_site:CART.site,p_cat:CART.cat,p_need:$('#r_date',m.el).value||null,p_need_note:$('#r_time',m.el).value.trim(),p_note:$('#r_note',m.el).value.trim(),p_due:hasTool?$('#r_due',m.el).value:null,p_lines:ids.map(id=>({material_id:id,qty:CART.items[id]}))});
+      if(error&&/create_req2/.test(error.message)){ busy(ev.target,false); return toast('ยังไม่ได้รันไฟล์ 14_unify_req.sql',true); }
       if(error){ busy(ev.target,false); return toast(errText(error),true); }
       m.close(); CART.items={}; toast(`ส่งขอเบิกแล้ว ${data.doc_no}`);
       location.hash='#mat/d/'+data.id; setTimeout(()=>shareDocImage(data.id),400);
@@ -142,23 +146,25 @@ async function matDoc(id){
   if(d.error||!d.data){ $('#db2').outerHTML=`<div class="card empty"><b>ไม่พบเอกสาร หรือไม่มีสิทธิ์ดู</b></div>`; return; }
   const doc=d.data, lines=l.data||[], dlv=v.data||[], st=DOC_ST[doc.status]||[doc.status,''];
   const site=S.sites.find(s=>s.id===doc.site_id), req=['REQ','BRW'].includes(doc.doc_type), brw=doc.doc_type==='BRW', rets=rt.error?[]:(rt.data||[]);
+  const isTool=x=>matById(x.material_id).item_type==='tool', toolDoc=brw||lines.some(isTool);
+  const returnable=lines.some(x=>isTool(x)?x.qty_received-x.qty_returned-x.qty_damaged-x.qty_lost>0:(doc.doc_type==='REQ'&&x.qty_received-(x.qty_back||0)>0));
   const canApprove=brw?isBrwApprover():isMatRole(['approver','admin']), canIssue=brw?(isBrwApprover()||isMatRole(['store','admin'])):isMatRole(['store','admin']);
   const mine=doc.requester===S.profile.id, siteUser=mine||isManager()||(S.mySites||[]).includes(doc.site_id);
   const acts=[];
   if(req&&doc.status==='pending'&&(mine||isManager())) acts.push(`<button class="btn btn-bad" data-act="cancel">ยกเลิก${brw?'ใบยืม':'ใบเบิก'}</button>`);
   if(req&&doc.status==='pending'&&canApprove) acts.push('<button class="btn btn-bad" data-act="reject">ไม่อนุมัติ</button>','<button class="btn btn-p" data-act="approve">อนุมัติ</button>');
   if(req&&['approved','partial'].includes(doc.status)&&canIssue) acts.push(`<button class="btn btn-p" data-act="issue">${brw?'ส่งอุปกรณ์':'จ่ายของ'}</button>`);
-  if(brw&&brwOut(doc)&&(siteUser||canIssue)) acts.push('<button class="btn btn-p" data-act="return">คืนอุปกรณ์</button>');
-  if(brw&&['approved','partial','issued','received'].includes(doc.status)&&siteUser&&!doc.ext_due) acts.push('<button class="btn" data-act="ext">ขอขยายเวลา</button>');
-  if(brw&&doc.ext_due&&canApprove) acts.push('<button class="btn" data-act="extno">ไม่ขยาย</button>','<button class="btn btn-p" data-act="extok">อนุมัติขยายเวลา</button>');
+  if(req&&['partial','issued','received','review','returned'].includes(doc.status)&&returnable&&(siteUser||canIssue)) acts.push('<button class="btn btn-p" data-act="return">คืน วัสดุ/อุปกรณ์</button>');
+  if(toolDoc&&doc.due_date&&['approved','partial','issued','received'].includes(doc.status)&&siteUser&&!doc.ext_due) acts.push('<button class="btn" data-act="ext">ขอขยายเวลา</button>');
+  if(doc.ext_due&&canApprove) acts.push('<button class="btn" data-act="extno">ไม่ขยาย</button>','<button class="btn btn-p" data-act="extok">อนุมัติขยายเวลา</button>');
   const kv=(a,b)=>`<div class="kv"><span>${a}</span><span>${b||'-'}</span></div>`;
   $('#db2').outerHTML=`<div class="col" style="gap:12px;max-width:820px">
     <div class="card col" style="gap:4px"><div class="row"><b class="grow" style="font-size:17px">${esc(doc.doc_no)}</b><span class="tag ${st[1]}">${st[0]}</span></div><span class="sm muted">${DOC_T[doc.doc_type]} · ${dayLong(localISO(new Date(doc.created_at)))}</span></div>
-    <div class="card card-l">${kv('ไซต์ / คลัง',esc(site?.name||locName(doc.to_loc)))}${req&&!brw?kv('หมวดงาน',esc(doc.work_category)):''}${doc.from_loc&&!req?kv('จาก',esc(locName(doc.from_loc))):''}${kv(brw?'ผู้ขอยืม':req?'ผู้ขอเบิก':'ผู้บันทึก',esc(doc.requester_name))}
+    <div class="card card-l">${kv('ไซต์ / คลัง',esc(site?.name||locName(doc.to_loc)))}${req&&!brw?kv('หมวดงาน',esc(doc.work_category)):''}${!brw&&doc.due_date?kv('กำหนดคืนอุปกรณ์',`<b style="color:${doc.due_date<localISO()&&brwOut(doc)?'var(--bad)':'inherit'}">${thaiDate(doc.due_date)}</b>${doc.ext_due?` <span style="color:var(--warn)">(ขอขยายถึง ${thaiDate(doc.ext_due)})</span>`:''}`):''}${doc.from_loc&&!req?kv('จาก',esc(locName(doc.from_loc))):''}${kv(brw?'ผู้ขอยืม':req?'ผู้ขอเบิก':'ผู้บันทึก',esc(doc.requester_name))}
       ${brw?kv('ระยะเวลายืม',`${thaiDate(doc.need_date)} – <b style="color:${doc.due_date<localISO()&&brwOut(doc)?'var(--bad)':'inherit'}">${thaiDate(doc.due_date)}</b>`)+kv('ใช้สำหรับ',esc(doc.need_note))+(doc.ext_due?kv('ขอขยายถึง',`<span style="color:var(--warn)">${thaiDate(doc.ext_due)} · ${esc(doc.ext_reason||'')}</span>`):''):req?kv('ต้องการใช้',doc.need_date?`${thaiDate(doc.need_date)} ${esc(doc.need_note||'')}`:esc(doc.need_note)):''}${doc.supplier?kv('ผู้ขาย',esc(doc.supplier)):''}${doc.approver_name&&req?kv('ผู้อนุมัติ',`${esc(doc.approver_name)} · ${new Date(doc.approved_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}`):''}
       ${val.data!=null?kv('มูลค่า',`<b class="num">${baht(val.data)}</b>`):''}${doc.reject_reason?kv('เหตุผลไม่อนุมัติ',`<span style="color:var(--bad)">${esc(doc.reject_reason)}</span>`):''}${doc.note?kv('หมายเหตุ',esc(doc.note).replace(/\n/g,'<br>')):''}</div>
-    <div class="card" style="padding:0;overflow-x:auto"><table class="tbl"><thead><tr><th>รายการ</th><th class="num">ขอ</th>${req?`<th class="num">อนุมัติ</th><th class="num">${brw?'ส่งแล้ว':'จ่ายแล้ว'}</th><th class="num">รับแล้ว</th>${brw?'<th class="num">คืนแล้ว</th>':''}`:''}</tr></thead><tbody>
-      ${lines.map(x=>{ const m=matById(x.material_id); return `<tr><td><b>${esc(m.name)}</b><div class="xs muted">${esc(m.id)} · ${esc(m.unit)}</div></td><td class="num">${fmtN(x.qty_req)}</td>${req?`<td class="num">${x.qty_approved==null?'-':fmtN(x.qty_approved)}</td><td class="num">${fmtN(x.qty_issued)}</td><td class="num">${fmtN(x.qty_received)}</td>${brw?`<td class="num">${fmtN(x.qty_returned+x.qty_damaged+x.qty_lost)}${x.qty_damaged||x.qty_lost?`<div class="xs" style="color:var(--bad)">ชำรุด ${fmtN(x.qty_damaged)} หาย ${fmtN(x.qty_lost)}</div>`:''}</td>`:''}`:''}</tr>`; }).join('')}</tbody></table></div>
+    <div class="card" style="padding:0;overflow-x:auto"><table class="tbl"><thead><tr><th>รายการ</th><th class="num">ขอ</th>${req?`<th class="num">อนุมัติ</th><th class="num">${brw?'ส่งแล้ว':'จ่ายแล้ว'}</th><th class="num">รับแล้ว</th>${toolDoc||lines.some(x=>+x.qty_back)?'<th class="num">คืนแล้ว</th>':''}`:''}</tr></thead><tbody>
+      ${lines.map(x=>{ const m=matById(x.material_id); return `<tr><td><b>${esc(m.name)}</b><div class="xs muted">${esc(m.id)} · ${esc(m.unit)}${m.item_type==='tool'?' · <span style="color:var(--accent-ink,#B88700)">อุปกรณ์</span>':''}</div></td><td class="num">${fmtN(x.qty_req)}</td>${req?`<td class="num">${x.qty_approved==null?'-':fmtN(x.qty_approved)}</td><td class="num">${fmtN(x.qty_issued)}</td><td class="num">${fmtN(x.qty_received)}</td>${toolDoc||lines.some(y=>+y.qty_back)?`<td class="num">${fmtN(x.qty_returned+x.qty_damaged+x.qty_lost+(+x.qty_back||0))}${x.qty_damaged||x.qty_lost?`<div class="xs" style="color:var(--bad)">ชำรุด ${fmtN(x.qty_damaged)} หาย ${fmtN(x.qty_lost)}</div>`:''}</td>`:''}`:''}</tr>`; }).join('')}</tbody></table></div>
     ${dlv.map(x=>`<div class="card col" style="gap:8px"><div class="row"><b class="grow">จ่ายรอบที่ ${x.round}</b><span class="tag ${x.status==='review'?'t-bad':x.status==='sent'?'t-acc':'t-ok'}">${{sent:'รอไซต์รับ',received:'รับครบ',review:'รับไม่ตรง รอตรวจ',closed:'ปิดแล้ว'}[x.status]}</span></div>
       <span class="sm muted">จ่ายโดย ${esc(x.issued_name||'')} · ${new Date(x.issued_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}${x.received_name?` · รับโดย ${esc(x.received_name)} · ${new Date(x.received_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}`:''}</span>
       <div class="sm">${x.lines.map(y=>{ const got=(x.received_lines||[]).find(z=>z.line_id===y.line_id); return `${esc(matById(y.material_id).name)} ${fmtN(y.qty)}${got&&+got.qty!==+y.qty?` <span style="color:var(--bad)">(รับ ${fmtN(got.qty)})</span>`:''}`; }).join(' · ')}</div>
@@ -297,16 +303,16 @@ async function shareDocImage(id){
   try{
     await Promise.all([loadScript(LIB.h2c),loadScript(LIB.qr),loadMat()]);
     const [d,l]=await Promise.all([ sb.from('docs').select('*').eq('id',id).single(), sb.from('doc_lines').select('*').eq('doc_id',id).order('id') ]);
-    const doc=d.data, lines=l.data||[], site=S.sites.find(s=>s.id===doc.site_id), brw=doc.doc_type==='BRW';
+    const doc=d.data, lines=l.data||[], site=S.sites.find(s=>s.id===doc.site_id), brw=doc.doc_type==='BRW', mixed=!brw&&!!doc.due_date;
     const qr=qrcode(0,'M'); qr.addData(`${location.origin}${location.pathname}#mat/d/${id}`); qr.make();
     const stepI=(brw?{pending:1,approved:2,partial:2,issued:2,received:3,review:3,returned:4}:{pending:1,approved:2,partial:2,issued:3,received:4,review:3})[doc.status]??1;
     const steps=(brw?['ขอยืม','อนุมัติ','รับของ','คืนแล้ว']:['ขอ','อนุมัติ','จ่ายของ','รับของ']).map((t,i)=>`<div class="ds-st ${i<stepI?'done':i===stepI?'now':''}"><span>${i<stepI?'✓':i+1}</span><em>${t}</em></div>`).join('<div class="ds-ln"></div>');
     const shown=lines.slice(0,12);
     const B=BR(), logoUrl=B.logo||(S.settings.company_logo?.drive_id?`https://drive.google.com/thumbnail?id=${S.settings.company_logo.drive_id}&sz=w200`:'');
     const el=document.createElement('div'); el.className='docslip';
-    el.innerHTML=`<div class="ds-head"><div class="ds-logo">${logoUrl?`<img src="${logoUrl}" crossorigin="anonymous" alt="">`:esc(B.mark)}</div><div class="ds-co"><b>${esc(B.company_th)}</b><span>${esc(B.company_en)}</span></div><div class="ds-ti"><b>${brw?'ใบขอยืมอุปกรณ์':'ใบขอเบิกวัสดุ'}</b><span>${brw?'EQUIPMENT BORROW SLIP':'MATERIAL REQUISITION'}</span></div></div><div class="ds-rule"></div>
+    el.innerHTML=`<div class="ds-head"><div class="ds-logo">${logoUrl?`<img src="${logoUrl}" crossorigin="anonymous" alt="">`:esc(B.mark)}</div><div class="ds-co"><b>${esc(B.company_th)}</b><span>${esc(B.company_en)}</span></div><div class="ds-ti"><b>${brw?'ใบขอยืมอุปกรณ์':mixed?'ใบเบิก วัสดุ/อุปกรณ์':'ใบขอเบิกวัสดุ'}</b><span>${brw?'EQUIPMENT BORROW SLIP':mixed?'MATERIAL & EQUIPMENT REQUISITION':'MATERIAL REQUISITION'}</span></div></div><div class="ds-rule"></div>
       <div class="ds-no"><span>เลขที่ <b>${esc(doc.doc_no)}</b></span><span>${thaiDate(localISO(new Date(doc.created_at)))} · ${new Date(doc.created_at).toTimeString().slice(0,5)} น.</span></div>
-      <div class="ds-info"><div>${(brw?[['โครงการ',(site?.code?site.code+' ':'')+(site?.name||'')],['ผู้ขอยืม',doc.requester_name],['ระยะเวลายืม',`${thaiDate(doc.need_date)} – ${thaiDate(doc.due_date)}`],['ใช้สำหรับ',doc.need_note||'-']]:[['โครงการ',(site?.code?site.code+' ':'')+(site?.name||'')],['หมวดงาน',doc.work_category||'-'],['ผู้ขอเบิก',doc.requester_name],['ต้องการใช้',doc.need_date?thaiDate(doc.need_date)+' '+(doc.need_note||''):(doc.need_note||'-')]]).map(([a,b])=>`<p><span>${a}</span><b>${esc(b||'-')}</b></p>`).join('')}</div><div class="ds-qr">${qr.createSvgTag({cellSize:3,margin:0,scalable:true})}<small>สแกนเปิดใน ${esc(B.app)}</small></div></div>
+      <div class="ds-info"><div>${(brw?[['โครงการ',(site?.code?site.code+' ':'')+(site?.name||'')],['ผู้ขอยืม',doc.requester_name],['ระยะเวลายืม',`${thaiDate(doc.need_date)} – ${thaiDate(doc.due_date)}`],['ใช้สำหรับ',doc.need_note||'-']]:[['โครงการ',(site?.code?site.code+' ':'')+(site?.name||'')],['หมวดงาน',doc.work_category||'-'],['ผู้ขอเบิก',doc.requester_name],['ต้องการใช้',doc.need_date?thaiDate(doc.need_date)+' '+(doc.need_note||''):(doc.need_note||'-')],...(mixed?[['กำหนดคืน',thaiDate(doc.due_date)+' (อุปกรณ์)']]:[])]).map(([a,b])=>`<p><span>${a}</span><b>${esc(b||'-')}</b></p>`).join('')}</div><div class="ds-qr">${qr.createSvgTag({cellSize:3,margin:0,scalable:true})}<small>สแกนเปิดใน ${esc(B.app)}</small></div></div>
       <table><tr><th>ที่</th><th>รายการ</th><th class="r">จำนวน</th><th>หน่วย</th></tr>${shown.map((x,i)=>{ const m=matById(x.material_id); return `<tr><td>${i+1}</td><td><b>${esc(m.name)}</b>${m.spec?`<i>${esc(m.spec)}</i>`:''}</td><td class="r"><b>${fmtN(x.qty_approved??x.qty_req)}</b></td><td>${esc(m.unit)}</td></tr>`; }).join('')}</table>
       <div class="ds-sum">รวม ${lines.length} รายการ${lines.length>shown.length?` (แสดง ${shown.length} รายการแรก)`:''}</div>
       ${brw?'<div class="ds-note">ผู้ยืมรับผิดชอบดูแลอุปกรณ์จนกว่าจะคืน หากชำรุดหรือสูญหายต้องแจ้งทันที</div>':''}${doc.note?`<div class="ds-note">${esc(doc.note)}</div>`:''}

@@ -106,18 +106,45 @@ async function brwWhere(){
   $$('[data-wv]').forEach(b=>b.onclick=()=>{ whereView=b.dataset.wv; brwWhere(); });
 }
 
-/* ---------------- คืนอุปกรณ์ ---------------- */
+/* ---------------- คืน วัสดุ/อุปกรณ์ ---------------- */
+async function pageRet(){
+  setPage(head('คืน วัสดุ/อุปกรณ์','อุปกรณ์ที่ยืมอยู่ และวัสดุเหลือใช้ที่จะคืนคลัง',{back:'#mat'})+'<div id="rtb"><div class="loading"><div class="spin"></div></div></div>');
+  if(!await loadMat()) { $('#rtb').outerHTML=needMat(); return; }
+  const ids=S.site?[+S.site]:mySiteIds(), all=isManager()||isMatRole(['store','admin']);
+  let q=sb.from('docs').select('*, doc_lines(*)').in('doc_type',['REQ','BRW']).in('status',['partial','issued','received','review','returned']).order('updated_at',{ascending:false}).limit(80);
+  if(!all) q=q.in('site_id',ids.length?ids:[0]); else if(S.site) q=q.eq('site_id',+S.site);
+  const {data,error}=await q;
+  if(error){ $('#rtb').outerHTML=`<div class="note n-bad">${esc(errText(error))}</div>`; return; }
+  const today=localISO();
+  const rows=(data||[]).map(d=>{ const L=d.doc_lines||[]; const tools=L.filter(x=>matById(x.material_id).item_type==='tool').map(x=>({...x,out:x.qty_received-x.qty_returned-x.qty_damaged-x.qty_lost})).filter(x=>x.out>0);
+    const mats=d.doc_type==='REQ'?L.filter(x=>matById(x.material_id).item_type!=='tool').map(x=>({...x,out:x.qty_received-(x.qty_back||0)})).filter(x=>x.out>0):[];
+    return {d,tools,mats}; }).filter(r=>r.tools.length||r.mats.length);
+  const withTools=rows.filter(r=>r.tools.length), onlyMats=rows.filter(r=>!r.tools.length);
+  const card=r=>{ const d=r.d, over=d.due_date&&d.due_date<today&&r.tools.length;
+    return `<button class="li" data-rd="${d.id}" style="align-items:flex-start;text-align:left"><div class="grow"><b style="font-size:14.5px">${esc(d.doc_no)}</b><span class="xs muted">${esc(S.sites.find(s=>s.id===d.site_id)?.name||'')} · ${esc(d.requester_name||'')}</span>
+      ${r.tools.length?`<span class="sm" style="display:block;margin-top:4px">${r.tools.map(x=>`${esc(matById(x.material_id).name)} ${fmtN(x.out)}`).join(' · ')}</span>`:''}${r.mats.length?`<span class="xs muted" style="display:block">วัสดุที่รับไป: ${r.mats.slice(0,4).map(x=>`${esc(matById(x.material_id).name)} ${fmtN(x.out)}`).join(' · ')}${r.mats.length>4?' …':''}</span>`:''}</div>
+      ${r.tools.length&&d.due_date?`<span class="tag ${over?'t-bad':d.due_date===today?'t-warn':'t-acc'}">${over?'เกินกำหนด':'คืน '+thaiDate(d.due_date)}</span>`:''}${IC.chev}</button>`; };
+  $('#rtb').outerHTML=`<div class="col" style="gap:12px;max-width:820px">
+    <h3 class="h2">อุปกรณ์ที่ต้องคืน (${withTools.length})</h3>${withTools.length?`<div class="card card-l">${withTools.map(card).join('')}</div>`:'<div class="card empty"><b>ไม่มีอุปกรณ์ค้างคืน</b></div>'}
+    <h3 class="h2">คืนวัสดุเหลือใช้เข้าคลัง</h3>${onlyMats.length?`<div class="card card-l">${onlyMats.slice(0,30).map(card).join('')}</div>`:'<div class="card empty"><b>ไม่มีรายการ</b></div>'}
+    <span class="xs muted">แตะใบเบิกเพื่อคืน · อุปกรณ์ระบุสภาพ ปกติ / ชำรุด / สูญหาย · วัสดุคืนได้เฉพาะของเหลือใช้ ไม่เกินที่รับไป</span></div>`;
+  $$('[data-rd]').forEach(x=>x.onclick=()=>{ const r=rows.find(y=>y.d.id==x.dataset.rd); returnSheet(r.d,r.d.doc_lines,()=>pageRet()); });
+}
 function returnSheet(doc, lines, done){
-  const out=lines.map(x=>({...x, out:x.qty_received-x.qty_returned-x.qty_damaged-x.qty_lost})).filter(x=>x.out>0);
+  const isTool=x=>matById(x.material_id).item_type==='tool';
+  const tools=lines.filter(isTool).map(x=>({...x,out:x.qty_received-x.qty_returned-x.qty_damaged-x.qty_lost})).filter(x=>x.out>0);
+  const mats=doc.doc_type==='REQ'?lines.filter(x=>!isTool(x)).map(x=>({...x,out:x.qty_received-(x.qty_back||0)})).filter(x=>x.out>0):[];
   const photos=[];
-  const m=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="คืนอุปกรณ์"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>คืนอุปกรณ์<small>${esc(doc.doc_no)}</small></h1></header>
-    <div class="sheet-body">${out.map(x=>{ const mm=matById(x.material_id); return `<div class="card col" style="gap:10px"><div class="row"><div class="grow"><b>${esc(mm.name)}</b><div class="xs muted">ยืมอยู่ ${fmtN(x.out)} ${esc(mm.unit)}</div></div></div>
-      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"><div class="field"><label>คืนปกติ</label><input class="in num" type="number" min="0" step="any" value="${x.out}" data-ok="${x.id}"></div><div class="field"><label style="color:var(--warn)">ชำรุด</label><input class="in num" type="number" min="0" step="any" value="0" data-dm="${x.id}"></div><div class="field"><label style="color:var(--bad)">สูญหาย</label><input class="in num" type="number" min="0" step="any" value="0" data-ls="${x.id}"></div></div></div>`; }).join('')||'<div class="card empty"><b>ไม่มีอุปกรณ์ค้างคืน</b></div>'}
-      <span class="hint">คืนบางส่วนได้ ชิ้นที่ชำรุดจะย้ายไปคลัง "ส่งซ่อม"</span>
+  const m=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="คืน วัสดุ/อุปกรณ์"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>คืน วัสดุ/อุปกรณ์<small>${esc(doc.doc_no)}</small></h1></header>
+    <div class="sheet-body">${tools.length?`<div class="sec">อุปกรณ์ (ระบุสภาพ)</div>`:''}${tools.map(x=>{ const mm=matById(x.material_id); return `<div class="card col" style="gap:10px"><div class="row"><div class="grow"><b>${esc(mm.name)}</b><div class="xs muted">ยืมอยู่ ${fmtN(x.out)} ${esc(mm.unit)}</div></div></div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"><div class="field"><label>คืนปกติ</label><input class="in num" type="number" min="0" step="any" value="${x.out}" data-ok="${x.id}"></div><div class="field"><label style="color:var(--warn)">ชำรุด</label><input class="in num" type="number" min="0" step="any" value="0" data-dm="${x.id}"></div><div class="field"><label style="color:var(--bad)">สูญหาย</label><input class="in num" type="number" min="0" step="any" value="0" data-ls="${x.id}"></div></div></div>`; }).join('')}
+      ${mats.length?`<div class="sec">วัสดุเหลือใช้ คืนเข้าคลังกลาง</div><div class="card card-l">${mats.map(x=>{ const mm=matById(x.material_id); return `<div class="li"><div class="grow"><b>${esc(mm.name)}</b><span class="xs muted">รับไป ${fmtN(x.out)} ${esc(mm.unit)}</span></div><input class="in num" type="number" min="0" max="${x.out}" step="any" value="0" data-ok="${x.id}" style="width:96px;text-align:right" aria-label="จำนวนคืน"><span class="sm muted" style="width:40px">${esc(mm.unit)}</span></div>`; }).join('')}</div>`:''}
+      ${!tools.length&&!mats.length?'<div class="card empty"><b>ไม่มีรายการให้คืน</b></div>':''}
+      <span class="hint">คืนบางส่วนได้ · อุปกรณ์ชำรุดย้ายไปคลัง "ส่งซ่อม" · ใส่ 0 สำหรับรายการที่ไม่คืน</span>
       <div class="field"><label for="rt_note">หมายเหตุ (ถ้าชำรุด/สูญหายต้องระบุ)</label><input class="in" id="rt_note"></div>
       <div class="field"><label>รูปถ่าย</label><div class="pgrid" id="rtph"></div></div>
       <div class="field"><label>ลายเซ็นผู้คืน *</label><div id="rtsig"></div><span class="hint">${esc(S.profile.display_name)} · ${new Date().toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'})}</span></div></div>
-    <div class="sheet-foot"><button class="btn" data-x2>ยกเลิก</button><button class="btn btn-p" data-go ${out.length?'':'disabled'}>ยืนยันคืน</button></div></div>`, false, false);
+    <div class="sheet-foot"><button class="btn" data-x2>ยกเลิก</button><button class="btn btn-p" data-go ${tools.length||mats.length?'':'disabled'}>ยืนยันคืน</button></div></div>`, false, false);
   const pad=signaturePad($('#rtsig',m.el));
   const drawPh=()=>{ $('#rtph',m.el).innerHTML=photos.map((p,i)=>`<div class="pthumb"><img src="${p.url}" alt=""><button type="button" data-dp="${i}" aria-label="ลบรูป">×</button></div>`).join('')+(photos.length<6&&hasBridge()?`<label class="pthumb padd">${IC.camera}<span class="xs">เพิ่มรูป</span><input type="file" accept="image/*" multiple hidden data-ph></label>`:'');
     $$('[data-dp]',m.el).forEach(b=>b.onclick=()=>{ photos.splice(+b.dataset.dp,1); drawPh(); });
@@ -125,15 +152,19 @@ function returnSheet(doc, lines, done){
   drawPh();
   $('[data-x]',m.el).onclick=m.close; $('[data-x2]',m.el).onclick=m.close;
   $('[data-go]',m.el).onclick=async ev=>{
-    const rows=out.map(x=>({line_id:x.id, ok:Number($(`[data-ok="${x.id}"]`,m.el).value)||0, damaged:Number($(`[data-dm="${x.id}"]`,m.el).value)||0, lost:Number($(`[data-ls="${x.id}"]`,m.el).value)||0}));
-    const bad=rows.find((r,i)=>r.ok+r.damaged+r.lost>out[i].out); if(bad) return toast('จำนวนคืนเกินที่ยืมอยู่',true);
+    const all=[...tools,...mats];
+    const rows=all.map(x=>({line_id:x.id, ok:Number($(`[data-ok="${x.id}"]`,m.el)?.value)||0, damaged:Number($(`[data-dm="${x.id}"]`,m.el)?.value)||0, lost:Number($(`[data-ls="${x.id}"]`,m.el)?.value)||0})).filter(r=>r.ok+r.damaged+r.lost>0);
+    if(!rows.length) return toast('ระบุจำนวนที่คืนอย่างน้อย 1 รายการ',true);
+    const bad=rows.find(r=>{ const x=all.find(y=>y.id===r.line_id); return r.ok+r.damaged+r.lost>x.out; }); if(bad) return toast('จำนวนคืนเกินที่รับไป',true);
     const note=$('#rt_note',m.el).value.trim(); if(rows.some(r=>r.damaged+r.lost>0)&&!note) return toast('ระบุหมายเหตุของที่ชำรุด/สูญหาย',true);
     if(pad.empty()) return toast('ลงลายเซ็นผู้คืนก่อน',true);
     busy(ev.target,true,'กำลังบันทึก...');
     try{
       const up=[]; for(const p of photos){ const r=await bridge('upload_photo',{site_id:doc.site_id,date:localISO(),name:`${doc.doc_no}_RTN_${up.length+1}.jpg`,data:await blobToB64(p.blob)}); up.push({id:r.id,url:r.url,thumb:r.thumb}); }
-      const {data,error}=await sb.rpc('return_brw',{p_doc:doc.id,p_lines:rows,p_signature:pad.data(),p_photos:up,p_note:note||null}); if(error) throw error;
-      m.close(); toast(data==='returned'?'คืนครบแล้ว ปิดใบยืม':'บันทึกการคืนบางส่วนแล้ว'); done();
+      let res=await sb.rpc('return_items',{p_doc:doc.id,p_lines:rows,p_signature:pad.data(),p_photos:up,p_note:note||null});
+      if(res.error&&/return_items/.test(res.error.message)) res=await sb.rpc('return_brw',{p_doc:doc.id,p_lines:rows,p_signature:pad.data(),p_photos:up,p_note:note||null});
+      if(res.error) throw res.error;
+      m.close(); toast(res.data==='returned'?'คืนอุปกรณ์ครบแล้ว ปิดรายการยืม':'บันทึกการคืนแล้ว'); done();
     }catch(e){ busy(ev.target,false); toast(errText(e),true); }
   };
 }
