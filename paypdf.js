@@ -49,7 +49,8 @@ async function summaryDoc(p, slips, cfg, cols){
   if(!widths.includes('*')) widths[widths.indexOf('auto')>=0?widths.indexOf('auto'):1]='*';
   const head=keys.map(k=>({text:title(k),bold:true,color:C_DARK,fillColor:C_BAND,alignment:isNum(k)?'right':'left'}));
   const rows=slips.map((s,i)=>keys.map(k=>k==='#'?{text:String(i+1),color:C_LAB}:k==='_sign'?{text:' '}:{text:String(PCOLS[k].f(s.data)),alignment:isNum(k)?'right':'left',bold:k==='net'}));
-  const tot=keys.map(k=>({text:k==='name'?'รวมทั้งสิ้น':(k!=='#'&&k!=='_sign'&&PCOLS[k].m?num(slips.reduce((a,s)=>a+(+String(PCOLS[k].f(s.data)).replace(/,/g,'')||0),0)):''),bold:true,alignment:k==='name'?'left':'right',fillColor:C_BAND}));
+  const LK=keys.find(k=>k!=='#'&&k!=='_sign'&&!PCOLS[k].n)||'#';
+  const tot=keys.map(k=>({text:k===LK?'รวมทั้งสิ้น':(k!=='#'&&k!=='_sign'&&PCOLS[k].m?num(slips.reduce((a,s)=>a+(+String(PCOLS[k].f(s.data)).replace(/,/g,'')||0),0)):''),bold:true,alignment:k===LK?'left':'right',fillColor:C_BAND}));
   const qr=`${location.origin}${location.pathname}#pay/p/${p.id}`;
   return { pageSize:'A4', pageOrientation:'landscape', pageMargins:[m.l*PT,m.t*PT,m.r*PT,m.b*PT+12],
     defaultStyle:{font:'Sarabun',fontSize:fs,color:'#1B262C',lineHeight:1.15},
