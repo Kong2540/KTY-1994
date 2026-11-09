@@ -338,6 +338,18 @@ async function shareDocImage(id){
 }
 
 /* ---------------- จัดการ: ทะเบียนวัสดุ / BOQ / ชุดวัสดุ / ใครเห็นเงิน ---------------- */
+/* ---------- Google Sheet สองทาง ---------- */
+async function sheetPush(what){ if(!hasBridge()) return; try{ const r=await bridge('sync_push',{what}); S.settings.sheet_sync={...(S.settings.sheet_sync||{}),url:r.url,last_push:new Date().toISOString()}; toast(r.created?'สร้าง Google Sheet ใหม่และส่งข้อมูลแล้ว':'อัปเดต Google Sheet แล้ว'); }catch(e){ if(!/sync_push|ไม่รู้จักคำสั่ง/.test(e.message||'')) toast('อัปเดต Google Sheet ไม่สำเร็จ: '+errText(e),true); } }
+function sheetBar(what, onPulled){
+  const ss=S.settings.sheet_sync||{}, admin=isAdmin();
+  const el=document.createElement('div'); el.className='card row'; el.style.cssText='gap:10px;flex-wrap:wrap;padding:12px 14px';
+  el.innerHTML=`<span style="font-size:20px">📗</span><div class="grow"><b class="sm">Google Sheet (เชื่อมสองทาง)</b><div class="xs muted">${ss.url?`ซิงก์ล่าสุด ${new Date(ss.last_pull&&ss.last_pull>ss.last_push?ss.last_pull:ss.last_push||Date.now()).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})} · แก้ในชีตแล้วแอปอัปเดตเอง`:'ยังไม่ได้สร้างชีต'}</div></div>
+    ${ss.url?`<a class="btn btn-sm" href="${esc(ss.url)}" target="_blank" rel="noopener">เปิดชีต</a><button class="btn btn-sm" data-pull>ดึงจากชีตตอนนี้</button>`:''}<button class="btn btn-sm ${ss.url?'':'btn-p'}" data-push>${ss.url?'ส่งไปชีต':'สร้างชีตและเชื่อม'}</button>${admin&&ss.url?'<button class="btn btn-sm" data-new>สร้างชีตใหม่</button>':''}`;
+  const pull=$('[data-pull]',el); if(pull) pull.onclick=async ev=>{ busy(ev.target,true,'กำลังดึง...'); try{ const r=await bridge('sync_pull'); toast(`ดึงจากชีตแล้ว: วัสดุ ${r.materials} · BOQ ${r.boq}${r.boq_deleted?` · ลบงบ ${r.boq_deleted}`:''}`); onPulled&&onPulled(); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
+  $('[data-push]',el).onclick=async ev=>{ if(!hasBridge()) return toast('ต้องติดตั้ง Bridge ก่อน',true); busy(ev.target,true,'กำลังส่ง...'); await sheetPush('all'); onPulled&&onPulled(); };
+  const nw=$('[data-new]',el); if(nw) nw.onclick=async ev=>{ if(!await confirmBox('สร้าง Google Sheet ไฟล์ใหม่จากข้อมูลในแอป? (ใช้เมื่อไฟล์เดิมหายหรือเสีย ไฟล์เดิมจะไม่เชื่อมอีก)','สร้างใหม่')) return; busy(ev.target,true); try{ const r=await bridge('sync_new'); S.settings.sheet_sync={...(S.settings.sheet_sync||{}),url:r.url}; toast('สร้างชีตใหม่แล้ว'); onPulled&&onPulled(); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
+  return el;
+}
 let GRID={q:'',cat:'',type:''};
 async function mgMat(){
   const host=$('#mg'); host.innerHTML='<div class="loading"><div class="spin"></div></div>';
@@ -372,6 +384,7 @@ async function mgMat(){
       <div class="gwrap"><table class="grid"><thead><tr><th class="gno">#</th>${COLS.map(c=>`<th style="min-width:${c.w}px;width:${c.w}px" class="${c.type==='num'||c.type==='ro'?'num':''}">${esc(c.t)}${c.req?' *':''}</th>`).join('')}</tr></thead>
       <tbody>${list.map((r,ri)=>`<tr class="${r._new?'gnew':''} ${val(r,'status')==='inactive'?'goff':''}"><td class="gno">${r._new?'ใหม่':ri+1}</td>${COLS.map((c,ci)=>cell(r,c,ri,ci)).join('')}</tr>`).join('')||`<tr><td colspan="${COLS.length+1}"><div class="empty"><b>ยังไม่มีรายการ</b>${admin?'กด "+ เพิ่มแถว" หรือ "วางจาก Google Sheet"':''}</div></td></tr>`}</tbody></table></div>
       <span class="xs muted">${list.length} รายการ${admin?' · แตะช่องเพื่อแก้ · วาง (Ctrl+V) หลายแถวจาก Google Sheet ลงช่องใดก็ได้ ระบบเติมต่อให้เหมือนชีต · แถวสีเหลือง = ยังไม่บันทึก':' · อ่านอย่างเดียว'}</span>`;
+    host.prepend(sheetBar('materials',()=>mgMat()));
     bind(list);
   }
   function setVal(r,k,v){ if(k==='id') v=String(v).trim().toUpperCase(); const orig=r._new?undefined:r[k]; const cur=dirty.get(r._key)||{};
@@ -418,7 +431,7 @@ async function mgMat(){
         if(r._new&&ids.has(o.id)) return toast(`รหัส ${o.id} มีอยู่แล้ว`,true); if(seen.has(o.id)) return toast(`รหัส ${o.id} ซ้ำในตาราง`,true); seen.add(o.id); out.push(o); }
       busy(ev.target,true,'กำลังบันทึก...');
       for(let i=0;i<out.length;i+=200){ const {error}=await sb.from('materials').upsert(out.slice(i,i+200),{onConflict:'id'}); if(error){ busy(ev.target,false); return toast(errText(error),true); } }
-      toast(`บันทึกแล้ว ${out.length} แถว`); mgMat();
+      toast(`บันทึกแล้ว ${out.length} แถว`); sheetPush('materials'); mgMat();
     };
     $$('[data-img]',host).forEach(b=>b.onclick=()=>{ const r=rows.find(x=>x._key===b.dataset.img); if(r._new) return toast('บันทึกแถวก่อนใส่รูป',true); matImageSheet(r, imgRole, ()=>mgMat()); });
   }
@@ -452,7 +465,7 @@ function matEdit(m){
     if(f.unit_price.value!=='') row.unit_price=Number(f.unit_price.value)||0;
     const {error}=isNew?await sb.from('materials').insert(row):await sb.from('materials').update(row).eq('id',row.id);
     if(error) return toast(/duplicate|materials_pkey/.test(error.message)?'รหัสนี้มีแล้ว':errText(error),true);
-    ov.close(); toast('บันทึกแล้ว'); mgMat(); };
+    ov.close(); toast('บันทึกแล้ว'); sheetPush('materials'); mgMat(); };
 }
 async function matImportRows(rows){
   try{
@@ -465,7 +478,7 @@ async function matImportRows(rows){
     if(!items.length) return toast(`ไม่พบข้อมูล: ต้องมีคอลัมน์ mat_id และ name (คอลัมน์ที่พบ: ${Object.keys(rows[0]||{}).filter(Boolean).join(', ')||'ไม่มี'})`,true);
     if(!await confirmBox(`นำเข้า ${items.length} รายการ? รหัสที่มีอยู่แล้วจะถูกอัปเดต`,'นำเข้า')) return;
     for(let i=0;i<items.length;i+=200){ const {error}=await sb.from('materials').upsert(items.slice(i,i+200),{onConflict:'id'}); if(error) throw error; }
-    toast(`นำเข้าแล้ว ${items.length} รายการ`); mgMat();
+    toast(`นำเข้าแล้ว ${items.length} รายการ`); sheetPush('materials'); mgMat();
   }catch(e){ toast(errText(e),true); }
 }
 async function mgBoq(){
@@ -480,11 +493,12 @@ async function mgBoq(){
       <form class="card col" id="bf" style="gap:8px"><b class="sm">เพิ่ม/แก้งบ (ใส่รหัสวัสดุเดิมซ้ำ = แก้จำนวน)</b><div class="g2"><input class="in" name="cat" placeholder="หมวดงาน เช่น งานพื้น" required list="bcats"><datalist id="bcats">${[...new Set(rows.map(r=>r.work_category))].map(c=>`<option value="${esc(c)}">`).join('')}</datalist><input class="in" name="mat" placeholder="รหัสวัสดุ" required list="bmats"><datalist id="bmats">${MAT.items.filter(m=>m.item_type==='consumable').slice(0,500).map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('')}</datalist></div>
         <div class="g2"><input class="in" name="qty" type="number" step="any" placeholder="จำนวนงบ" required><input class="in" name="price" type="number" step="any" placeholder="ราคาต่อหน่วยใน BOQ (ไม่บังคับ)"></div><button class="btn btn-sm" style="align-self:flex-start">บันทึก</button></form>
       <div class="card" style="padding:0;overflow-x:auto"><table class="tbl"><thead><tr><th>หมวดงาน / วัสดุ</th><th class="num">งบ</th><th class="num">ขอแล้ว</th><th></th></tr></thead><tbody>${rows.map(r=>{ const m=matById(r.material_id), p=r.budget?Math.round(r.used/r.budget*100):0; return `<tr><td><span class="xs muted">${esc(r.work_category)}</span><br><b>${esc(m.name)}</b></td><td class="num">${fmtN(r.budget)} ${esc(m.unit)}</td><td class="num" style="${p>100?'color:var(--bad)':p>80?'color:var(--warn)':''}">${fmtN(r.used)} (${p}%)</td><td><button class="ibtn" data-del="${esc(r.work_category)}|${r.material_id}" aria-label="ลบ">${IC.close}</button></td></tr>`; }).join('')||'<tr><td colspan="4"><div class="empty"><b>ยังไม่มีงบ BOQ ของไซต์นี้</b></div></td></tr>'}</tbody></table></div>`;
+    host.prepend(sheetBar('boq',()=>draw()));
     $('#bs').onchange=e=>{ site=+e.target.value; draw(); };
     $('[data-bimp]').onclick=()=>boqImportAny(s=>{ if(s) site=s; draw(); }, site);
     $('#bf').onsubmit=async e=>{ e.preventDefault(); const f=e.target; const row={site_id:site,work_category:f.cat.value.trim(),material_id:f.mat.value.trim().toUpperCase(),qty:Number(f.qty.value)||0}; if(f.price.value) row.unit_price=Number(f.price.value);
-      const {error}=await sb.from('boq_budget').upsert(row,{onConflict:'site_id,work_category,material_id'}); if(error) return toast(errText(error),true); toast('บันทึกงบแล้ว'); draw(); };
-    $$('[data-del]').forEach(b=>b.onclick=async()=>{ const [c,mid]=b.dataset.del.split('|'); if(!await confirmBox('ลบรายการงบนี้?','ลบ',true)) return; const {error}=await sb.from('boq_budget').delete().eq('site_id',site).eq('work_category',c).eq('material_id',mid); if(error) return toast(errText(error),true); draw(); });
+      const {error}=await sb.from('boq_budget').upsert(row,{onConflict:'site_id,work_category,material_id'}); if(error) return toast(errText(error),true); toast('บันทึกงบแล้ว'); sheetPush('boq'); draw(); };
+    $$('[data-del]').forEach(b=>b.onclick=async()=>{ const [c,mid]=b.dataset.del.split('|'); if(!await confirmBox('ลบรายการงบนี้?','ลบ',true)) return; const {error}=await sb.from('boq_budget').delete().eq('site_id',site).eq('work_category',c).eq('material_id',mid); if(error) return toast(errText(error),true); sheetPush('boq'); draw(); });
   };
   draw();
 }
@@ -578,7 +592,7 @@ function pr4Mapper(title, sheets, done, siteHint){
         const agg={}; use.forEach(it=>{ const mid=it.act==='new'?it.mid:it.act, k=`${it.cat}|${mid}`; if(agg[k]) agg[k].qty+=it.qty; else agg[k]={site_id:site,work_category:it.cat,material_id:mid,qty:it.qty,unit_price:it.price}; });
         const rows=Object.values(agg).map(r=>({...r,qty:Math.round(r.qty*100)/100}));
         for(let i=0;i<rows.length;i+=200){ const {error}=await sb.from('boq_budget').upsert(rows.slice(i,i+200),{onConflict:'site_id,work_category,material_id'}); if(error) throw error; }
-        ov.close(); await loadMat(true); toast(`นำเข้างบ ${rows.length} รายการ · สร้างวัสดุใหม่ ${newMats.length} รายการ`); done&&done(site);
+        ov.close(); await loadMat(true); toast(`นำเข้างบ ${rows.length} รายการ · สร้างวัสดุใหม่ ${newMats.length} รายการ`); sheetPush('all'); done&&done(site);
       }catch(e){ busy(ev.target,false); toast(errText(e),true); }
     };
   }
@@ -623,7 +637,7 @@ async function boqImportRows(rows, done, siteHint){
       const out=Object.values(agg).map(x=>({...x,qty:Math.round(x.qty*100)/100}));
       if(!out.length) throw new Error('ไม่มีแถวที่นำเข้าได้ (รหัสวัสดุยังไม่มีในทะเบียน)');
       for(let i=0;i<out.length;i+=200){ const {error}=await sb.from('boq_budget').upsert(out.slice(i,i+200),{onConflict:'site_id,work_category,material_id'}); if(error) throw error; }
-      ov.close(); toast(`นำเข้างบ BOQ แล้ว ${out.length} รายการ${skip?` · ข้าม ${skip} แถวที่ไม่มีรหัสวัสดุในทะเบียน`:''}`); done&&done(site);
+      ov.close(); toast(`นำเข้างบ BOQ แล้ว ${out.length} รายการ${skip?` · ข้าม ${skip} แถวที่ไม่มีรหัสวัสดุในทะเบียน`:''}`); sheetPush('all'); done&&done(site);
     }catch(e){ busy(ev.target,false); toast(errText(e),true); }
   };
 }
