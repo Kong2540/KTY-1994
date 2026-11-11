@@ -481,3 +481,12 @@ details.perm>summary::-webkit-details-marker{display:none}
 .mc.s-off{background:#E7EBEE;color:#475569;font-weight:800}
 
 .myh-strip span{font-size:10.5px}.myh-leg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px;color:var(--ink2)}.myh-leg span{display:flex;align-items:center;gap:4px}.myh-leg i{font-style:normal;width:16px;height:16px;border-radius:4px;color:#fff;font-size:9.5px;font-weight:700;display:grid;place-items:center}
+
+/* ================= อ่านบัตรประชาชน ================= */
+.idcbox{border:2px solid var(--accent)}.idcgrid{display:grid;gap:8px}@media (min-width:600px){.idcgrid{grid-template-columns:1fr 1fr}}.idcgrid .btn{min-height:48px}
+.idclay{display:grid;gap:16px}@media (min-width:900px){.idclay{grid-template-columns:260px minmax(0,1fr);align-items:start}}
+.idfields{display:grid;gap:10px;grid-template-columns:1fr}@media (min-width:600px){.idfields{grid-template-columns:repeat(2,minmax(0,1fr))}}@media (min-width:900px){.idfields{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}}
+.idfields .field{gap:4px}.idb{height:18px!important;font-size:10px!important;vertical-align:middle}
+.idlow .in{background:#FFF4CC;color:#1B262C;box-shadow:inset 0 0 0 2px #E8B400}
+.idcph{width:150px;height:185px;border-radius:12px;overflow:hidden;background:var(--surface2);align-self:center}.idcph img{width:100%;height:100%;object-fit:cover}
+.idcimg{width:100%;border-radius:10px;box-shadow:var(--shadow)}

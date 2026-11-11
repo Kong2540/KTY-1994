@@ -142,7 +142,7 @@ function openWizard(e, startStep=0, onSaved){
     <div class="g2">${inp(pre+'_zip','รหัสไปรษณีย์',{num:true,mode:'numeric'})}<div class="hint" style="align-self:end;padding-bottom:14px">เลือกตำบลแล้วเติมให้อัตโนมัติ</div></div>`;
 
   const stepsHTML=[
-    ()=>`<div class="photo-pick"><div class="pv">${photoPreview?`<img src="${photoPreview}" alt="">`:(F.photo_path?`<img data-ph="${esc(F.photo_path)}" alt="" style="display:block">`:svg('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>','style="width:30px;height:30px"'))}</div>
+    ()=>`${typeof idCardBox==='function'&&isManager()?idCardBox():''}<div class="photo-pick"><div class="pv">${photoPreview?`<img src="${photoPreview}" alt="">`:(F.photo_path?`<img data-ph="${esc(F.photo_path)}" alt="" style="display:block">`:svg('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>','style="width:30px;height:30px"'))}</div>
         <div class="col" style="gap:8px"><b>รูปถ่ายพนักงาน</b><div class="row" style="gap:8px;flex-wrap:wrap"><label class="btn btn-sm">${IC.camera}ถ่ายรูป<input type="file" accept="image/*" capture="user" data-photo hidden></label><label class="btn btn-sm">เลือกรูป<input type="file" accept="image/*" data-photo hidden></label></div></div></div>
       <div class="field"><label>คำนำหน้า</label>${seg('title',TITLES.map(t=>[t,t]))}</div>
       <div class="g2">${inp('first_name','ชื่อ *',{auto:'given-name'})}${inp('last_name','นามสกุล *',{auto:'family-name'})}</div>
@@ -232,6 +232,7 @@ function openWizard(e, startStep=0, onSaved){
         h.textContent = !r.value?'': k==='birth_date'?`อายุ ${ageText(r.value)}`: k==='start_date'?`อายุงาน ${serviceText(r.value)}`: k==='id_expiry_date'?(daysUntil(r.value)<0?'บัตรหมดอายุแล้ว':`ใช้ได้อีก ${untilText(r.value)||daysUntil(r.value)+' วัน'}`): k==='probation_end'?(daysUntil(r.value)<0?'ผ่านแล้ว':`อีก ${daysUntil(r.value)} วัน`):''; if(k==='id_expiry_date'&&daysUntil(r.value)<=60) h.className='hint warn'; } }
       else if(h){ h.className='hint bad'; h.textContent=r.msg; }
     }); });
+    if(typeof bindIdCard==='function') bindIdCard(sheet,(out,ph)=>{ Object.assign(F,out); if(ph){ photoBlob=ph; if(photoPreview) URL.revokeObjectURL(photoPreview); photoPreview=URL.createObjectURL(ph); } rerender(); });
     $$('[data-photo]',sheet).forEach(inpEl=>inpEl.onchange=async()=>{ const f=inpEl.files[0]; if(!f) return; try{ photoBlob=await resizeImage(f); if(photoPreview) URL.revokeObjectURL(photoPreview); photoPreview=URL.createObjectURL(photoBlob); rerender(); }catch(_){ toast('อ่านไฟล์รูปไม่ได้ ลองเลือกรูปอื่น',true); } });
     const cs=$('[data-consent]',sheet); if(cs) cs.onchange=()=>{ if(cs.checked) F.blood_consent_at=orig?.blood_consent_at||new Date().toISOString(); else { F.blood_consent_at=null; F.blood_type=null; } rerender(); };
     const si=$('[data-sameid]',sheet); if(si) si.onclick=()=>{ const id=digits(F.national_id); if(!id) return toast('กรอกเลขบัตรประชาชนก่อน',true); F.social_security_no=id; rerender(); };
