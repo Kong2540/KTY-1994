@@ -458,3 +458,17 @@ details.perm>summary::-webkit-details-marker{display:none}
 .arprev{display:flex;flex-direction:column;align-items:center;gap:14px;background:var(--surface2);border-radius:14px;padding:14px;min-height:300px}
 .arimg{width:100%;max-width:1000px;box-shadow:0 4px 18px rgba(0,0,0,.2);background:#fff;border-radius:2px}
 .archips{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:8px}.archk{display:flex;align-items:center;gap:6px;font-size:13px;min-height:30px}.archk input{width:17px;height:17px;accent-color:var(--accent)}
+
+.myh-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.myh-grid>div{display:flex;flex-direction:column;gap:2px;background:var(--surface2);border-radius:12px;padding:10px 12px}
+@media (max-width:560px){.myh-grid{grid-template-columns:1fr 1fr}.myh-grid>div:last-child{grid-column:span 2}}
+
+/* ================= หน้าหลักสมาชิก ================= */
+.myh-cnt{display:grid;grid-template-columns:repeat(5,1fr);margin-top:6px}.myh-cnt div{display:flex;flex-direction:column;align-items:center}.myh-cnt b{font-size:17px}
+.myh-strip{display:grid;gap:3px}.myh-strip div{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0}.myh-strip span{width:100%;aspect-ratio:1;border-radius:5px;display:grid;place-items:center;color:#fff;font-size:9px;font-weight:700;max-width:26px}.myh-strip small{font-size:9px;color:var(--ink2)}
+/* ================= iOS ================= */
+@supports (-webkit-touch-callout:none){ input,select,textarea,.in{font-size:16px!important} }
+@supports (height:100dvh){ .app,.auth{min-height:100dvh} .gwrap{max-height:calc(100dvh - 290px)} }
+.sheet-body,.modal,.sheet{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.bnav{padding-bottom:max(6px,env(safe-area-inset-bottom,0px))}
+.a2hs{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:60;background:var(--surface);color:var(--ink);border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.a2hs-ic{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;background:var(--surface2)}

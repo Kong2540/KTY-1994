@@ -128,3 +128,63 @@ async function pageReqs(){
   act('[data-cok]',true,(id,n)=>sb.rpc('review_profile_change',{p_id:id,p_ok:true,p_note:n})); act('[data-cno]',false,(id,n)=>sb.rpc('review_profile_change',{p_id:id,p_ok:false,p_note:n}));
   act('[data-lok]',true,(id,n)=>sb.rpc('decide_link',{p_id:id,p_ok:true,p_note:n})); act('[data-lno]',false,(id,n)=>sb.rpc('decide_link',{p_id:id,p_ok:false,p_note:n}));
 }
+
+/* ---------- หน้าหลัก: เงินเดือนและอัตราการมาทำงานของฉัน ---------- */
+let MYH_MODE='period';
+async function myHomeCard(){
+  const eid=S.profile.employee_id; if(!eid) return;
+  const anchor=document.querySelector('#page .card, #page .tiles, #page .note'); if(!anchor) return;
+  const box=document.createElement('div'); box.className='col myhome'; box.style.gap='12px';
+  box.innerHTML='<div class="card"><div class="loading" style="min-height:80px"><div class="spin"></div></div></div>';
+  anchor.parentElement.insertBefore(box, anchor);
+  try{
+    const today=localISO(), d=parseISO(today), last=new Date(d.y,d.m,0).getDate(), mm=today.slice(0,8);
+    const m0=mm+'01', m1=mm+String(last).padStart(2,'0'), p0=d.d<=15?mm+'01':mm+'16', p1=d.d<=15?mm+'15':m1;
+    const [at,sl,hd,ins]=await Promise.all([ sb.from('attendance').select('work_date,status,ot_hours').eq('employee_id',eid).gte('work_date',m0).lte('work_date',m1),
+      sb.from('pay_slips').select('id,net,pay_periods(start_date,end_date,pay_date,status)').eq('employee_id',eid).order('id',{ascending:false}).limit(8),
+      sb.from('holidays').select('day,type_key').gte('day',m0).lte('day',m1), sb.from('installments').select('total,paid,status').eq('employee_id',eid).eq('status','active') ]);
+    const att={}; (at.data||[]).forEach(r=>att[r.work_date]=r);
+    const HT=S.settings.holiday_types||[], hol={}; (hd.data||[]).forEach(h=>{ const t=HT.find(x=>x.key===h.type_key); if(t) hol[h.day]=t; });
+    const closed=(sl.data||[]).filter(x=>x.pay_periods?.status==='closed').sort((a,b)=>b.pay_periods.start_date.localeCompare(a.pay_periods.start_date))[0];
+    const owe=(ins.data||[]).reduce((a,i)=>a+(i.total-i.paid),0);
+    const nextPay=d.d<=15?thaiDate(mm+'16'):thaiDate(addDays(m1,1));
+    const DOT={present:'#16A34A',late:'#D97706',half:'#0284C7',sick:'#7C3AED',personal:'#7C3AED',vacation:'#7C3AED',absent:'#DC2626'};
+    const draw=()=>{ const a=MYH_MODE==='period'?p0:m0, b=MYH_MODE==='period'?p1:m1, days=[]; for(let x=a;x<=b;x=addDays(x,1)) days.push(x);
+      const c={present:0,late:0,half:0,leave:0,absent:0,ot:0,n:0}; days.forEach(x=>{ const r=att[x]; if(!r) return; c.n++; c.ot+=+r.ot_hours||0;
+        if(r.status==='present') c.present++; else if(r.status==='late') c.late++; else if(r.status==='half') c.half++; else if(r.status==='absent') c.absent++; else c.leave++; });
+      const worked=c.present+c.late+c.half*0.5, base=c.n, rate=base?Math.round(worked/base*100):null;
+      const col=rate==null?'var(--ink2)':rate>=95?'#16A34A':rate>=85?'#D97706':'#DC2626', R=34, C=2*Math.PI*R;
+      const lbl=MYH_MODE==='period'?`งวด ${parseISO(a).d}–${parseISO(b).d} ${TH_MON_S[d.m-1]} ${d.y+543}`:`เดือน${TH_MONTHS[d.m-1]} ${d.y+543}`;
+      box.innerHTML=`<div class="card col" style="gap:10px"><div class="row"><b class="grow">การมาทำงานของฉัน</b><div class="seg" style="padding:2px;width:160px"><button class="${MYH_MODE==='period'?'on':''}" data-hm="period" style="min-height:30px;font-size:12.5px">งวดนี้</button><button class="${MYH_MODE==='month'?'on':''}" data-hm="month" style="min-height:30px;font-size:12.5px">ทั้งเดือน</button></div></div>
+        <div class="row" style="gap:14px"><svg viewBox="0 0 84 84" width="84" height="84" role="img" aria-label="อัตราการมาทำงาน ${rate??'-'}%"><circle cx="42" cy="42" r="${R}" fill="none" stroke="var(--surface2)" stroke-width="9"/><circle cx="42" cy="42" r="${R}" fill="none" stroke="${col}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C*(1-(rate||0)/100)).toFixed(1)}" transform="rotate(-90 42 42)"/><text x="42" y="47" text-anchor="middle" font-size="17" font-weight="700" fill="currentColor">${rate==null?'-':rate+'%'}</text></svg>
+          <div class="grow col" style="gap:2px"><b style="font-size:15px">มาทำงาน ${fmtN(worked)} / ${base} วัน</b><span class="xs muted">${lbl} · ถึงวันนี้</span>
+          <div class="myh-cnt">${[['มา',c.present,'#16A34A'],['สาย',c.late,'#D97706'],['ลา',c.leave,'#7C3AED'],['ขาด',c.absent,c.absent?'#DC2626':'var(--ink2)'],['OT',fmtN(c.ot),'var(--ink)']].map(([t,v,cl])=>`<div><b class="num" style="color:${cl}">${v}</b><span class="xs muted">${t}</span></div>`).join('')}</div></div></div>
+        <div class="myh-strip" style="grid-template-columns:repeat(${Math.min(days.length,16)},1fr)">${days.map(x=>{ const r=att[x], h=hol[x], fut=x>today; return `<div title="${thaiDate(x)}"><span style="background:${r?DOT[r.status]||'#999':h?h.color:'var(--line)'};opacity:${fut&&!h?.35:1}">${!r&&h?esc(h.abbr):''}</span><small>${parseISO(x).d}</small></div>`; }).join('')}</div></div>
+      <a href="#my" class="card col" style="gap:8px;text-decoration:none;color:inherit"><div class="row"><b class="grow">เงินเดือนของฉัน</b><span class="xs muted">งวดล่าสุดที่ปิดแล้ว</span></div>
+        <div class="row" style="align-items:flex-end;gap:10px"><div class="grow"><span class="xs muted">${closed?`รับสุทธิ · งวด ${periodLabel(closed.pay_periods)}`:'ยังไม่มีสลิปที่ปิดงวด'}</span><div class="num" style="font-size:28px;font-weight:800">${closed?baht(closed.net):'-'}</div>${closed?`<span class="xs muted">จ่ายวันที่ ${thaiDate(closed.pay_periods.pay_date)}</span>`:''}</div>
+          ${owe?`<div style="text-align:right"><span class="xs muted">เบิก/ผ่อนคงเหลือ</span><div class="num" style="font-weight:700;color:var(--warn)">${baht(owe)}</div></div>`:''}</div>
+        <div class="note n-info" style="padding:8px 10px">${IC.info}<span class="xs">งวดปัจจุบันจะแสดงยอดเมื่อปิดงวด (จ่าย ${nextPay})</span></div>
+        <span class="btn btn-p">ดูรายละเอียด / ย้อนหลัง</span></a>`;
+      $$('[data-hm]',box).forEach(bt=>bt.onclick=ev=>{ ev.preventDefault(); MYH_MODE=bt.dataset.hm; draw(); }); };
+    draw();
+  }catch(err){ box.remove(); }
+}
+
+/* ---------- iOS: บันทึกไฟล์ผ่านแผ่นแชร์ + ป้ายแนะนำเพิ่มลงหน้าจอโฮม ---------- */
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const IS_STANDALONE = matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+async function saveOrShare(blob, name){
+  const type=blob.type||(name.endsWith('.pdf')?'application/pdf':name.endsWith('.png')?'image/png':'application/octet-stream');
+  const file=new File([blob],name,{type});
+  if(IS_IOS&&navigator.canShare&&navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file],title:name}); return; }catch(e){ if(e.name==='AbortError') return; } }
+  const u=URL.createObjectURL(blob), a=document.createElement('a'); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),60000);
+}
+function iosInstallHint(){
+  if(!IS_IOS||IS_STANDALONE) return; try{ if(localStorage.getItem('kty-a2hs')) return; }catch(_){}
+  if(document.querySelector('.a2hs')) return;
+  const el=document.createElement('div'); el.className='a2hs'; el.setAttribute('role','dialog'); el.setAttribute('aria-label','ติดตั้งแอปบน iPhone');
+  el.innerHTML=`<div class="row" style="gap:10px">${markHTML(44)}<div class="grow"><b>ติดตั้ง ${esc(BR().app)} บน iPhone</b><div class="xs muted">เปิดเร็วขึ้น เต็มจอเหมือนแอป</div></div><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button></div>
+    <div class="sm">1. แตะปุ่ม <b>แชร์</b> <span class="a2hs-ic">⬆︎</span> ที่แถบของ Safari</div><div class="sm">2. เลือก <b>"เพิ่มลงหน้าจอโฮม"</b></div><div class="sm">3. แตะ <b>"เพิ่ม"</b> แล้วเปิดจากไอคอนบนหน้าจอโฮม</div>`;
+  document.body.appendChild(el);
+  $('[data-x]',el).onclick=()=>{ el.remove(); try{ localStorage.setItem('kty-a2hs','1'); }catch(_){} };
+}

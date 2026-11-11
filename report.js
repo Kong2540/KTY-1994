@@ -114,7 +114,7 @@ async function monthReport(month){
   }
   drawCtl(); render();
   const fname=ext=>{ const [a,b]=bounds(); return `รายงานการมาทำงาน_${a}_${b}.${ext}`; };
-  $('[data-pdf]',ov.el).onclick=async ev=>{ if(!ov.blob) return; const a=document.createElement('a'); a.href=URL.createObjectURL(ov.blob); a.download=fname('pdf'); a.click(); };
+  $('[data-pdf]',ov.el).onclick=async ev=>{ if(!ov.blob) return; await saveOrShare(ov.blob,fname('pdf')); };
   $('[data-png]',ov.el).onclick=async ev=>{ if(!ov.blob) return; busy(ev.target,true,'กำลังสร้าง...'); try{ const pngs=await pdfToPngs(ov.blob,3);
-      pngs.forEach((b,i)=>{ const a=document.createElement('a'); a.href='data:image/png;base64,'+b; a.download=fname('png').replace('.png',pngs.length>1?`_หน้า${i+1}.png`:'.png'); a.click(); }); }catch(e){ toast(errText(e),true); } busy(ev.target,false); };
+      for(let i=0;i<pngs.length;i++){ const bl=await (await fetch('data:image/png;base64,'+pngs[i])).blob(); await saveOrShare(bl,fname('png').replace('.png',pngs.length>1?`_หน้า${i+1}.png`:'.png')); } }catch(e){ toast(errText(e),true); } busy(ev.target,false); };
 }

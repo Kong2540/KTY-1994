@@ -1,7 +1,7 @@
 /* =====================================================================
    KTY Hub — โครงหน้า: แถบเมนูด้านข้าง / ลิ้นชักเมนูบนมือถือ / ตัวเลือกไซต์
    ===================================================================== */
-const HUB_VERSION = '2.4';
+const HUB_VERSION = '2.5';
 const MOD = {
   att:      { t:'เช็คชื่อ',            hue:'#2E9E5B', i:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>' },
   daily:    { t:'รายงานประจำวัน',      hue:'#2F6FDB', i:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>' },
@@ -221,7 +221,7 @@ async function pageHome(){
     if(hasMod('materials')) t.push(tileHTML('materials','#mat','เบิก วัสดุ/อุปกรณ์','mat'));
     if(hasMod('borrow')||hasMod('materials')) t.push(tileHTML('borrow','#ret','คืน วัสดุ/อุปกรณ์','brw'));
     if(hasMod('issues')) t.push(tileHTML('issues','#soon/issues','รายงานปัญหาหน้างาน',null,true));
-    t.push(tileHTML('payroll','#my','ข้อมูลของฉัน'), tileHTML('stars','#me/stars','ดาวของฉัน'), tileHTML('me','#me','ข้อมูลของฉัน'));
+    t.push(tileHTML('payroll','#my','ข้อมูลของฉัน'), tileHTML('stars','#me/stars','ดาวของฉัน'), tileHTML('me','#me','บัญชีของฉัน'));
     tiles=t.join('');
   }
   let d; try{ d=await collectTasks(); }catch(err){ $('#hb').outerHTML=`<div class="note n-bad">${esc(errText(err))}</div>`; return; }
@@ -240,6 +240,8 @@ async function pageHome(){
     <div class="row" style="justify-content:space-between"><h3 class="h2">${mgr?'งานที่รอคุณ':'งานของฉันวันนี้'}</h3>${d.tasks.length>4?'<a href="#tasks" class="sm" style="color:var(--ink2)">ดูทั้งหมด</a>':''}</div>
     ${d.tasks.length?`<div class="card card-l">${d.tasks.slice(0,4).map(taskHTML).join('')}</div>`:`<div class="card empty" style="padding:24px"><b>ไม่มีงานค้าง</b>เรียบร้อยดีทุกอย่าง</div>`}</div>`;
   paintBadges();
+  if(S.profile.employee_id&&typeof myHomeCard==='function') myHomeCard();
+  if(typeof iosInstallHint==='function') setTimeout(iosInstallHint,1500);
 }
 async function pageTasks(){
   setPage(head('งานที่รอ',siteLabel()) + `<div id="tb"><div class="loading"><div class="spin"></div></div></div>`);

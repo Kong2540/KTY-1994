@@ -200,7 +200,7 @@ async function paySummaryPreview(p, slips){
   $$('[data-w]',ov.el).forEach(i=>i.oninput=()=>{ const k=i.dataset.w, v=i.value===''?null:Math.max(5,Math.min(120,+i.value)); if(k==='_sign') cfg.sign_w=v||34; else if(v) cfg.widths[k]=v; else delete cfg.widths[k]; render(); });
   const df=$('[data-def]',ov.el); if(df) df.onclick=()=>{ ov.close(); S.settings.payroll_print_tmp=null; const keep=S.settings.payroll_print; S.settings.payroll_print=null; paySummaryPreview(p,slips); S.settings.payroll_print=keep; };
   const sc=$('[data-savecfg]',ov.el); if(sc) sc.onclick=async ev=>{ busy(ev.target,true); try{ const sets=JSON.parse(JSON.stringify(paySets())); const id=activeSetId(); sets[id].print=JSON.parse(JSON.stringify(cfg)); await saveSetting('payroll_columns',{...(S.settings.payroll_columns||{}),sets,active:id}); busy(ev.target,false); toast(`บันทึกหน้ากระดาษไว้กับชุด "${sets[id].name}" แล้ว`); }catch(e){ busy(ev.target,false); toast(e.message,true); } };
-  $('[data-pdf]',ov.el).onclick=async ev=>{ busy(ev.target,true,'กำลังสร้าง PDF...'); try{ const dd=await summaryDoc(p,slips,cfg,cols); pdfMake.createPdf(dd).download(`ใบสรุปเงินเดือน_${p.start_date}_${p.end_date}.pdf`); busy(ev.target,false); toast('ดาวน์โหลด PDF (เวกเตอร์) แล้ว'); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
+  $('[data-pdf]',ov.el).onclick=async ev=>{ busy(ev.target,true,'กำลังสร้าง PDF...'); try{ const dd=await summaryDoc(p,slips,cfg,cols); await saveOrShare(await pdfBlob(dd), `ใบสรุปเงินเดือน_${p.start_date}_${p.end_date}.pdf`); busy(ev.target,false); toast('ดาวน์โหลด PDF (เวกเตอร์) แล้ว'); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
 }
 function renderSummary(W,p,slips,cfg,cols){
     const m=cfg.margin, colsAll=['#',...cols,...(cfg.sign?['_sign']:[])];
@@ -241,7 +241,7 @@ async function paySlipsPreview(p, slips){
     <div class="sheet-body"><div class="note n-info">${IC.info}<span>QR บนสลิปเปิดหน้าการเงินของพนักงานในแอป (ต้องเข้าสู่ระบบ · พนักงานเห็นเฉพาะของตัวเอง ผู้บริหารเห็นทุกคน)</span></div><div class="pg-wrap">${pages.join('')||'<div class="card empty"><b>ยังไม่มีสลิป</b></div>'}</div></div>
     <div class="sheet-foot"><button class="btn btn-p" data-pdf ${slips.length?'':'disabled'}>ดาวน์โหลด PDF สลิป</button></div></div>`,false,false);
   $('[data-x]',ov.el).onclick=ov.close;
-  $('[data-pdf]',ov.el).onclick=async ev=>{ busy(ev.target,true,'กำลังสร้าง PDF...'); try{ const dd=await slipsDoc(p,slips,qrOf); pdfMake.createPdf(dd).download(`สลิปเงินเดือน_${p.start_date}_${p.end_date}.pdf`); busy(ev.target,false); toast('ดาวน์โหลด PDF (เวกเตอร์) แล้ว'); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
+  $('[data-pdf]',ov.el).onclick=async ev=>{ busy(ev.target,true,'กำลังสร้าง PDF...'); try{ const dd=await slipsDoc(p,slips,qrOf); await saveOrShare(await pdfBlob(dd), `สลิปเงินเดือน_${p.start_date}_${p.end_date}.pdf`); busy(ev.target,false); toast('ดาวน์โหลด PDF (เวกเตอร์) แล้ว'); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
 }
 async function paySheetExport(p, slips, btn){
   if(!hasBridge()) return toast('ต้องติดตั้ง Bridge ก่อน',true);

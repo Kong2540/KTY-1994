@@ -204,8 +204,7 @@ async function vectorPreview(dd, name, title, extraHTML='', onReady){
       <div class="sheet-body"><img src="${url}" alt="${esc(title)}" style="width:100%;max-width:520px;border-radius:10px;box-shadow:var(--shadow);align-self:center">${extraHTML}</div>
       <div class="sheet-foot" style="flex-wrap:wrap"><button class="btn" data-save>บันทึกรูป</button><button class="btn" data-pdf>PDF</button><button class="btn btn-p" data-share style="background:#06C755;border-color:#06C755;color:#fff">แชร์รูปเข้า LINE</button></div></div>`, false, false);
     $('[data-x]',m.el).onclick=()=>{ URL.revokeObjectURL(url); URL.revokeObjectURL(purl); m.close(); };
-    const dl=(u,n)=>{ const a=document.createElement('a'); a.href=u; a.download=n; a.click(); };
-    $('[data-save]',m.el).onclick=()=>dl(url,name+'.png');
+    $('[data-save]',m.el).onclick=()=>saveOrShare(pngBlob,name+'.png');
     $('[data-pdf]',m.el).onclick=async()=>{ const f=new File([blob],name+'.pdf',{type:'application/pdf'}); try{ if(navigator.canShare&&navigator.canShare({files:[f]})) await navigator.share({files:[f],title}); else dl(purl,name+'.pdf'); }catch(e){ if(e.name!=='AbortError') dl(purl,name+'.pdf'); } };
     $('[data-share]',m.el).onclick=async()=>{ const f=new File([pngBlob],name+'.png',{type:'image/png'}); try{ if(navigator.canShare&&navigator.canShare({files:[f]})) await navigator.share({files:[f],title}); else { dl(url,name+'.png'); toast('อุปกรณ์นี้แชร์ไฟล์ไม่ได้ บันทึกรูปให้แล้ว'); } }catch(e){ if(e.name!=='AbortError') toast(errText(e),true); } };
     onReady&&onReady({m,blob,png64});
