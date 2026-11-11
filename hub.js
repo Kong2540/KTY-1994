@@ -1,7 +1,7 @@
 /* =====================================================================
    KTY Hub — โครงหน้า: แถบเมนูด้านข้าง / ลิ้นชักเมนูบนมือถือ / ตัวเลือกไซต์
    ===================================================================== */
-const HUB_VERSION = '2.5';
+const HUB_VERSION = '2.6';
 const MOD = {
   att:      { t:'เช็คชื่อ',            hue:'#2E9E5B', i:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>' },
   daily:    { t:'รายงานประจำวัน',      hue:'#2F6FDB', i:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>' },
@@ -144,6 +144,7 @@ const setPage = html => { $('#page').innerHTML = html + '</div>'; const d=$('[da
    ===================================================================== */
 async function collectTasks(){
   const today=localISO(), mgr=isManager(), tasks=[];
+  if(isAdmin()){ const qc=quotaCache(); if(!qc.ts||Date.now()-qc.ts>12*3600e3) quotaRefresh(true).catch(()=>{}); quotaAlerts().forEach(a=>tasks.push({m:'manage',t:`${a.t} ใช้ไป ${a.p}%`,sub:'ใกล้เต็ม ตรวจที่ จัดการ > พื้นที่และสำรอง',tag:a.p>=90?'ใกล้เต็มมาก':'ใกล้เต็ม',c:a.p>=90?'t-bad':'t-warn',href:'#manage/storage'})); }
   const siteIds=S.site?[+S.site]:mySiteIds();
   const q=[ S.hasPhase2&&siteIds.length?sb.from('site_reports').select('site_id,total,updated_at').eq('report_date',today).in('site_id',siteIds):Promise.resolve({data:[]}),
     siteIds.length?sb.from('daily_reports').select('id,site_id,total,no_work,updated_at,line_status').eq('report_date',today).in('site_id',siteIds):Promise.resolve({data:[]}) ];
@@ -362,24 +363,51 @@ function gaugeHTML(k,title,used,total,note){
   return `<div class="card col" style="gap:10px"><div class="row" style="gap:12px">${modIcon(k,40)}<div class="grow"><b>${title}</b><div class="xs muted">${note}</div></div><b class="num" style="font-size:20px;${warn?'color:var(--bad)':''}">${pct}%</b></div>
     <div class="track" style="height:12px"><i style="width:${pct}%;background:${warn?'var(--bad)':MOD[k].hue}"></i></div><div class="row xs muted" style="justify-content:space-between"><span>ใช้ไป ${fmtBytes(used)}</span><span>จาก ${fmtBytes(total)} · เตือนที่ ${S.settings.retention?.warn_pct||70}%</span></div></div>`;
 }
+/* ---------- พื้นที่และสำรอง: GitHub · Supabase · Google Drive (เตือนเมื่อใกล้เต็ม) ---------- */
+const QUOTA={ db:500*1048576, files:1024*1048576, gh:1024*1048576 };
+const ghRepo=()=>{ const host=location.hostname, seg=location.pathname.split('/').filter(Boolean)[0]; if(!/\.github\.io$/.test(host)) return null; const owner=host.split('.')[0]; return {owner, repo:seg&&!/\./.test(seg)?seg:`${owner}.github.io`}; };
+const quotaCache=()=>{ try{ return JSON.parse(localStorage.getItem('kty-quota')||'{}'); }catch(_){ return {}; } };
+const quotaSave=o=>{ try{ localStorage.setItem('kty-quota',JSON.stringify({...quotaCache(),...o,ts:Date.now()})); }catch(_){} };
+async function quotaRefresh(withDrive){
+  const out={};
+  try{ const {data}=await sb.rpc('db_stats'); if(data) out.db=[data.db_bytes,QUOTA.db]; }catch(_){}
+  try{ const {data}=await sb.rpc('storage_stats'); if(data&&data.total_bytes!=null) out.files=[+data.total_bytes||0,QUOTA.files]; }catch(_){}
+  const g=ghRepo(); if(g){ try{ const r=await fetch(`https://api.github.com/repos/${g.owner}/${g.repo}`); if(r.ok){ const j=await r.json(); out.gh=[(j.size||0)*1024,QUOTA.gh]; out.gh_private=!!j.private; } }catch(_){} }
+  if(withDrive&&hasBridge()){ try{ const j=await bridge('stats'); out.drive=[j.drive_used,j.drive_limit]; }catch(_){} }
+  quotaSave(out); return out;
+}
+function quotaAlerts(){ const c=quotaCache(), L=[]; const chk=(k,t)=>{ const v=c[k]; if(v&&v[1]){ const p=Math.round(v[0]/v[1]*100); if(p>=80) L.push({k,t,p}); } };
+  chk('db','ฐานข้อมูล Supabase'); chk('files','ไฟล์ใน Supabase (รูปพนักงาน/วัสดุ)'); chk('gh','GitHub (ไฟล์แอป)'); chk('drive','Google Drive บริษัท'); return L; }
 async function mgStorage(){
   const host=$('#mg'); host.innerHTML='<div class="loading"><div class="spin"></div></div>';
-  const {data:st,error}=await sb.rpc('db_stats');
-  let html='';
+  const [{data:st,error},{data:fs}]=await Promise.all([sb.rpc('db_stats'),sb.rpc('storage_stats').then(r=>r,()=>({data:null}))]);
+  const g=ghRepo(); let gh=null; if(g){ try{ const r=await fetch(`https://api.github.com/repos/${g.owner}/${g.repo}`); if(r.ok) gh=await r.json(); }catch(_){} }
+  quotaSave({...(st?{db:[st.db_bytes,QUOTA.db]}:{}),...(fs&&fs.total_bytes!=null?{files:[+fs.total_bytes||0,QUOTA.files]}:{}),...(gh?{gh:[(gh.size||0)*1024,QUOTA.gh],gh_private:!!gh.private}:{})});
+  const BN={'employee-photos':'รูปพนักงาน','material-images':'รูปวัสดุ/อุปกรณ์','brand':'โลโก้'};
+  let html='<div id="qsum"></div><h3 class="h2" style="margin-top:4px">Supabase (ฐานข้อมูลและไฟล์)</h3>';
   if(error||!st) html+=`<div class="card empty"><b>ยังไม่ได้อัปเดตฐานข้อมูล Hub</b>รันไฟล์ 05_hub.sql ใน Supabase</div>`;
-  else html+=gaugeHTML('manage','ฐานข้อมูล Supabase',st.db_bytes,500*1048576,'แพ็กเกจฟรี 500 MB')+`<details class="card"><summary style="cursor:pointer"><b>ขนาดแยกตามตาราง</b></summary><div style="margin-top:8px">${(st.tables||[]).slice(0,12).map(t=>`<div class="kv"><span>${esc(t.name)} <span class="xs">(${t.rows} แถว)</span></span><span class="num">${fmtBytes(t.bytes)}</span></div>`).join('')}</div></details>`;
-  html+=`<div id="drv"></div>`;
-  if(isAdmin()) html+=`<form class="card col" id="bf" style="gap:10px"><b>KTY Hub Bridge (Apps Script)</b><span class="xs muted">ใช้สำรองข้อมูลลง Google Drive และอ่านพื้นที่ Drive (ภายหลังใช้ส่งรูปและแจ้ง LINE)</span><input class="in" name="u" value="${esc(S.settings.bridge_url||'')}" placeholder="https://script.google.com/macros/s/.../exec" aria-label="Bridge URL"><button class="btn btn-sm" style="align-self:flex-start">บันทึก URL</button></form>`;
+  else html+=gaugeHTML('manage','ฐานข้อมูล Supabase',st.db_bytes,QUOTA.db,'แพ็กเกจฟรี 500 MB')+`<details class="card"><summary style="cursor:pointer"><b>ขนาดแยกตามตาราง</b></summary><div style="margin-top:8px">${(st.tables||[]).slice(0,12).map(t=>`<div class="kv"><span>${esc(t.name)} <span class="xs">(${t.rows} แถว)</span></span><span class="num">${fmtBytes(t.bytes)}</span></div>`).join('')}</div></details>`;
+  html+=fs&&fs.total_bytes!=null?gaugeHTML('materials','ไฟล์ใน Supabase Storage',+fs.total_bytes||0,QUOTA.files,'แพ็กเกจฟรี 1 GB · '+((fs.buckets||[]).map(b=>`${BN[b.bucket]||b.bucket} ${fmtBytes(b.bytes)}`).join(' · ')||'ยังไม่มีไฟล์')):`<div class="note n-info">${IC.info}<span>รันไฟล์ 18_storage_stats.sql เพื่อดูพื้นที่ไฟล์ใน Supabase</span></div>`;
+  html+=`<div class="note n-info">${IC.info}<span>Supabase แพ็กเกจฟรี: ถ้าไม่มีใครใช้งานระบบติดต่อกันราว 1 สัปดาห์ โปรเจกต์จะถูกพัก (ข้อมูลไม่หาย) เข้า supabase.com แล้วกด Restore ได้ · ใช้งานทุกวันจึงไม่ถูกพัก</span></div>`;
+  html+='<h3 class="h2">GitHub (ไฟล์แอป)</h3>';
+  html+=gh?gaugeHTML('studio',`GitHub · ${esc(g.owner)}/${esc(g.repo)}`,(gh.size||0)*1024,QUOTA.gh,'GitHub Pages ฟรี เว็บไม่เกิน 1 GB'):`<div class="note n-warn">${IC.info}<span>${g?'อ่านขนาด repo จาก GitHub ไม่ได้ (repo อาจเป็น Private)':'เปิดแอปจาก github.io จึงจะดูขนาด repo ได้'}</span></div>`;
+  if(gh?.private) html+=`<div class="note n-bad">${IC.info}<span>repo เป็น Private: GitHub Pages แบบฟรีใช้ได้เฉพาะ repo แบบ Public</span></div>`;
+  html+=`<div class="card col" style="gap:8px"><b class="sm">Codespaces (ไม่จำเป็นต่อ KTY Hub)</b><span class="xs muted">ระบบอ่านการใช้ Codespaces ให้ไม่ได้ ตรวจที่ GitHub: ลบ codespace ที่ค้าง และตั้งงบ $0 เพื่อไม่ให้ถูกเก็บเงิน · อัปไฟล์ด้วย Add file > Upload files ไม่ใช้ Codespaces</span>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><a class="btn btn-sm" href="https://github.com/codespaces" target="_blank" rel="noopener">เปิดหน้า Codespaces</a><a class="btn btn-sm" href="https://github.com/settings/billing" target="_blank" rel="noopener">ตั้งงบ / ดูการใช้งาน</a>${g?`<a class="btn btn-sm" href="https://github.com/${esc(g.owner)}/${esc(g.repo)}/upload/main" target="_blank" rel="noopener">อัปโหลดไฟล์ขึ้น repo</a>`:''}</div></div>`;
+  html+='<h3 class="h2">Google Drive (รูปรายงาน PDF ไฟล์สำรอง)</h3><div id="drv"></div>';
+  if(isAdmin()) html+=`<form class="card col" id="bf" style="gap:10px"><b>KTY Hub Bridge (Apps Script)</b><span class="xs muted">ใช้สำรองข้อมูลลง Google Drive อ่านพื้นที่ Drive ส่งรูปและแจ้ง LINE</span><input class="in" name="u" value="${esc(S.settings.bridge_url||'')}" placeholder="https://script.google.com/macros/s/.../exec" aria-label="Bridge URL"><button class="btn btn-sm" style="align-self:flex-start">บันทึก URL</button></form>`;
   html+=`<div class="card row" style="gap:12px;opacity:.75">${modIcon('tasks',40)}<div class="grow"><b>ปิดปีและย้ายข้อมูลเก่า</b><div class="xs muted">เก็บรายละเอียดในฐานข้อมูล ${S.settings.retention?.keep_years||2} ปี ปุ่มนี้จะเปิดใช้ก่อนสิ้นปี 2570</div></div></div>`;
   host.innerHTML=html;
+  const drawSum=()=>{ const A=quotaAlerts(), el=$('#qsum'); if(!el) return; el.innerHTML=A.length?`<div class="note n-bad">${IC.info}<span><b>พื้นที่ใกล้เต็ม:</b> ${A.map(a=>`${a.t} ${a.p}%`).join(' · ')} · ลบไฟล์ที่ไม่ใช้ ลดอายุการเก็บข้อมูล หรือย้ายไฟล์เก่าออก</span></div>`:`<div class="note n-ok">${svg('<path d="M5 12l5 5 9-10"/>','style="flex:none"')}<span>พื้นที่ทุกส่วนยังเหลือเพียงพอ (เตือนเมื่อใช้เกิน 80%)</span></div>`; };
+  drawSum();
   const bf=$('#bf'); if(bf) bf.onsubmit=async ev=>{ ev.preventDefault(); const v=bf.u.value.trim();
     const {error}=await sb.from('app_settings').update({value:v,updated_at:new Date().toISOString()}).eq('key','bridge_url'); if(error) return toast(errText(error),true); await loadRefs(); toast('บันทึก Bridge URL แล้ว'); mgStorage(); };
   const drv=$('#drv');
   if(!String(S.settings.bridge_url||'').trim()){ drv.innerHTML=`<div class="note n-warn">${IC.info}<span>ยังไม่ได้ติดตั้ง Bridge จึงยังไม่มีการสำรองข้อมูลอัตโนมัติ ดูวิธีติดตั้งในคู่มือ</span></div>`; return; }
   drv.innerHTML='<div class="card"><div class="spin" style="margin:8px auto"></div></div>';
   try{
-    const j=await bridge('stats');
-    drv.innerHTML=gaugeHTML('daily','Google Drive บริษัท',j.drive_used,j.drive_limit,'รูปถ่าย + ไฟล์สำรอง')+`<div class="card" style="padding:12px 16px 4px"><div class="row" style="justify-content:space-between"><b>สำรองรายสัปดาห์</b><span class="tag ${j.backups?.length?'t-ok':'t-warn'}">${j.backups?.length||0} ชุด</span></div>
+    const j=await bridge('stats'); quotaSave({drive:[j.drive_used,j.drive_limit]}); drawSum();
+    drv.innerHTML=gaugeHTML('daily','Google Drive บริษัท',j.drive_used,j.drive_limit,'ใช้ร่วมกับ Gmail และ Google Photos ของบัญชีเดียวกัน')+`<div class="card" style="padding:12px 16px 4px"><div class="row" style="justify-content:space-between"><b>สำรองรายสัปดาห์</b><span class="tag ${j.backups?.length?'t-ok':'t-warn'}">${j.backups?.length||0} ชุด</span></div>
       ${(j.backups||[]).map(b=>`<div class="li" style="padding:9px 0">${svg('<path d="M5 12l5 5 9-10"/>','style="color:var(--ok);width:18px"')}<span class="grow sm">${esc(b.name)}</span><span class="xs muted num">${fmtBytes(b.size)}</span></div>`).join('')||'<p class="sm muted">ยังไม่มีไฟล์สำรอง</p>'}
       <div style="padding:8px 0 10px"><button class="btn btn-sm" id="bkn">สำรองตอนนี้</button></div></div>`;
     const bk=$('#bkn'); if(bk) bk.onclick=async()=>{ busy(bk,true,'กำลังสำรอง...'); try{ const r=await bridge('backup'); toast(`สำรองแล้ว ${r.name}`); mgStorage(); }catch(e){ busy(bk,false); toast(errText(e),true); } };
