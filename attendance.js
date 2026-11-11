@@ -286,9 +286,10 @@ function openWizard(e, startStep=0, onSaved){
    ===================================================================== */
 const ATT = {
   present:{t:'มา',c:'t-ok',s:''}, late:{t:'สาย',c:'t-warn',s:'ส'}, half:{t:'ครึ่งวัน',c:'',s:'½'},
-  sick:{t:'ลาป่วย',c:'t-leave',s:'ป'}, personal:{t:'ลากิจ',c:'t-leave',s:'ก'}, vacation:{t:'ลาพักร้อน',c:'t-leave',s:'พ'}, absent:{t:'ขาด',c:'t-bad',s:'ข'}
+  sick:{t:'ลาป่วย',c:'t-leave',s:'ป'}, personal:{t:'ลากิจ',c:'t-leave',s:'ก'}, vacation:{t:'ลาพักร้อน',c:'t-leave',s:'พ'}, absent:{t:'ขาด',c:'t-bad',s:'ข'},
+  off:{t:'วันหยุดบริษัท',c:'t-off',s:'O'}
 };
-const ATT_ORDER=['present','late','half','absent','sick','personal','vacation'];
+const ATT_ORDER=['present','late','half','absent','sick','personal','vacation','off'];
 const addDays=(iso,n)=>{ const p=parseISO(iso); return localISO(new Date(p.y,p.m-1,p.d+n)); };
 const monthRange=iso=>{ const p=parseISO(iso); return [localISO(new Date(p.y,p.m-1,1)), localISO(new Date(p.y,p.m,0))]; };
 const dayLong=iso=>{ const p=parseISO(iso); const d=new Date(p.y,p.m-1,p.d); return `วัน${TH_DAYS[d.getDay()]}ที่ ${p.d} ${TH_MONTHS_S[p.m-1]} ${p.y+543}`; };
@@ -658,7 +659,7 @@ function mgStars(){
    ===================================================================== */
 let rollView=(()=>{ try{ return localStorage.getItem('kty-roll-view')||'grid'; }catch(e){ return 'grid'; } })();
 let rollSize=(()=>{ try{ return localStorage.getItem('kty-roll-size')||'M'; }catch(e){ return 'M'; } })();
-const QUICK=['late','sick','personal','vacation','absent'];
+const QUICK=['late','half','sick','personal','vacation','absent','off'];
 async function pageRoll(){
   const today=localISO(), [m0]=monthRange(today), mgr=isManager();
   setPage(head('เช็คชื่อวันนี้', dayLong(today), {back:mgr?'#att':'', mActions:`<span class="tag t-acc">${mgr?ROLES[S.profile.role]:'ผู้เช็คชื่อ'}</span>`}) + `<div id="rb"><div class="loading"><div class="spin"></div></div></div>`);
@@ -669,7 +670,8 @@ async function pageRoll(){
   const rec={}, lateB={}; att.forEach(x=>{ if(x.work_date===today) rec[x.employee_id]=x; else if(x.status==='late') lateB[x.employee_id]=(lateB[x.employee_id]||0)+1; });
   const locked=id=>rec[id]&&!mgr&&rec[id].updated_by!==S.profile.id;
   const sel=new Set(emps.filter(e=>!locked(e.id)&&rec[e.id]?.status==='present').map(e=>e.id));
-  const st={}, notice={};
+  const st={}, notice={}, siteOf={}, pick=new Set(); let multi=false, bulkSite=S.site?+S.site:(S.sites.find(s=>s.status==='active')?.id||null);
+  emps.forEach(e=>{ if(rec[e.id]?.site_id) siteOf[e.id]=rec[e.id].site_id; });
   emps.forEach(e=>{ const r=rec[e.id]; if(r&&!locked(e.id)&&r.status!=='present'){ st[e.id]=r.status; notice[e.id]=!r.no_notice; } });
   let q='', f='all';
   if(!emps.length){ $('#rb').outerHTML=`<div class="card empty"><b>ยังไม่มีรายชื่อที่คุณเช็คได้</b>${mgr?'เพิ่มพนักงานได้ที่เมนูพนักงาน':'ติดต่อแอดมินเพื่อกำหนดรายชื่อให้'}</div>`; return; }
@@ -679,7 +681,8 @@ async function pageRoll(){
       <div class="seg rsize" style="flex:none;padding:3px" role="group" aria-label="ขนาดการ์ด">${[['S','เล็ก'],['M','กลาง'],['L','ใหญ่']].map(([k,t])=>`<button data-size="${k}" style="min-height:40px;padding:0 10px">${t}</button>`).join('')}</div>
       <div class="seg" style="flex:none;padding:3px" role="group" aria-label="มุมมอง"><button data-view="grid" aria-label="แบบการ์ด" title="แบบการ์ด" style="min-height:40px;width:44px">${svg('<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>')}</button><button data-view="list" aria-label="แบบรายการ" title="แบบรายการ" style="min-height:40px;width:44px">${svg('<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>')}</button></div></div>
     <div class="chips scroll" id="rf"></div>
-    <div class="row" style="justify-content:space-between"><span class="sm muted">แตะเพื่อติ๊กว่ามาแล้ว</span><button class="linkbtn" id="rall" style="font-weight:700;color:var(--ink);text-decoration:none">เลือกทั้งหมด</button></div>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn btn-sm" id="rmulti">เลือกหลายคน · กำหนดสถานะ/ไซต์</button><button class="btn btn-sm" id="rsum">ใบสรุปวันนี้</button></div>
+    <div class="row" style="justify-content:space-between"><span class="sm muted" id="rhint">แตะเพื่อติ๊กว่ามาแล้ว</span><button class="linkbtn" id="rall" style="font-weight:700;color:var(--ink);text-decoration:none">เลือกทั้งหมด</button></div>
     <div id="rl"></div><div class="savebar" id="rbar"></div>`;
   const shown=()=>emps.filter(e=>(!q||[e.first_name,e.last_name,e.nickname].some(v=>(v||'').toLowerCase().includes(q)))&&(f==='all'||(f==='todo'?(!sel.has(e.id)&&!locked(e.id)):String(e.position_id)===f)));
   function drawFilters(){
@@ -690,9 +693,9 @@ async function pageRoll(){
     $$('[data-size]',host).forEach(b=>b.classList.toggle('on',b.dataset.size===rollSize)); $('.rsize',host).classList.toggle('hidden',rollView!=='grid');
   }
   function item(e){
-    const on=sel.has(e.id), lk=locked(e.id), r=rec[e.id];
+    const on=multi?pick.has(e.id):sel.has(e.id), lk=locked(e.id), r=rec[e.id], sn=siteOf[e.id]?S.sites.find(s=>s.id===siteOf[e.id]):null;
     const mark=`<span class="rchk ${on?'on':''}">${on?svg('<path d="M5 12l5 5 9-10"/>','style="width:16px;height:16px;stroke-width:3"'):''}</span>`;
-    const sub=lk?`<span class="tag ${ATT[r.status].c}" style="height:20px">${ATT[r.status].t}</span> <span class="xs muted">บันทึกโดยผู้บริหาร</span>`:(st[e.id]&&!on?`<span class="tag ${ATT[st[e.id]].c}" style="height:20px">${ATT[st[e.id]].t}</span>`:`<span class="xs muted">${esc(e.nickname?e.nickname+' · ':'')}${esc(e.position_name||'')}</span>`);
+    const sub=lk?`<span class="tag ${ATT[r.status].c}" style="height:20px">${ATT[r.status].t}</span> <span class="xs muted">บันทึกโดยผู้บริหาร</span>`:(st[e.id]&&(multi||!on)?`<span class="tag ${ATT[st[e.id]].c}" style="height:20px">${ATT[st[e.id]].t}</span>${sn?` <span class="xs muted">${esc(sn.code||sn.name)}</span>`:''}`:multi&&sel.has(e.id)?`<span class="tag t-ok" style="height:20px">มา</span>${sn?` <span class="xs muted">${esc(sn.code||sn.name)}</span>`:''}`:`<span class="xs muted">${esc(e.nickname?e.nickname+' · ':'')}${esc(e.position_name||'')}</span>`);
     if(rollView==='grid') return `<button class="rtile ${on?'on':''}" data-r="${e.id}" ${lk?'disabled':''} aria-pressed="${on}">${lk?'':mark}${avatar(e,'rav')}<div><b>${esc(shortName(e))}</b><div class="rsub" style="margin-top:2px">${sub}</div></div></button>`;
     return `<button class="li rrow ${on?'on':''}" data-r="${e.id}" ${lk?'disabled':''} aria-pressed="${on}">${avatar(e,'','width:44px;height:44px')}<div class="grow"><b>${esc(shortName(e))}</b><div>${sub}</div></div>${lk?'':mark}</button>`;
   }
@@ -700,9 +703,18 @@ async function pageRoll(){
     const list=shown();
     $('#rl',host).innerHTML=list.length?(rollView==='grid'?`<div class="rgrid rs-${rollSize}">${list.map(item).join('')}</div>`:`<div class="card card-l">${list.map(item).join('')}</div>`):`<div class="card empty"><b>${f==='todo'?'ติ๊กครบทุกคนแล้ว':'ไม่พบรายชื่อ'}</b></div>`;
     hydratePhotos($('#rl',host));
-    $$('[data-r]',host).forEach(b=>b.onclick=()=>{ const id=b.dataset.r; if(sel.has(id)) sel.delete(id); else { sel.add(id); delete st[id]; } drawAll(); });
+    $$('[data-r]',host).forEach(b=>b.onclick=()=>{ const id=b.dataset.r; if(multi){ pick.has(id)?pick.delete(id):pick.add(id); drawAll(); return; } if(sel.has(id)) sel.delete(id); else { sel.add(id); delete st[id]; } drawAll(); });
   }
   function drawBar(){
+    if(multi){ const sites=S.sites.filter(s=>s.status==='active'), BTN=['present','late','half','sick','personal','vacation','absent','off'];
+      $('#rbar',host).innerHTML=`<div class="col grow" style="gap:8px"><div class="row" style="gap:8px"><b class="grow">เลือกแล้ว ${pick.size} คน</b><button class="linkbtn" id="rmx">เสร็จ</button></div>
+        <label class="row sm" style="gap:8px">ไปทำงานที่ <select class="in" id="rsite" style="height:38px;flex:1"><option value="">— ไม่ระบุไซต์ —</option>${sites.map(s=>`<option value="${s.id}" ${s.id===bulkSite?'selected':''}>${esc(s.name)}${s.code?` (${esc(s.code)})`:''}</option>`).join('')}</select></label>
+        <div class="bulkst">${BTN.map(k=>`<button class="btn btn-sm st-${k}" data-bulk="${k}" ${pick.size?'':'disabled'}>${ATT[k].t}</button>`).join('')}</div><span class="xs muted">แตะสถานะ = ใช้กับทุกคนที่เลือก แก้รายคนได้ภายหลัง</span></div>`;
+      $('#rsite',host).onchange=e=>{ bulkSite=e.target.value?+e.target.value:null; };
+      $('#rmx',host).onclick=()=>{ multi=false; pick.clear(); drawAll(); };
+      $$('[data-bulk]',host).forEach(b=>b.onclick=()=>{ const k=b.dataset.bulk; pick.forEach(id=>{ if(locked(id)) return; if(k==='present'){ sel.add(id); delete st[id]; } else { sel.delete(id); st[id]=k; if(notice[id]===undefined) notice[id]=true; } if(bulkSite) siteOf[id]=bulkSite; });
+        toast(`กำหนด "${ATT[k].t}" ให้ ${pick.size} คนแล้ว`); pick.clear(); drawAll(); });
+      return; }
     const lockedPresent=emps.filter(e=>locked(e.id)&&rec[e.id].status==='present').length;
     const n=sel.size+lockedPresent, pct=Math.round(n/emps.length*100);
     $('#rbar',host).innerHTML=`<div class="col grow" style="gap:6px"><div class="row" style="gap:10px"><div class="track grow" style="height:8px"><i class="a" style="width:${pct}%"></i></div><b class="sm num">${n} / ${emps.length}</b></div><span class="xs muted">มาแล้ว ${n} คน</span></div><button class="btn btn-p" id="rgo">ตรวจสอบและยืนยัน</button>`;
@@ -712,7 +724,9 @@ async function pageRoll(){
   $('#rq',host).addEventListener('input',e=>{ q=e.target.value.trim().toLowerCase(); drawList(); });
   $$('[data-size]',host).forEach(b=>b.onclick=()=>{ rollSize=b.dataset.size; try{ localStorage.setItem('kty-roll-size',rollSize); }catch(_){} drawAll(); });
   $$('[data-view]',host).forEach(b=>b.onclick=()=>{ rollView=b.dataset.view; try{ localStorage.setItem('kty-roll-view',rollView); }catch(_){} drawAll(); });
-  $('#rall',host).onclick=()=>{ const list=shown().filter(e=>!locked(e.id)); const all=list.every(e=>sel.has(e.id)); list.forEach(e=>{ if(all) sel.delete(e.id); else { sel.add(e.id); delete st[e.id]; } }); drawAll(); };
+  $('#rmulti',host).onclick=()=>{ multi=!multi; pick.clear(); $('#rmulti',host).classList.toggle('btn-p',multi); $('#rhint',host).textContent=multi?'แตะเพื่อเลือกคนที่จะกำหนดสถานะ':'แตะเพื่อติ๊กว่ามาแล้ว'; drawAll(); };
+  $('#rsum',host).onclick=()=>dailySummary(today);
+  $('#rall',host).onclick=()=>{ if(multi){ const list=shown().filter(e=>!locked(e.id)); const all=list.every(e=>pick.has(e.id)); list.forEach(e=>all?pick.delete(e.id):pick.add(e.id)); drawAll(); return; } const list=shown().filter(e=>!locked(e.id)); const all=list.every(e=>sel.has(e.id)); list.forEach(e=>{ if(all) sel.delete(e.id); else { sel.add(e.id); delete st[e.id]; } }); drawAll(); };
   drawAll();
 
   function review(){
@@ -740,7 +754,7 @@ async function pageRoll(){
       $$('[data-q]',sh).forEach(b=>b.onclick=()=>{ const [id,k]=b.dataset.q.split('|'); st[id]=st[id]===k?undefined:k; if(!st[id]) delete st[id]; if(notice[id]===undefined) notice[id]=true; const y=$('.sheet-body',sh).scrollTop; draw(); $('.sheet-body',sh).scrollTop=y; });
       $$('[data-nt]',sh).forEach(c=>c.onchange=()=>{ notice[c.dataset.nt]=c.checked; });
       $('[data-go]',sh).onclick=async ev=>{
-        const keep=id=>({ot_hours:mgr?Number(rec[id]?.ot_hours||0):0, site_id:rec[id]?.site_id||null, note:rec[id]?.note||null});
+        const keep=id=>({ot_hours:mgr?Number(rec[id]?.ot_hours||0):0, site_id:siteOf[id]||rec[id]?.site_id||null, note:rec[id]?.note||null});
         const rows=[...ticked.filter(e=>!locked(e.id)).map(e=>({employee_id:e.id,work_date:today,status:'present',no_notice:false,...keep(e.id)})),
           ...rest.filter(e=>st[e.id]).map(e=>({employee_id:e.id,work_date:today,status:st[e.id],no_notice:['personal','vacation'].includes(st[e.id])?notice[e.id]===false:false,...keep(e.id)}))];
         busy(ev.target,true);
@@ -764,10 +778,11 @@ function rollDone(rows, emps, rec, locked){
       <div class="col" style="gap:0;align-items:center"><b style="font-size:24px;color:var(--warn)">${c(['late'])}</b><span class="xs muted">สาย</span></div>
       <div class="col" style="gap:0;align-items:center"><b style="font-size:24px">${c(['sick','personal','vacation'])}</b><span class="xs muted">ลา</span></div>
       <div class="col" style="gap:0;align-items:center"><b style="font-size:24px;color:var(--bad)">${c(['absent'])}</b><span class="xs muted">ขาด</span></div></div>
+    ${c(['off'])?`<span class="sm muted">วันหยุดบริษัท ${c(['off'])} คน</span>`:''}
     ${none?`<div class="note n-warn" style="width:100%;text-align:left;align-items:center">${IC.clock}<span>ยังไม่ระบุ ${none} คน ผู้บริหารจะจัดการภายหลัง</span></div>`:''}
     <span class="sm muted">${isManager()?'แก้ไขย้อนหลังได้ที่หน้าเช็คชื่อแบบละเอียด':'แก้ไขได้ถึงเที่ยงคืนวันนี้ หลังจากนั้นแก้ได้เฉพาะผู้บริหาร'}</span>
-    <div class="col" style="width:100%;gap:10px"><button class="btn" id="redo">แก้ไขการเช็คชื่อวันนี้</button><a href="#home" class="btn btn-p">กลับหน้าแรก</a></div></div></div>`;
-  $('#redo').onclick=pageRoll; scrollTo(0,0);
+    <div class="col" style="width:100%;gap:10px"><button class="btn btn-p" id="dsum">ดู / แชร์ใบสรุปคนงานประจำวัน</button><button class="btn" id="redo">แก้ไขการเช็คชื่อวันนี้</button><a href="#home" class="btn">กลับหน้าแรก</a></div></div></div>`;
+  $('#redo').onclick=pageRoll; $('#dsum').onclick=()=>dailySummary(localISO()); scrollTo(0,0); setTimeout(()=>dailySummary(localISO()),400);
 }
 
 /* =====================================================================
@@ -776,7 +791,7 @@ function rollDone(rows, emps, rec, locked){
 async function pageMe(){
   const p=S.profile, th=curTheme();
   setPage(head('ข้อมูลของฉัน',ROLES[p.role]) + `<div class="col" style="max-width:640px">
-    <div id="myEmp"></div>
+    <div id="myEmp"></div>${p.employee_id?`<a href="#my" class="card row" style="gap:12px;text-decoration:none;color:inherit"><span style="font-size:24px">🪪</span><div class="grow"><b>ข้อมูลของฉัน</b><div class="xs muted">เงินเดือน · ข้อมูลส่วนตัวทั้งหมด · ขอแก้ไขข้อมูล</div></div>${IC.chev}</a>`:''}
     <div class="card col" style="gap:10px"><b>รูปแบบสี</b>
       <div class="seg">${[['auto','ตามเครื่อง'],['light','สว่าง'],['dark','มืด']].map(([k,t])=>`<button class="${th===k?'on':''}" data-th="${k}">${t}</button>`).join('')}</div>
       <span class="xs muted">"ตามเครื่อง" จะสลับสว่าง/มืดตามการตั้งค่าของมือถือหรือคอมพิวเตอร์อัตโนมัติ</span></div>
@@ -849,4 +864,19 @@ function staffOrderSheet(){
     };
   }
   draw();
+}
+
+/* ---------- ใบสรุปคนงานประจำวัน (PDF เวกเตอร์ + PNG) ---------- */
+async function dailySummary(date){
+  try{
+    const mgr=isManager();
+    const [at,em]=await Promise.all([ sb.from('attendance').select('employee_id,status,site_id,ot_hours,updated_by').eq('work_date',date),
+      mgr?sb.from('employees').select('id,emp_code,first_name,last_name,nickname,position_id,sort_order,status').order('sort_order',{nullsFirst:false}):sb.rpc('list_checkable_employees') ]);
+    if(at.error) throw at.error;
+    const emps=(em.data||[]).map(e=>({...e,position:e.position_name||posName(e.position_id)||''})), byId=Object.fromEntries(emps.map(e=>[e.id,e]));
+    const rows=(at.data||[]).filter(r=>byId[r.employee_id]).map(r=>({...r,e:byId[r.employee_id]}));
+    if(!rows.length) return toast('วันนี้ยังไม่มีการเช็คชื่อ',true);
+    const dd=await dailySummaryDoc(date,rows);
+    vectorPreview(dd, `ใบสรุปคนงาน_${date}`, 'ใบสรุปคนงานประจำวัน', '');
+  }catch(e){ toast(errText(e),true); }
 }

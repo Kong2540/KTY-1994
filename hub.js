@@ -1,7 +1,7 @@
 /* =====================================================================
    KTY Hub — โครงหน้า: แถบเมนูด้านข้าง / ลิ้นชักเมนูบนมือถือ / ตัวเลือกไซต์
    ===================================================================== */
-const HUB_VERSION = '2.6';
+const HUB_VERSION = '2.7';
 const MOD = {
   att:      { t:'เช็คชื่อ',            hue:'#2E9E5B', i:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>' },
   daily:    { t:'รายงานประจำวัน',      hue:'#2F6FDB', i:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>' },
@@ -56,6 +56,7 @@ function navSections0(){
     if(hasMod('borrow')||hasMod('materials')) it.push({k:'ret',m:'borrow',t:'คืน วัสดุ/อุปกรณ์',b:'brw'});
     if(hasMod('issues')) it.push({k:'soon/issues',m:'issues',t:'รายงานปัญหาหน้างาน'});
     out.push({t:'งานของฉัน', items:it});
+    if(hasMod('hr',['approver'])) out.push({t:'บุคคล', items:[{k:'reqs',m:'people',t:'คำขอแก้ไขข้อมูล'}]});
     out.push({t:'ของฉัน', items:[{k:'my',m:'payroll',t:'ข้อมูลของฉัน'},{k:'me/stars',m:'stars'},{k:'me',m:'me'}]});
   }
   return out;
@@ -97,7 +98,7 @@ function route(){
   const cur=keyOf(location.hash); const [k,id,id2]=cur.split('/');
   if(k==='users'){ mgTab='users'; } if(k==='settings'){ mgTab='sites'; }
   const mgr=isManager(), p=S.profile;
-  const can={ home:1, tasks:1, me:1, soon:1, att:mgr, employees:mgr, emp:mgr, manage:mgr, users:mgr, settings:mgr, roll:mgr||p.can_check, report:p.role==='foreman'||mgr||hasMod('daily'), mat:mgr||hasMod('materials'), pay:1, id:1, my:1, reqs:mgr, brw:mgr||hasMod('borrow')||hasMod('materials'), ret:mgr||hasMod('borrow')||hasMod('materials'), daily:p.role==='foreman'||mgr||hasMod('daily'), studio:isAdmin() };
+  const can={ home:1, tasks:1, me:1, soon:1, att:mgr, employees:mgr, emp:mgr, manage:mgr, users:mgr, settings:mgr, roll:mgr||p.can_check, report:p.role==='foreman'||mgr||hasMod('daily'), mat:mgr||hasMod('materials'), pay:1, id:1, my:1, reqs:mgr||hasMod('hr',['approver']), brw:mgr||hasMod('borrow')||hasMod('materials'), ret:mgr||hasMod('borrow')||hasMod('materials'), daily:p.role==='foreman'||mgr||hasMod('daily'), studio:isAdmin() };
   if(ROUTE_MOD[k]&&!allowed(ROUTE_MOD[k])) can[k]=0;
   const key=can[k]?k:'home';
   if(key==='att'&&id&&['day','month','site'].includes(id)) attTab=id;
@@ -167,6 +168,7 @@ async function collectTasks(){
     (res.rc||[]).forEach(d=>tasks.push({m:'materials',t:`รับของ ${d.doc_no}`,sub:sn(d.site_id),tag:'รอรับ',c:'t-acc',href:`#mat/d/${d.id}`}));
     S.badges.mat=(res.ap||[]).length+(res.is||[]).length+(res.rc||[]).length;
   }catch(_){} }
+  if(!mgr&&hasMod('hr',['approver'])){ try{ const {data:pr}=await sb.rpc('pending_profile_requests'); if((pr||[]).length) tasks.push({m:'people',t:`คำขอแก้ไขข้อมูลพนักงาน ${pr.length} รายการ`,sub:'ตรวจค่าเดิม → ค่าใหม่ แล้วอนุมัติ',tag:'รออนุมัติ',c:'t-warn',href:'#reqs'}); }catch(_){} }
   if(mgr){ try{ const [c1,c2]=await Promise.all([sb.from('emp_change_requests').select('id',{count:'exact',head:true}).eq('status','pending'), isAdmin()?sb.from('link_requests').select('id',{count:'exact',head:true}).eq('status','pending'):Promise.resolve({count:0})]);
     if(c1.count) tasks.push({m:'people',t:`คำขอแก้ไขข้อมูลพนักงาน ${c1.count} รายการ`,sub:'ตรวจค่าเดิม → ค่าใหม่ แล้วอนุมัติ',tag:'รออนุมัติ',c:'t-warn',href:'#reqs'});
     if(c2.count) tasks.push({m:'people',t:`คำขอผูกบัญชีกับพนักงาน ${c2.count} รายการ`,sub:'จากการสแกน QR บนสลิป',tag:'รออนุมัติ',c:'t-warn',href:'#reqs'}); }catch(_){} }
@@ -269,13 +271,14 @@ const MROLES = {
   daily:{t:'รายงานประจำวัน', o:[['','ไม่มี'],['writer','เขียน'],['viewer','ดูทั้งหมด']]},
   materials:{t:'เบิกจ่ายวัสดุ', o:[['','ไม่มี'],['requester','ผู้ขอเบิก'],['approver','ผู้อนุมัติ'],['store','สโตร์'],['admin','แอดมิน']]},
   borrow:{t:'ยืม-คืนอุปกรณ์', o:[['','ไม่มี'],['requester','ผู้ขอยืม'],['approver','ผู้อนุมัติ']]},
-  issues:{t:'ปัญหาหน้างาน', o:[['','ไม่มี'],['reporter','แจ้งปัญหา'],['receiver','รับแจ้ง']]}
+  issues:{t:'ปัญหาหน้างาน', o:[['','ไม่มี'],['reporter','แจ้งปัญหา'],['receiver','รับแจ้ง']]},
+  hr:{t:'บุคคล (อนุมัติข้อมูลพนักงาน)', o:[['','ไม่มี'],['approver','ผู้อนุมัติข้อมูล']]}
 };
 async function mgPerms(){
   const [u,r]=await Promise.all([ sb.from('profiles').select('*').eq('is_active',true).neq('role','pending').order('display_name'), sb.from('module_roles').select('*') ]);
   if(r.error){ $('#mg').innerHTML=`<div class="card empty"><b>ยังไม่ได้อัปเดตฐานข้อมูล Hub</b>รันไฟล์ 05_hub.sql ใน Supabase แล้วโหลดหน้านี้ใหม่</div>`; return; }
   const roles=r.data||[], get=(uid,m)=>roles.find(x=>x.user_id===uid&&x.module===m)?.role||'';
-  const short={writer:'เขียน',viewer:'ดู',requester:'ขอ',approver:'อนุ',store:'สโตร์',admin:'แอด',reporter:'แจ้ง',receiver:'รับ'};
+  const short={writer:'เขียน',viewer:'ดู',requester:'ขอ',approver:'อนุ',store:'สโตร์',admin:'แอด',reporter:'แจ้ง',receiver:'รับ'}; short.approver=short.approver||'อนุ';
   $('#mg').innerHTML=`<div class="note n-info">${IC.info}<span>ผู้บริหารและแอดมินใช้ได้ทุกระบบโดยอัตโนมัติ ตั้งค่าเฉพาะผู้ใช้อื่น ส่วนรายชื่อที่ผู้เช็คชื่อเห็น ตั้งที่แท็บผู้ใช้</span></div>
     ${(u.data||[]).map(p=>{ const mgr=['admin','executive'].includes(p.role);
       return `<details class="card perm" data-u="${p.id}" ${mgr?'':''}><summary class="row" style="gap:12px;cursor:pointer;list-style:none"><div class="av round" style="width:40px;height:40px">${esc((p.display_name||'?').charAt(0))}</div><div class="grow"><b>${esc(p.display_name)}</b><div class="xs muted">${ROLES[p.role]}</div></div>

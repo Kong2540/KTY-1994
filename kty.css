@@ -474,3 +474,10 @@ details.perm>summary::-webkit-details-marker{display:none}
 .a2hs-ic{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;background:var(--surface2)}
 
 .n-ok{background:var(--okBg,#E8F6EE);color:var(--ok)}
+
+.t-off{background:#E7EBEE;color:#475569}
+.bulkst{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.bulkst .btn{min-height:40px;color:#fff;border:0}
+.st-present{background:#16A34A}.st-late{background:#D97706}.st-half{background:#0284C7}.st-sick,.st-personal,.st-vacation{background:#7C3AED}.st-absent{background:#DC2626}.st-off{background:#64748B}
+.mc.s-off{background:#E7EBEE;color:#475569;font-weight:800}
+
+.myh-strip span{font-size:10.5px}.myh-leg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px;color:var(--ink2)}.myh-leg span{display:flex;align-items:center;gap:4px}.myh-leg i{font-style:normal;width:16px;height:16px;border-radius:4px;color:#fff;font-size:9.5px;font-weight:700;display:grid;place-items:center}

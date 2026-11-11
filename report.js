@@ -4,7 +4,7 @@
    ===================================================================== */
 const AR_CNT = { present:'มา', late:'สาย', half:'ครึ่งวัน', sick:'ลาป่วย', personal:'ลากิจ', vacation:'ลาพักร้อน', absent:'ขาด', holiday:'วันหยุด', leave:'ลารวม', ot:'OT (ชม.)', work:'วันทำงานรวม' };
 const AR_MONEY = { wage:'ค่าแรง', otpay:'ค่า OT', adds:'รายการเพิ่ม', gross:'รวมก่อนหัก', sso:'ประกันสังคม', ded:'หักอื่น ๆ', net:'รับสุทธิ' };
-const AR_CODE = { present:['ม','#16A34A'], late:['ส','#D97706'], half:['½','#0284C7'], sick:['ป','#7C3AED'], personal:['ก','#7C3AED'], vacation:['พ','#7C3AED'], absent:['ข','#DC2626'] };
+const AR_CODE = { present:['ม','#16A34A'], late:['ส','#D97706'], half:['½','#0284C7'], sick:['ป','#7C3AED'], personal:['ก','#7C3AED'], vacation:['พ','#7C3AED'], absent:['ข','#DC2626'], off:['O','#64748B'] };
 const AR_PRESETS = {
   main: { name:'ตารางมาทำงาน + เงิน', emp:['code','name_nick','position'], grid:true, cnt:['work','absent','leave','ot'], money:['net'], font:7.5, margin:{t:10,r:8,b:10,l:8}, legend:true, sign:true },
   days: { name:'สรุปวัน', emp:['code','name_nick','position'], grid:false, cnt:['present','late','half','sick','personal','vacation','absent','holiday','ot','work'], money:[], font:11, margin:{t:12,r:12,b:12,l:12}, legend:false, sign:true },
@@ -45,8 +45,8 @@ async function monthReport(month){
     const days=[]; for(let d=a; d<=b; d=addDays(d,1)) days.push(d);
     data={key,a,b,emps,att,hol,pay,days}; return data;
   }
-  function counts(D,e){ const c={present:0,late:0,half:0,sick:0,personal:0,vacation:0,absent:0,holiday:0,ot:0};
-    D.days.forEach(d=>{ const r=D.att[e.id+'|'+d]; if(r){ c[r.status]++; c.ot+=+r.ot_hours||0; } else if(D.hol[d]) c.holiday++; });
+  function counts(D,e){ const c={present:0,late:0,half:0,sick:0,personal:0,vacation:0,absent:0,holiday:0,ot:0,off:0};
+    D.days.forEach(d=>{ const r=D.att[e.id+'|'+d]; if(r){ if(r.status==='off') c.holiday++; else c[r.status]++; c.ot+=+r.ot_hours||0; } else if(D.hol[d]) c.holiday++; });
     c.leave=c.sick+c.personal+c.vacation; c.work=c.present+c.late+c.half*0.5; return c; }
   function buildDoc(D,cfg){
     const B=BR(), m=cfg.margin, pageW=841.89-(m.l+m.r)*PT, EF=arEmpFields();

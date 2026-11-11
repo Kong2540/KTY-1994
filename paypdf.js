@@ -210,3 +210,36 @@ async function vectorPreview(dd, name, title, extraHTML='', onReady){
     onReady&&onReady({m,blob,png64});
   }catch(e){ prog.close(); toast(errText(e),true); }
 }
+
+/* ---------- ใบสรุปคนงานประจำวัน (A4 แนวตั้ง จัดกลุ่มตามหน้างาน) ---------- */
+async function dailySummaryDoc(date, rows){
+  await pdfReady(); await logoData();
+  const W=595.28, M=34, iw=W-M*2, B=BR();
+  const COL={present:'#16A34A',late:'#D97706',half:'#0284C7',sick:'#7C3AED',personal:'#7C3AED',vacation:'#7C3AED',absent:'#DC2626',off:'#64748B'};
+  const LBL={present:'มา',late:'มาสาย',half:'ครึ่งวัน',sick:'ลาป่วย',personal:'ลากิจ',vacation:'ลาพักร้อน',absent:'ขาด',off:'วันหยุดบริษัท'};
+  const work=rows.filter(r=>['present','late','half'].includes(r.status)), other=rows.filter(r=>!['present','late','half'].includes(r.status));
+  const sort=(a,b)=>(a.e.sort_order??1e9)-(b.e.sort_order??1e9)||String(a.e.emp_code).localeCompare(String(b.e.emp_code));
+  const groups={}; work.forEach(r=>{ const k=r.site_id||0; (groups[k]=groups[k]||[]).push(r); });
+  const siteKeys=Object.keys(groups).sort((a,b)=>groups[b].length-groups[a].length);
+  const cnt=k=>rows.filter(r=>k.includes(r.status)).length;
+  const p=parseISO(date), docNo=`DWS-${String(p.y+543).slice(-2)}${String(p.m).padStart(2,'0')}${String(p.d).padStart(2,'0')}`;
+  const stat=(t,v,c)=>({stack:[{text:String(v),bold:true,fontSize:17,color:c,alignment:'center'},{text:t,fontSize:7.5,color:C_LAB,alignment:'center'}],margin:[0,3,0,3]});
+  let n=0;
+  const sections=siteKeys.map(k=>{ const site=S.sites.find(s=>s.id===+k), list=groups[k].sort(sort);
+    return {stack:[
+      {table:{widths:['*','auto'],body:[[{text:site?`${site.name}${site.code?` (${site.code})`:''}`:'ไม่ระบุไซต์',bold:true,color:'#fff',fontSize:10},{text:[`${list.length} คน`],bold:true,color:'#F2B705',fontSize:10,alignment:'right'}]]},layout:{hLineWidth:()=>0,vLineWidth:()=>0,fillColor:()=>C_DARK,paddingLeft:()=>8,paddingRight:()=>8,paddingTop:()=>4,paddingBottom:()=>4}},
+      {table:{widths:[18,'*',100,58,30],headerRows:0,body:list.map(r=>{ n++; return [{text:String(n),color:C_LAB},{text:[{text:`${r.e.first_name} ${r.e.last_name||''}`.trim(),bold:true},r.e.nickname?` (${r.e.nickname})`:'']},{text:r.e.position||'-',color:C_LAB},{text:LBL[r.status],bold:true,color:COL[r.status],alignment:'center'},{text:+r.ot_hours?`OT ${num(r.ot_hours)}`:'',fontSize:7.5,color:C_LAB,alignment:'right'}]; })},
+        layout:{hLineWidth:(i,node)=>i===node.table.body.length?.6:.3,vLineWidth:(i,node)=>i===0||i===node.table.widths.length?.6:0,hLineColor:()=>C_LINE,vLineColor:()=>C_LINE,paddingLeft:()=>6,paddingRight:()=>6,paddingTop:()=>3.5,paddingBottom:()=>3.5},fontSize:9}
+    ],margin:[0,0,0,9],unbreakable:list.length<=18}; });
+  const box=(t,c,list)=>({stack:[{text:`${t} (${list.length})`,bold:true,color:c,fontSize:9},{text:list.length?list.sort(sort).map(r=>`${r.e.first_name}${r.e.nickname?` (${r.e.nickname})`:''}${r.status==='sick'?' ป':r.status==='personal'?' ก':r.status==='vacation'?' พ':''}`).join(', '):'-',fontSize:8,color:C_LAB,margin:[0,2,0,0]}],margin:[6,5,6,5]});
+  const boxes={table:{widths:['*','*','*'],body:[[box('ลา','#7C3AED',other.filter(r=>['sick','personal','vacation'].includes(r.status))),box('ขาด','#DC2626',other.filter(r=>r.status==='absent')),box('วันหยุดบริษัท','#64748B',other.filter(r=>r.status==='off'))]]},layout:{hLineWidth:()=>.6,vLineWidth:()=>.6,hLineColor:()=>C_LINE,vLineColor:()=>C_LINE},margin:[0,4,0,0],unbreakable:true};
+  return { pageSize:'A4', pageMargins:[M,M,M,M+10], defaultStyle:{font:'Sarabun',fontSize:9,color:'#1B262C',lineHeight:1.12}, info:{title:`ใบสรุปคนงานประจำวัน ${date}`,author:B.company_th},
+    footer:(c,t)=>({columns:[{text:`${B.app} · เอกสารนี้สร้างจากการเช็คชื่อในระบบ`,fontSize:6.5,color:'#9AA6AA'},{text:`หน้า ${c}/${t}`,alignment:'right',fontSize:6.5,color:'#9AA6AA'}],margin:[M,0,M,0]}),
+    content:[...docHead('ใบสรุปคนงานประจำวัน','DAILY WORKFORCE SUMMARY',iw),
+      {columns:[{text:dayLong(date),fontSize:10,bold:true},{text:['เลขที่ ',{text:docNo,bold:true}],fontSize:9,alignment:'right'}],margin:[0,0,0,6]},
+      {table:{widths:['*','*','*','*','*','*'],body:[[stat('มาทำงานรวม',work.length,C_DARK),stat('มา',cnt(['present']),'#16A34A'),stat('มาสาย',cnt(['late']),'#D97706'),stat('ลา',cnt(['sick','personal','vacation']),'#7C3AED'),stat('ขาด',cnt(['absent']),'#DC2626'),stat('วันหยุด',cnt(['off']),'#64748B')]]},layout:{hLineWidth:()=>.6,vLineWidth:()=>.6,hLineColor:()=>C_LINE,vLineColor:()=>C_LINE},margin:[0,0,0,10]},
+      ...(sections.length?sections:[{text:'วันนี้ไม่มีผู้มาทำงาน',color:C_LAB,margin:[0,10,0,10]}]),
+      boxes,
+      {columns:['ผู้เช็คชื่อ','ผู้ตรวจสอบ'].map(t=>({stack:[{text:'..............................................',alignment:'center',color:'#9AA6AA'},{text:t,alignment:'center',fontSize:8.5,margin:[0,2,0,0]}]})),margin:[0,26,0,0],unbreakable:true}
+    ] };
+}
