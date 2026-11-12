@@ -1,7 +1,7 @@
 /* =====================================================================
    KTY Hub — โครงหน้า: แถบเมนูด้านข้าง / ลิ้นชักเมนูบนมือถือ / ตัวเลือกไซต์
    ===================================================================== */
-const HUB_VERSION = '2.8';
+const HUB_VERSION = '2.8.1';
 const MOD = {
   att:      { t:'เช็คชื่อ',            hue:'#2E9E5B', i:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>' },
   daily:    { t:'รายงานประจำวัน',      hue:'#2F6FDB', i:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>' },
@@ -19,7 +19,8 @@ const MOD = {
   me:       { t:'ข้อมูลของฉัน',          hue:'#5B6B73', i:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4.2 4.2-6.5 8-6.5s7 2.3 8 6.5"/>' }
 };
 const SOON = { issues:'โฟร์แมนแจ้งปัญหาหน้างานพร้อมรูป ผู้บริหารได้รับแจ้งเตือนทันที' };
-const modIcon = (k, size=34) => `<span class="micon" style="--h:${MOD[k].hue};width:${size}px;height:${size}px;border-radius:${Math.round(size*.3)}px">${svg(MOD[k].i,`style="width:${Math.round(size*.56)}px;height:${Math.round(size*.56)}px"`)}</span>`;
+const modIcon = (k, size=34) => { if(!MOD[k]) k=MOD.people?'people':'home'; return modIcon0(k,size); };
+const modIcon0 = (k, size=34) => `<span class="micon" style="--h:${MOD[k].hue};width:${size}px;height:${size}px;border-radius:${Math.round(size*.3)}px">${svg(MOD[k].i,`style="width:${Math.round(size*.56)}px;height:${Math.round(size*.56)}px"`)}</span>`;
 
 S.badges = S.badges || {};
 S.site = (()=>{ try{ return localStorage.getItem('kty-site')||''; }catch(e){ return ''; } })();
