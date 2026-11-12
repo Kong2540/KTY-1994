@@ -9,7 +9,8 @@ const STUDIO_SECS = [
   ['access','🔐','สิทธิ์เมนูและหน้า','บทบาทไหนเห็นเมนูไหน'],
   ['rules','📷','กติการายงาน','จำนวนรูปขั้นต่ำ'],
   ['holidays','📅','วันหยุดบริษัท','ประเภท ตัวย่อ ปฏิทินวันหยุด'],
-  ['payroll','💰','กติกาเงินเดือน','การลา ประกันสังคม การผ่อน']
+  ['payroll','💰','กติกาเงินเดือน','การลา ประกันสังคม การผ่อน'],
+  ['wa','✅','ประเภทการขออนุมัติ','ตรวจเหล็ก เทคอนกรีต รายการตรวจ ช่องลงนาม']
 ];
 async function saveSetting(key, value){
   const {error}=await sb.from('app_settings').upsert({key,value,updated_at:new Date().toISOString()});
@@ -23,7 +24,7 @@ function pageStudio(sec){
     `<div class="studio ${isForm?'studio-wide':''}">${(wide&&!isForm)||!cur?`<nav class="studio-nav card card-l">${STUDIO_SECS.map(([k,e,t,d])=>`<a href="#studio/${k}" class="li ${show===k?'on':''}" style="text-decoration:none"><span class="se">${e}</span><div class="grow"><b>${t}</b><span class="xs muted">${d}</span></div>${IC.chev}</a>`).join('')}
       <a href="#manage" class="li" style="text-decoration:none"><span class="se">⚙️</span><div class="grow"><b>จัดการข้อมูลอื่น</b><span class="xs muted">ผู้ใช้ สิทธิ์รายระบบ ไซต์ ตำแหน่ง วัสดุ</span></div>${IC.chev}</a></nav>`:''}
       ${show?'<section class="studio-body col" id="sb" style="gap:14px"></section>':''}</div>`);
-  if(show) ({brand:stBrand,labels:stLabels,forms:stForms,lists:stLists,access:stAccess,rules:stRules,holidays:stHolidays,payroll:stPayroll})[show]($('#sb'));
+  if(show) ({brand:stBrand,labels:stLabels,forms:stForms,lists:stLists,access:stAccess,rules:stRules,holidays:stHolidays,payroll:stPayroll,wa:stWa})[show]($('#sb'));
 }
 
 /* ---------------- แบรนด์ ---------------- */
@@ -82,11 +83,11 @@ function stLabels(host){
 /* ---------------- รายการตัวเลือก ---------------- */
 const LIST_DEFS = [
   ['weather','สภาพอากาศ','daily_lists'],['machinery','เครื่องจักร','daily_lists'],['tools','เครื่องมือ','daily_lists'],
-  ['no_work_reasons','เหตุผลที่ไม่มีการทำงาน','daily_lists'],['issue_cats','หมวดแจ้งปัญหา','daily_lists'],['site_trades','ประเภทช่าง (คนงานหน้างาน)','site_trades']
+  ['no_work_reasons','เหตุผลที่ไม่มีการทำงาน','daily_lists'],['issue_cats','หมวดแจ้งปัญหา','daily_lists'],['wa_elements','ชิ้นส่วนโครงสร้าง (ขออนุมัติงาน)','daily_lists'],['site_trades','ประเภทช่าง (คนงานหน้างาน)','site_trades']
 ];
 function stLists(host){
   let cur=LIST_DEFS[0][0];
-  const get=k=>{ const d=LIST_DEFS.find(x=>x[0]===k); if(d[2]==='site_trades') return [...(S.settings.site_trades||[])]; const v=(S.settings.daily_lists||DL())[k]; return [...(v&&v.length?v:(k==='issue_cats'&&typeof ISS_CATS_DEF!=='undefined'?ISS_CATS_DEF:[]))]; };
+  const get=k=>{ const d=LIST_DEFS.find(x=>x[0]===k); if(d[2]==='site_trades') return [...(S.settings.site_trades||[])]; const v=(S.settings.daily_lists||DL())[k]; return [...(v&&v.length?v:(k==='issue_cats'&&typeof ISS_CATS_DEF!=='undefined'?ISS_CATS_DEF:k==='wa_elements'&&typeof WA_ELEMENTS_DEF!=='undefined'?WA_ELEMENTS_DEF:[]))]; };
   let items=get(cur);
   const draw=()=>{ host.innerHTML=`<div class="card col" style="gap:12px"><div class="chips">${LIST_DEFS.map(([k,t])=>`<button class="chip ${k===cur?'on':''}" data-t="${k}">${t}</button>`).join('')}</div>
     <div class="card card-l" style="box-shadow:none">${items.map((v,i)=>`<div class="li" style="gap:6px"><span class="muted" style="width:22px;text-align:right">${i+1}</span><input class="in grow" data-e="${i}" value="${esc(v)}" style="height:40px"><button class="ibtn" data-u="${i}" ${i?'':'disabled'} aria-label="ขึ้น">${svg('<path d="M6 15l6-6 6 6"/>')}</button><button class="ibtn" data-d="${i}" ${i<items.length-1?'':'disabled'} aria-label="ลง">${svg('<path d="M6 9l6 6 6-6"/>')}</button><button class="ibtn" data-x="${i}" aria-label="ลบ">${IC.close}</button></div>`).join('')||'<div class="empty"><b>ยังไม่มีตัวเลือก</b></div>'}</div>

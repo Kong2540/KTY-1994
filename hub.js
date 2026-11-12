@@ -1,8 +1,9 @@
 /* =====================================================================
    KTY Hub — โครงหน้า: แถบเมนูด้านข้าง / ลิ้นชักเมนูบนมือถือ / ตัวเลือกไซต์
    ===================================================================== */
-const HUB_VERSION = '2.9';
+const HUB_VERSION = '3.0';
 const MOD = {
+  wa:       { t:'ขออนุมัติงาน',        hue:'#0E7C86', i:'<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>' },
   att:      { t:'เช็คชื่อ',            hue:'#2E9E5B', i:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>' },
   daily:    { t:'รายงานประจำวัน',      hue:'#2F6FDB', i:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>' },
   materials:{ t:'เบิก วัสดุ/อุปกรณ์',        hue:'#E07A1F', i:'<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>' },
@@ -38,7 +39,7 @@ async function loadUserCtx(){
 /* เมนูทั้งหมดตามสิทธิ์ (ใช้ทั้งแถบด้านข้าง/ลิ้นชัก) */
 const ACCESS_MODS=['att','daily','materials','borrow','issues','people','payroll','sites'];
 const allowed = m => isAdmin() || !ACCESS_MODS.includes(m) || (S.settings.menu_access?.[m]?.[S.profile.role]!=='hide');
-const ROUTE_MOD={iss:'issues',att:'att',roll:'att',report:'daily',ret:'materials',daily:'daily',mat:'materials',brw:'borrow',employees:'people',emp:'people',pay:'payroll'};
+const ROUTE_MOD={wa:'wa',iss:'issues',att:'att',roll:'att',report:'daily',ret:'materials',daily:'daily',mat:'materials',brw:'borrow',employees:'people',emp:'people',pay:'payroll'};
 function navSections(){ return navSections0().map(s=>({...s,items:s.items.filter(x=>allowed(x.m))})).filter(s=>s.items.length); }
 function navSections0(){
   const p=S.profile, mgr=isManager(), out=[];
@@ -46,7 +47,7 @@ function navSections0(){
     out.push({t:'ภาพรวม', items:[{k:'home',m:'home'},{k:'tasks',m:'tasks',b:'tasks'}]});
     out.push({t:'ระบบงาน', items:[
       {k:'att',m:'att',b:'att'}, {k:'roll',m:'att',t:'เช็คชื่อแบบติ๊ก',sub:1}, {k:'att/month',m:'att',t:'ตารางรายเดือน',sub:1}, {k:'att/site',m:'att',t:'คนงานหน้างาน',sub:1,b:'crew'},
-      {k:'daily',m:'daily',b:'daily'}, {k:'mat',m:'materials',b:'mat'}, {k:'ret',m:'borrow',b:'brw'}, {k:'iss',m:'issues',b:'iss'},
+      {k:'daily',m:'daily',b:'daily'}, {k:'mat',m:'materials',b:'mat'}, {k:'ret',m:'borrow',b:'brw'}, {k:'iss',m:'issues',b:'iss'},{k:'wa',m:'wa',b:'wa'},
       {k:'employees',m:'people'}, {k:'pay',m:'payroll'} ]});
     out.push({t:'ตั้งค่า', items:[{k:'manage/sites',m:'sites'},{k:'manage',m:'manage',b:'users'},...(isAdmin()?[{k:'studio',m:'studio'}]:[])]});
   } else {
@@ -56,6 +57,7 @@ function navSections0(){
     if(hasMod('materials')) it.push({k:'mat',m:'materials',t:'เบิก วัสดุ/อุปกรณ์',b:'mat'});
     if(hasMod('borrow')||hasMod('materials')) it.push({k:'ret',m:'borrow',t:'คืน วัสดุ/อุปกรณ์',b:'brw'});
     it.push({k:'iss',m:'issues',t:'แจ้งปัญหา',b:'iss'});
+    if(p.role==='foreman'||hasMod('wa')) it.push({k:'wa',m:'wa',t:'ขออนุมัติงาน',b:'wa'});
     out.push({t:'งานของฉัน', items:it});
     if(hasMod('hr',['approver'])) out.push({t:'บุคคล', items:[{k:'reqs',m:'people',t:'คำขอแก้ไขข้อมูล'}]});
     out.push({t:'ของฉัน', items:[{k:'my',m:'payroll',t:'ข้อมูลของฉัน'},{k:'me/stars',m:'stars'},{k:'me',m:'me'}]});
@@ -99,14 +101,14 @@ function route(){
   const cur=keyOf(location.hash); const [k,id,id2]=cur.split('/');
   if(k==='users'){ mgTab='users'; } if(k==='settings'){ mgTab='sites'; }
   const mgr=isManager(), p=S.profile;
-  const can={ home:1, tasks:1, me:1, soon:1, att:mgr, employees:mgr, emp:mgr, manage:mgr, users:mgr, settings:mgr, roll:mgr||p.can_check, report:p.role==='foreman'||mgr||hasMod('daily'), mat:mgr||hasMod('materials'), pay:1, id:1, my:1, iss:1, reqs:mgr||hasMod('hr',['approver']), brw:mgr||hasMod('borrow')||hasMod('materials'), ret:mgr||hasMod('borrow')||hasMod('materials'), daily:p.role==='foreman'||mgr||hasMod('daily'), studio:isAdmin() };
+  const can={ home:1, tasks:1, me:1, soon:1, att:mgr, employees:mgr, emp:mgr, manage:mgr, users:mgr, settings:mgr, roll:mgr||p.can_check, report:p.role==='foreman'||mgr||hasMod('daily'), mat:mgr||hasMod('materials'), pay:1, id:1, my:1, iss:1, wa:mgr||hasMod('wa')||p.role==='foreman', reqs:mgr||hasMod('hr',['approver']), brw:mgr||hasMod('borrow')||hasMod('materials'), ret:mgr||hasMod('borrow')||hasMod('materials'), daily:p.role==='foreman'||mgr||hasMod('daily'), studio:isAdmin() };
   if(ROUTE_MOD[k]&&!allowed(ROUTE_MOD[k])) can[k]=0;
   const key=can[k]?k:'home';
   if(key==='att'&&id&&['day','month','site'].includes(id)) attTab=id;
   if(key==='manage'&&id) mgTab=id;
   if(key==='me'&&id==='stars') profTab='stars';
   renderShell(can[k]?cur:'home');
-  ({home:pageHome, tasks:pageTasks, att:pageAtt, employees:pageEmployees, emp:()=>pageProfile(id), manage:pageManage, users:pageManage, settings:pageManage, report:pageReport, mat:()=>pageMat(id,id2), pay:()=>pagePay(id,id2), iss:()=>pageIss(id,id2), id:()=>pageQR(id), my:()=>pageMy(id||null), reqs:pageReqs, brw:()=>pageBrw(id,id2), ret:pageRet, daily:()=>pageDaily(id,id2), roll:pageRoll, studio:()=>pageStudio(id), me:()=>id==='stars'?pageMyStars():pageMe(), soon:()=>pageSoon(id)})[key]();
+  ({home:pageHome, tasks:pageTasks, att:pageAtt, employees:pageEmployees, emp:()=>pageProfile(id), manage:pageManage, users:pageManage, settings:pageManage, report:pageReport, mat:()=>pageMat(id,id2), pay:()=>pagePay(id,id2), iss:()=>pageIss(id,id2), wa:()=>pageWa(id,id2), id:()=>pageQR(id), my:()=>pageMy(id||null), reqs:pageReqs, brw:()=>pageBrw(id,id2), ret:pageRet, daily:()=>pageDaily(id,id2), roll:pageRoll, studio:()=>pageStudio(id), me:()=>id==='stars'?pageMyStars():pageMe(), soon:()=>pageSoon(id)})[key]();
   scrollTo(0,0);
 }
 function renderShell(cur){
@@ -175,6 +177,11 @@ async function collectTasks(){
       L.filter(i=>(mgr&&i.status==='new')||unread(i)||(i.reporter===me&&i.status==='resolved')||(i.assignee===me&&['new','acknowledged','in_progress'].includes(i.status)&&!mgr)).sort((a,b)=>({critical:0,urgent:1,normal:2})[a.urgency]-({critical:0,urgent:1,normal:2})[b.urgency])
         .forEach(i=>tasks.push({m:'issues',t:(i.reporter===me&&i.status==='resolved'?'ยืนยันผลการแก้ไข: ':mgr&&i.status==='new'?'เรื่องใหม่: ':'')+i.title,sub:`${i.issue_no||''}${unread(i)?' · มีความเคลื่อนไหวใหม่':''}`,tag:UR[i.urgency],c:i.urgency==='critical'?'t-bad':i.urgency==='urgent'?'t-warn':'',href:'#iss/'+i.id,top:i.urgency==='critical'}));
       S.badges.iss=L.filter(i=>(mgr&&i.status==='new')||unread(i)||(i.reporter===me&&i.status==='resolved')).length; } }catch(_){}
+  try{ if(mgr||hasMod('wa')||S.profile.role==='foreman'){ const {data:wl}=await sb.from('work_approvals').select('id,wa_no,type_key,status,step,requester,element,element_code,floor,result').in('status',['submitted','in_review','rejected']).limit(200);
+      if(wl&&typeof waType==='function'){ const mine=wl.filter(w=>waCanSign(w,waType(w.type_key)));
+        mine.forEach(w=>{ const t=waType(w.type_key)||{}; tasks.push({m:'wa',t:`ลงนาม${t.signers?.[w.step]?.label||''}: ${t.name||''} ${w.element||''} ${w.element_code||''} ${w.floor||''}`.replace(/\s+/g,' '),sub:w.wa_no||'',tag:'รอลงนาม',c:'t-warn',href:'#wa/'+w.id}); });
+        wl.filter(w=>w.status==='rejected'&&w.requester===S.profile.id).forEach(w=>tasks.push({m:'wa',t:`ไม่ผ่าน: ${(waType(w.type_key)||{}).name||''} ${w.element_code||''}`,sub:'แก้ไขแล้วกด "ขอตรวจใหม่"',tag:'ไม่ผ่าน',c:'t-bad',href:'#wa/'+w.id}));
+        S.badges.wa=mine.length; } } }catch(_){}
   if(!mgr&&hasMod('hr',['approver'])){ try{ const {data:pr}=await sb.rpc('pending_profile_requests'); if((pr||[]).length) tasks.push({m:'people',t:`คำขอแก้ไขข้อมูลพนักงาน ${pr.length} รายการ`,sub:'ตรวจค่าเดิม → ค่าใหม่ แล้วอนุมัติ',tag:'รออนุมัติ',c:'t-warn',href:'#reqs'}); }catch(_){} }
   if(mgr){ try{ const [c1,c2]=await Promise.all([sb.from('emp_change_requests').select('id',{count:'exact',head:true}).eq('status','pending'), isAdmin()?sb.from('link_requests').select('id',{count:'exact',head:true}).eq('status','pending'):Promise.resolve({count:0})]);
     if(c1.count) tasks.push({m:'people',t:`คำขอแก้ไขข้อมูลพนักงาน ${c1.count} รายการ`,sub:'ตรวจค่าเดิม → ค่าใหม่ แล้วอนุมัติ',tag:'รออนุมัติ',c:'t-warn',href:'#reqs'});
@@ -231,6 +238,7 @@ async function pageHome(){
     if(hasMod('materials')) t.push(tileHTML('materials','#mat','เบิก วัสดุ/อุปกรณ์','mat'));
     if(hasMod('borrow')||hasMod('materials')) t.push(tileHTML('borrow','#ret','คืน วัสดุ/อุปกรณ์','brw'));
     t.push(tileHTML('issues','#iss','แจ้งปัญหา','iss'));
+    if(p.role==='foreman'||hasMod('wa')) t.push(tileHTML('wa','#wa','ขออนุมัติงาน','wa'));
     t.push(tileHTML('payroll','#my','ข้อมูลของฉัน'), tileHTML('stars','#me/stars','ดาวของฉัน'), tileHTML('me','#me','บัญชีของฉัน'));
     tiles=t.join('');
   }
@@ -279,13 +287,14 @@ const MROLES = {
   materials:{t:'เบิกจ่ายวัสดุ', o:[['','ไม่มี'],['requester','ผู้ขอเบิก'],['approver','ผู้อนุมัติ'],['store','สโตร์'],['admin','แอดมิน']]},
   borrow:{t:'ยืม-คืนอุปกรณ์', o:[['','ไม่มี'],['requester','ผู้ขอยืม'],['approver','ผู้อนุมัติ']]},
   issues:{t:'ปัญหาหน้างาน', o:[['','ไม่มี'],['reporter','แจ้งปัญหา'],['receiver','รับแจ้ง']]},
-  hr:{t:'บุคคล (อนุมัติข้อมูลพนักงาน)', o:[['','ไม่มี'],['approver','ผู้อนุมัติข้อมูล']]}
+  hr:{t:'บุคคล (อนุมัติข้อมูลพนักงาน)', o:[['','ไม่มี'],['approver','ผู้อนุมัติข้อมูล']]},
+  wa:{t:'ขออนุมัติงาน (ตรวจเหล็ก/เทคอนกรีต)', o:[['','ไม่มี'],['requester','ขออนุมัติ'],['checker','ผู้ตรวจ/อนุมัติ (เช่น วิศวกร)']]}
 };
 async function mgPerms(){
   const [u,r]=await Promise.all([ sb.from('profiles').select('*').eq('is_active',true).neq('role','pending').order('display_name'), sb.from('module_roles').select('*') ]);
   if(r.error){ $('#mg').innerHTML=`<div class="card empty"><b>ยังไม่ได้อัปเดตฐานข้อมูล Hub</b>รันไฟล์ 05_hub.sql ใน Supabase แล้วโหลดหน้านี้ใหม่</div>`; return; }
   const roles=r.data||[], get=(uid,m)=>roles.find(x=>x.user_id===uid&&x.module===m)?.role||'';
-  const short={writer:'เขียน',viewer:'ดู',requester:'ขอ',approver:'อนุ',store:'สโตร์',admin:'แอด',reporter:'แจ้ง',receiver:'รับ'}; short.approver=short.approver||'อนุ';
+  const short={writer:'เขียน',viewer:'ดู',requester:'ขอ',approver:'อนุ',store:'สโตร์',admin:'แอด',reporter:'แจ้ง',receiver:'รับ',checker:'ตรวจ'}; short.approver=short.approver||'อนุ';
   $('#mg').innerHTML=`<div class="note n-info">${IC.info}<span>ผู้บริหารและแอดมินใช้ได้ทุกระบบโดยอัตโนมัติ ตั้งค่าเฉพาะผู้ใช้อื่น ส่วนรายชื่อที่ผู้เช็คชื่อเห็น ตั้งที่แท็บผู้ใช้</span></div>
     ${(u.data||[]).map(p=>{ const mgr=['admin','executive'].includes(p.role);
       return `<details class="card perm" data-u="${p.id}" ${mgr?'':''}><summary class="row" style="gap:12px;cursor:pointer;list-style:none"><div class="av round" style="width:40px;height:40px">${esc((p.display_name||'?').charAt(0))}</div><div class="grow"><b>${esc(p.display_name)}</b><div class="xs muted">${ROLES[p.role]}</div></div>

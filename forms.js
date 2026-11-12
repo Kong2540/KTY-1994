@@ -69,6 +69,7 @@ const cfText = (f, v) => v==null||v===''?'':f.type==='multi'?(v||[]).join(', '):
 /* ---------- ตัวสร้างฟอร์มในหน้า ตั้งค่าระบบ ---------- */
 let FB = { form:'daily', sel:0, fields:null, dirty:false };
 function stForms(host){
+  if(typeof waSyncForms==='function') waSyncForms();
   if(!FB.fields||FB.formLoaded!==FB.form){ FB.fields=formAll(FB.form,true); FB.formLoaded=FB.form; FB.sel=Math.min(FB.sel,FB.fields.length-1); FB.dirty=!!S.settings.forms?.[FB.form]?.draft; }
   const F=FB.fields, fs=S.settings.forms?.[FB.form]||{}, wide=matchMedia('(min-width:1100px)').matches;
   const fieldRow=(f,i)=>`<div class="fbrow ${i===FB.sel?'on':''} ${f.hidden?'off':''}" draggable="true" data-i="${i}"><span class="grip" aria-hidden="true">⋮⋮</span><span class="fbt">${FTYPES[f.type]?.[1]||'?'}</span>
@@ -160,5 +161,6 @@ function formPreview(fields){
     title:f=>`<div class="field"><label>${esc(f.label)} *</label><div class="in"></div></div>`,
     detail:f=>`<div class="field"><label>${esc(f.label)}${f.required?' *':''}</label><div class="in" style="height:56px"></div></div>`,
     photos:f=>FB.form==='issue'?`<div class="field"><label>${esc(f.label)}</label><div class="pgrid"><div class="pthumb padd">${IC.camera}</div></div></div>`:`<div class="field"><label>${esc(f.label)} * · อย่างน้อย ${minPhotos()} รูป</label><div class="pgrid"><div class="pthumb padd">${IC.camera}</div></div></div>` };
-  return `<div class="col" style="gap:10px">${fields.filter(f=>!f.hidden).map(f=>core[f.key]?core[f.key](f):cfHTML(f,null,'pv')).join('')}</div>`;
+  const gen=f=>`<div class="field"><label>${esc(f.label)}${f.required?' *':''}</label><div class="in" style="${f.type==='checklist'||f.type==='photos'?'height:56px':''}"></div>${f.help?`<span class="hint">${esc(f.help)}</span>`:''}</div>`;
+  return `<div class="col" style="gap:10px">${fields.filter(f=>!f.hidden).map(f=>FB.form&&FB.form.startsWith('wa_')&&f.core?gen(f):core[f.key]?core[f.key](f):cfHTML(f,null,'pv')).join('')}</div>`;
 }

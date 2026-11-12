@@ -498,3 +498,8 @@ details.perm>summary::-webkit-details-marker{display:none}
 .isst{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}.isst div{display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;position:relative}.isst i{width:16px;height:16px;border-radius:50%;background:var(--line);display:block}.isst .on i{background:#16A34A}.isst .on b{color:var(--ink)}.isst b{color:var(--ink2)}
 .isman{display:grid;gap:8px}@media (min-width:600px){.isman{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .iscm{background:var(--surface2);border-radius:12px;padding:8px 12px;max-width:92%}.iscm.me{align-self:flex-end;background:color-mix(in srgb,var(--accent) 14%,var(--surface))}
+
+/* ================= ขออนุมัติงาน ================= */
+.watypes{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.wasig{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}.wasig>div{border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:3px;align-items:center;text-align:center}
+.wasig>div.done{border-color:var(--ok)}.wasig>div.now{border:2px solid var(--accent)}.wasig img{height:40px;max-width:100%;object-fit:contain;background:#fff;border-radius:6px}.wasig-blank{height:40px}
