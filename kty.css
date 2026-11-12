@@ -503,3 +503,7 @@ details.perm>summary::-webkit-details-marker{display:none}
 .watypes{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .wasig{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}.wasig>div{border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:3px;align-items:center;text-align:center}
 .wasig>div.done{border-color:var(--ok)}.wasig>div.now{border:2px solid var(--accent)}.wasig img{height:40px;max-width:100%;object-fit:contain;background:#fff;border-radius:6px}.wasig-blank{height:40px}
+
+/* ================= ตั้งค่าขั้นสูง ================= */
+.advrow{display:flex;align-items:center;gap:8px}.advrow .in{height:38px;flex:1}.advrow input[type=color]{width:40px;height:38px;border:1px solid var(--line);border-radius:8px;padding:2px;background:var(--surface)}
+.advgrid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}

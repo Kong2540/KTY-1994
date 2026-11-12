@@ -70,7 +70,7 @@ async function dailyForm(o){
   const ids=isManager()?mySiteIds():(S.mySites||[]);
   const siteList=S.sites.filter(s=>ids.includes(s.id)&&(s.status==='active'||s.id===o.site_id));
   if(!siteList.length) return toast('ยังไม่มีไซต์ที่รับผิดชอบ',true);
-  const FIELDS=formOf('daily'), FX={};
+  const FIELDS=formOf('daily'), FX={}, dMin=photoMin(FIELDS,'photos',minPhotos()), dMax=photoMax(FIELDS,'photos',30);
   const F={ site_id:o.site_id||(S.site?+S.site:siteList[0].id), date:o.date||localISO(), weather:null, no_work:false, no_work_reason:null, work_items:'', machinery:[], tools:[], problems:'', crew:{}, crew_morning:null, changes:{}, photos:[], newPhotos:[], existing:null, morning:null, extra:{} };
   const m=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="รายงานประจำวัน"></div>`, false, false);
   const sh=$('.sheet',m.el);
@@ -103,9 +103,9 @@ async function dailyForm(o){
       machinery:f=>F.no_work?'':`<div class="field"><label>${esc(f.label)}${req(f)}</label><div class="chips">${chips(L.machinery,F.machinery,'machinery')}<button type="button" class="chip" data-addeq="machinery">+ อื่น ๆ</button></div>${hlp(f)}</div>`,
       tools:f=>F.no_work?'':`<div class="field"><label>${esc(f.label)}${req(f)}</label><div class="chips">${chips(L.tools,F.tools,'tools')}<button type="button" class="chip" data-addeq="tools">+ อื่น ๆ</button></div>${hlp(f)}</div>`,
       problems:f=>`<div class="field"><label for="df_prob">${esc(f.label)}${req(f)}</label><textarea class="in" id="df_prob" rows="3" placeholder="${esc(f.help||'')}">${esc(F.problems)}</textarea></div>`,
-      photos:f=>`<div class="field"><label>${esc(f.label)} ${F.no_work?'':'*'} <span style="color:${!F.no_work&&F.photos.length+F.newPhotos.length<minPhotos()?'var(--bad)':'var(--ink2)'}">${F.photos.length+F.newPhotos.length} / 30${F.no_work?'':` · อย่างน้อย ${minPhotos()} รูป`}</span></label>
+      photos:f=>`<div class="field"><label>${esc(f.label)} ${F.no_work?'':'*'} <span style="color:${!F.no_work&&F.photos.length+F.newPhotos.length<dMin?'var(--bad)':'var(--ink2)'}">${F.photos.length+F.newPhotos.length} / 30${F.no_work?'':` · อย่างน้อย ${dMin} รูป`}</span></label>
           <div class="pgrid">${F.photos.map((p,i)=>`<div class="pthumb"><img src="${thumbOf(p)}" alt="" loading="lazy"><button type="button" data-delp="${i}" aria-label="ลบรูป">×</button></div>`).join('')}${F.newPhotos.map((p,i)=>`<div class="pthumb"><img src="${p.url}" alt=""><button type="button" data-delnp="${i}" aria-label="ลบรูป">×</button><span class="tag t-acc" style="position:absolute;left:4px;bottom:4px;height:18px;font-size:10px">ใหม่</span></div>`).join('')}
-          ${F.photos.length+F.newPhotos.length<30?`<label class="pthumb padd">${IC.camera}<span class="xs">เพิ่มรูป</span><input type="file" accept="image/*" multiple data-photos hidden></label>`:''}</div>
+          ${F.photos.length+F.newPhotos.length<dMax?`<label class="pthumb padd">${IC.camera}<span class="xs">เพิ่มรูป</span><input type="file" accept="image/*" multiple data-photos hidden></label>`:''}</div>
           ${!hasBridge()?'<span class="hint warn">ยังไม่ได้ติดตั้ง Bridge รูปถ่ายและ PDF จะใช้ไม่ได้ (แจ้งแอดมิน)</span>':''}</div>`
     };
     const formBody=()=>FIELDS.map(f=>B[f.key]?B[f.key](f):(F.no_work&&f.hide_nowork?'':cfHTML(f,F.extra[f.key]))).join('');
@@ -154,12 +154,12 @@ async function dailyForm(o){
     if(!F.no_work&&fd('tools')?.required&&!F.tools.length) return toast(`เลือก${fd('tools').label}`,true);
     { const cv=cfValidate(FIELDS.filter(x=>!(F.no_work&&x.hide_nowork)),F.extra); if(cv) return toast(cv,true); }
     const ch=changed(); for(const t of ch){ if(!String(F.changes[t]?.reason||'').trim()) return toast(`ใส่เหตุผลที่ ${t} เปลี่ยนจากรอบเช้า`,true); }
-    if(!F.no_work&&F.photos.length+F.newPhotos.length<minPhotos()) return toast(`ต้องแนบรูปอย่างน้อย ${minPhotos()} รูป (ตอนนี้มี ${F.photos.length+F.newPhotos.length} รูป)`,true);
+    if(!F.no_work&&F.photos.length+F.newPhotos.length<dMin) return toast(`ต้องแนบรูปอย่างน้อย ${dMin} รูป (ตอนนี้มี ${F.photos.length+F.newPhotos.length} รูป)`,true);
     if(F.newPhotos.length&&!hasBridge()) return toast('ยังไม่ได้ติดตั้ง Bridge จึงอัปโหลดรูปไม่ได้',true);
     const crew={}; Object.entries(F.crew).forEach(([k,n])=>{ if(+n>0) crew[k]=+n; });
     const row={ site_id:F.site_id, report_date:F.date, weather:F.weather, no_work:F.no_work, no_work_reason:F.no_work?F.no_work_reason:null, work_items:F.no_work?null:F.work_items.trim(),
       machinery:F.no_work?[]:F.machinery, tools:F.no_work?[]:F.tools, problems:F.problems.trim()||null, crew:F.no_work?{}:crew, crew_morning:F.crew_morning,
-      extra:F.extra, form_version:S.settings.forms?.daily?.version||0, crew_changes:ch.map(t=>({trade:t,from:+F.crew_morning[t]||0,to:+F.crew[t]||0,period:F.changes[t]?.period||'บ่าย',reason:F.changes[t]?.reason||''})), photos:F.photos };
+      extra:cfStrip(F.extra), form_version:S.settings.forms?.daily?.version||0, crew_changes:ch.map(t=>({trade:t,from:+F.crew_morning[t]||0,to:+F.crew[t]||0,period:F.changes[t]?.period||'บ่าย',reason:F.changes[t]?.reason||''})), photos:F.photos };
     const prog=overlay(`<div class="modal" role="dialog" aria-modal="true"><h3 class="h2" style="font-size:18px">กำลังบันทึกรายงาน</h3><div id="pg" class="col" style="gap:8px"></div></div>`,true,false);
     const step=(t,done)=>{ $('#pg',prog.el).insertAdjacentHTML('beforeend',`<div class="row sm" style="gap:8px">${done?svg('<path d="M5 12l5 5 9-10"/>','style="color:var(--ok);width:18px"'):'<span class="spin" style="width:16px;height:16px;margin:0;border-width:2px"></span>'}<span>${t}</span></div>`); };
     try{
@@ -175,7 +175,9 @@ async function dailyForm(o){
         const r=await sb.from('daily_reports').update({photos:up}).eq('id',rep.id).select('*').single(); if(r.error) throw r.error; rep=r.data||{...rep,photos:up};
       }
       for(const [k,bl] of Object.entries(FX)){ if(!hasBridge()) break; const r2=await bridge('upload_photo',{site_id:F.site_id,date:F.date,name:`${F.date}_${k}.jpg`,data:await blobToB64(bl)}); F.extra[k]={id:r2.id,url:r2.url,thumb:r2.thumb}; }
-      if(Object.keys(FX).length){ const r3=await sb.from('daily_reports').update({extra:F.extra}).eq('id',rep.id).select('*').single(); if(!r3.error&&r3.data) rep=r3.data; }
+      const hasSets=FIELDS.some(f=>!f.core&&f.type==='photos'&&(F.extra[f.key]||[]).some(p=>p&&p.local));
+      if(hasSets&&hasBridge()) await cfUploadPhotoSets(FIELDS,F.extra,async(bl,f,i)=>{ const r=await bridge('upload_photo',{site_id:F.site_id,date:F.date,name:`${F.date}_${f.key}_${String(i+1).padStart(2,'0')}.jpg`,data:await blobToB64(bl)}); return {id:r.id,url:r.url,thumb:r.thumb}; });
+      if(Object.keys(FX).length||hasSets){ const r3=await sb.from('daily_reports').update({extra:cfStrip(F.extra)}).eq('id',rep.id).select('*').single(); if(!r3.error&&r3.data) rep=r3.data; }
       let pdf=null;
       if(hasBridge()){ step('สร้าง Google Sheet และ PDF'); pdf=await bridge('render',{report_id:rep.id}); const r=await sb.from('daily_reports').select('*').eq('id',rep.id).single(); rep={...rep,pdf_url:pdf.pdf_url,pdf_id:pdf.pdf_id,sheet_url:pdf.sheet_url,sheet_tab:pdf.sheet_tab,photo_folder_url:pdf.folder_url,...(r.data||{})}; }
       prog.close(); m.close(); toast('บันทึกรายงานแล้ว');

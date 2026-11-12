@@ -2,7 +2,7 @@
    ตัวสร้างฟอร์ม (Form Builder) — แอดมินออกแบบฟอร์มเอง
    ===================================================================== */
 const FTYPES = { text:['ข้อความ','T'], longtext:['ข้อความยาว','¶'], number:['ตัวเลข','#'], single:['ตัวเลือกเดียว','◉'], multi:['หลายตัวเลือก','☑'],
-  date:['วันที่','📅'], time:['เวลา','🕘'], switch:['สวิตช์','⊘'], photo:['รูปถ่าย','▣'], signature:['ลายเซ็น','✍'], crew:['คนงาน','👷'], photos:['รูปถ่ายหลายรูป','▣'] };
+  date:['วันที่','📅'], time:['เวลา','🕘'], switch:['สวิตช์','⊘'], photo:['รูปถ่าย','▣'], signature:['ลายเซ็น','✍'], crew:['คนงาน','👷'], photos:['ชุดรูปถ่าย','▦'] };
 const FORM_DEFS = {
   daily: { name:'รายงานประจำวัน (รอบเย็น)', fields:[
     {key:'weather',   type:'single',   label:'สภาพอากาศ',            core:1, required:1, list:'weather', show_pdf:1, show_line:1},
@@ -41,6 +41,8 @@ function cfHTML(f, v, ctx=''){
     case 'single': return `<div class="field"><label>${esc(f.label)}${req}</label><div class="chips">${opts.map(o=>`<button type="button" class="chip ${v===o?'on':''}" data-cfs="${f.key}" data-v="${esc(o)}" ${dis}>${esc(o)}</button>`).join('')}</div>${help}</div>`;
     case 'multi': { const a=Array.isArray(v)?v:[]; return `<div class="field"><label>${esc(f.label)}${req}</label><div class="chips">${opts.map(o=>`<button type="button" class="chip ${a.includes(o)?'on':''}" data-cfm="${f.key}" data-v="${esc(o)}" ${dis}>${esc(o)}</button>`).join('')}</div>${help}</div>`; }
     case 'switch': return `<div class="card row" style="padding:12px 14px"><div class="grow"><b>${esc(f.label)}</b>${f.help?`<div class="xs muted">${esc(f.help)}</div>`:''}</div><button type="button" class="sw ${v?'on':''}" data-cfw="${f.key}" role="switch" aria-checked="${!!v}" aria-label="${esc(f.label)}" ${dis}></button></div>`;
+    case 'photos': { const L=Array.isArray(v)?v:[], mn=+f.min||0, mx=+f.max||9;
+      return `<div class="field"><label>${esc(f.label)}${req||(mn?' <span style="color:var(--bad)">*</span>':'')} <span class="muted" style="${mn&&L.length<mn?'color:var(--bad)':''}">${L.length}${mn?` / ขั้นต่ำ ${mn}`:''} รูป</span></label><div class="pgrid">${L.map((p,i)=>`<div class="pthumb"><img src="${esc(p.thumb||p.url||'')}" alt="">${dis?'':`<button type="button" data-cfpsx="${f.key}:${i}" aria-label="ลบรูป">×</button>`}</div>`).join('')}${L.length<mx&&!dis?`<label class="pthumb padd">${IC.camera}<span class="xs">เพิ่มรูป</span><input type="file" accept="image/*" multiple hidden data-cfps="${f.key}"></label>`:''}</div>${help}</div>`; }
     case 'photo': return `<div class="field"><label>${esc(f.label)}${req}</label><div class="pgrid">${v&&(v.thumb||v.url)?`<div class="pthumb"><img src="${esc(v.thumb||v.url)}" alt=""><button type="button" data-cfpx="${f.key}" aria-label="ลบรูป">×</button></div>`:`<label class="pthumb padd">${IC.camera}<span class="xs">เพิ่มรูป</span><input type="file" accept="image/*" hidden data-cfp="${f.key}" ${dis}></label>`}</div>${help}</div>`;
     case 'signature': return `<div class="field"><label>${esc(f.label)}${req}</label>${v?`<div class="row" style="gap:8px"><img src="${v}" alt="ลายเซ็น" style="height:70px;background:#fff;border:1px solid var(--line);border-radius:8px"><button type="button" class="btn btn-sm" data-cfsx="${f.key}">เซ็นใหม่</button></div>`:`<div data-cfsig="${f.key}"></div>`}${help}</div>`;
   }
@@ -54,17 +56,20 @@ function cfBind(host, obj, onChange, files){
   $$('[data-cfw]',host).forEach(b=>b.onclick=()=>{ obj[b.dataset.cfw]=!obj[b.dataset.cfw]; onChange(); });
   $$('[data-cfp]',host).forEach(i=>i.onchange=async()=>{ const f=i.files[0]; if(!f) return; const bl=await resizeImage(f,1600); files[i.dataset.cfp]=bl; obj[i.dataset.cfp]={local:1,url:URL.createObjectURL(bl)}; onChange(); });
   $$('[data-cfpx]',host).forEach(b=>b.onclick=()=>{ delete files[b.dataset.cfpx]; obj[b.dataset.cfpx]=null; onChange(); });
+  $$('[data-cfps]',host).forEach(i=>i.onchange=async()=>{ const k=i.dataset.cfps; const L=Array.isArray(obj[k])?obj[k]:[]; for(const fl of [...i.files]){ const bl=await resizeImage(fl,1600); L.push({local:1,url:URL.createObjectURL(bl),_blob:bl}); } obj[k]=L; onChange(); });
+  $$('[data-cfpsx]',host).forEach(b=>b.onclick=()=>{ const [k,ix]=b.dataset.cfpsx.split(':'); (obj[k]||[]).splice(+ix,1); onChange(); });
   $$('[data-cfsx]',host).forEach(b=>b.onclick=()=>{ obj[b.dataset.cfsx]=null; onChange(); });
   $$('[data-cfsig]',host).forEach(d=>{ const k=d.dataset.cfsig, pad=signaturePad(d); const t=setInterval(()=>{ if(!document.body.contains(d)) return clearInterval(t); if(!pad.empty()) obj['__sig_'+k]=pad; },400); });
 }
 function cfCollectSignatures(obj){ Object.keys(obj).filter(k=>k.startsWith('__sig_')).forEach(k=>{ const pad=obj[k]; if(pad&&!pad.empty()) obj[k.slice(6)]=pad.data(); delete obj[k]; }); }
 function cfValidate(fields, obj){
-  for(const f of fields){ if(f.core||!f.required||!fieldCanFill(f)) continue; const v=obj[f.key]; const empty=v==null||v===''||(Array.isArray(v)&&!v.length)||(f.type==='switch'&&!v);
+  for(const f of fields){ if(!f.core&&f.type==='photos'&&fieldCanFill(f)){ const n=(obj[f.key]||[]).length, mn=+f.min||0; if((f.required&&!n)||n<mn) return `"${f.label}" ต้องแนบอย่างน้อย ${Math.max(mn,1)} รูป`; continue; }
+    if(f.core||!f.required||!fieldCanFill(f)) continue; const v=obj[f.key]; const empty=v==null||v===''||(Array.isArray(v)&&!v.length)||(f.type==='switch'&&!v);
     if(empty&&!(f.type==='signature'&&obj['__sig_'+f.key])) return `กรอก "${f.label}"`;
     if(f.type==='number'&&v!=null&&v!==''){ if(f.min!==''&&f.min!=null&&v<+f.min) return `"${f.label}" ต้องไม่น้อยกว่า ${f.min}`; if(f.max!==''&&f.max!=null&&v>+f.max) return `"${f.label}" ต้องไม่เกิน ${f.max}`; } }
   return null;
 }
-const cfText = (f, v) => v==null||v===''?'':f.type==='multi'?(v||[]).join(', '):f.type==='switch'?(v?'ใช่':'ไม่ใช่'):f.type==='photo'?'(มีรูป)':f.type==='signature'?'(ลงชื่อแล้ว)':`${v}${f.type==='number'&&f.unit?' '+f.unit:''}`;
+const cfText = (f, v) => v==null||v===''?'':f.type==='photos'?(Array.isArray(v)&&v.length?`${v.length} รูป`:''):f.type==='multi'?(v||[]).join(', '):f.type==='switch'?(v?'ใช่':'ไม่ใช่'):f.type==='photo'?'(มีรูป)':f.type==='signature'?'(ลงชื่อแล้ว)':`${v}${f.type==='number'&&f.unit?' '+f.unit:''}`;
 
 /* ---------- ตัวสร้างฟอร์มในหน้า ตั้งค่าระบบ ---------- */
 let FB = { form:'daily', sel:0, fields:null, dirty:false };
@@ -117,7 +122,7 @@ function fieldEditor(f){
     ${f.type==='number'?`<div class="g3" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"><div class="field"><label>ต่ำสุด</label><input class="in num" data-fe="min" value="${esc(f.min??'')}"></div><div class="field"><label>สูงสุด</label><input class="in num" data-fe="max" value="${esc(f.max??'')}"></div><div class="field"><label>หน่วย</label><input class="in" data-fe="unit" value="${esc(f.unit??'')}"></div></div>`:''}
     <div class="field"><label>ข้อความช่วย</label><input class="in" data-fe="help" value="${esc(f.help||'')}" placeholder="แสดงใต้ช่อง"></div>
     ${f.locked?'':`<div class="li" style="padding:4px 0"><span class="grow">บังคับกรอก</span><button class="sw ${f.required?'on':''}" data-ft="required" role="switch" aria-label="บังคับกรอก"></button></div>`}
-    ${f.type==='photos'?`<div class="note n-info">${IC.info}<span>จำนวนรูปขั้นต่ำตั้งที่ <a href="#studio/rules">กติการายงาน</a></span></div>`:''}
+    ${f.type==='photos'?`<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px"><div class="field"><label>จำนวนรูปขั้นต่ำ</label><input class="in num" type="number" min="0" max="30" data-fe="min" value="${esc(f.min??(FB.form==='daily'?minPhotos():''))}" placeholder="0 = ไม่บังคับ"></div><div class="field"><label>สูงสุด</label><input class="in num" type="number" min="1" max="30" data-fe="max" value="${esc(f.max??'')}" placeholder="${FB.form==='daily'?30:FB.form==='issue'?6:9}"></div></div><span class="hint">${FB.form==='daily'?'รายงานประจำวัน: วันที่ไม่มีการทำงานไม่บังคับรูป':'ตั้งไม่เท่ากันได้ในแต่ละฟอร์ม/แต่ละชุดรูป'}</span>`:''}
     ${f.core?'':`<div class="li" style="padding:4px 0"><span class="grow">แสดงใน PDF รายงาน</span><button class="sw ${f.show_pdf?'on':''}" data-ft="show_pdf" role="switch" aria-label="แสดงใน PDF"></button></div>
     <div class="li" style="padding:4px 0"><span class="grow">แสดงในการ์ด LINE</span><button class="sw ${f.show_line?'on':''}" data-ft="show_line" role="switch" aria-label="แสดงใน LINE"></button></div>
     <div class="field"><label>ใครกรอกได้ (ไม่เลือก = ทุกคนที่เขียนรายงานได้)</label><div class="chips">${ROLE_OPTS.map(([k,t])=>`<button class="chip ${(f.roles||[]).includes(k)?'on':''}" data-role="${k}">${t}</button>`).join('')}</div></div>`}
@@ -136,7 +141,7 @@ function bindEditor(host, f, redraw){
   const dl=$('[data-del]',e); if(dl) dl.onclick=async()=>{ if(!await confirmBox(`ลบช่อง "${f.label}"? รายงานเก่าที่กรอกไว้ยังเก็บข้อมูลเดิม`,'ลบช่อง',true)) return; FB.fields.splice(FB.fields.indexOf(f),1); FB.sel=Math.max(0,FB.sel-1); redraw(); };
 }
 function addFieldSheet(done){
-  const types=['text','longtext','number','single','multi','date','time','switch','photo','signature']; let t='text';
+  const types=['text','longtext','number','single','multi','date','time','switch','photo','photos','signature']; let t='text';
   const ov=overlay(`<div class="modal" role="dialog" aria-modal="true" style="max-width:520px"><h3 class="h2" style="font-size:18px">เพิ่มช่องใหม่</h3>
     <div class="fbtypes">${types.map(k=>`<button class="fbtype ${k===t?'on':''}" data-t="${k}"><span class="fbt">${FTYPES[k][1]}</span><b class="sm">${FTYPES[k][0]}</b></button>`).join('')}</div>
     <div class="field"><label for="nf_l">ชื่อช่อง</label><input class="in" id="nf_l" placeholder="เช่น ความคืบหน้างาน (%)"></div>
@@ -164,3 +169,14 @@ function formPreview(fields){
   const gen=f=>`<div class="field"><label>${esc(f.label)}${f.required?' *':''}</label><div class="in" style="${f.type==='checklist'||f.type==='photos'?'height:56px':''}"></div>${f.help?`<span class="hint">${esc(f.help)}</span>`:''}</div>`;
   return `<div class="col" style="gap:10px">${fields.filter(f=>!f.hidden).map(f=>FB.form&&FB.form.startsWith('wa_')&&f.core?gen(f):core[f.key]?core[f.key](f):cfHTML(f,null,'pv')).join('')}</div>`;
 }
+
+/* ---------- ชุดรูปถ่ายที่แอดมินเพิ่ม: อัปโหลดตอนบันทึก ---------- */
+const photoMin = (fields, key, def=0) => { const f=(fields||[]).find(x=>x.key===key); return f&&f.min!=null&&f.min!==''?Math.max(0,+f.min):def; };
+const photoMax = (fields, key, def=9) => { const f=(fields||[]).find(x=>x.key===key); return f&&f.max!=null&&f.max!==''?Math.max(1,+f.max):def; };
+async function cfUploadPhotoSets(fields, obj, uploader){
+  for(const f of fields){ if(f.core||f.type!=='photos') continue; const L=obj[f.key]; if(!Array.isArray(L)) continue;
+    const out=[]; for(let i=0;i<L.length;i++){ const p=L[i]; if(p&&p.local&&p._blob){ const r=await uploader(p._blob,f,i); if(r) out.push(r); } else if(p) out.push(p); }
+    obj[f.key]=out; }
+  return obj;
+}
+const cfStrip = obj => { const o={}; Object.entries(obj||{}).forEach(([k,v])=>{ o[k]=Array.isArray(v)?v.filter(p=>!(p&&p.local)).map(p=>{ if(p&&typeof p==='object'){ const {_blob,local,...r}=p; return r; } return p; }):v; }); return o; };

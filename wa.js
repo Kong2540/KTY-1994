@@ -37,7 +37,7 @@ async function pageWa(a,b){
 /* ---------- ฟอร์มขออนุมัติ ---------- */
 function waForm(typeKey){
   const t=waType(typeKey); if(!t) return location.replace('#wa');
-  const FIELDS=formOf('wa_'+t.key), pre=WA_PRE||{}; WA_PRE=null;
+  const FIELDS=formOf('wa_'+t.key), pre=WA_PRE||{}; WA_PRE=null; const pMin=photoMin(FIELDS,'photos',0), pMax=photoMax(FIELDS,'photos',9);
   const F={site_id:pre.site_id||(S.site?+S.site:mySiteIds()[0]||''),floor:pre.floor||'',element:pre.element||'',element_code:pre.element_code||'',drawing_ref:pre.drawing_ref||'',request_at:'',extra:{...(pre.data||{})},photos:[],ref_id:pre.ref_id||null,
     checklist:t.checklist.map(it=>({item:it,self:false}))}, FX={};
   setPage(head(`ขออนุมัติ: ${t.name}`,t.doc_title,{back:'#wa'})+'<div id="waf" class="col" style="gap:14px;max-width:760px"></div><div class="savebar" id="wabar"></div>');
@@ -50,14 +50,14 @@ function waForm(typeKey){
     element:f=>`<div class="field"><label>${esc(f.label)}${req(f)}</label><div class="chips">${waElements().map(e=>`<button type="button" class="chip ${F.element===e?'on':''}" data-el="${esc(e)}">${esc(e)}</button>`).join('')}</div></div>`,
     request_at:f=>`<div class="field"><label for="wa_at">${esc(f.label)}${req(f)}</label><input class="in" type="datetime-local" id="wa_at" value="${esc(F.request_at)}"></div>`,
     checklist:f=>`<div class="field"><label>${esc(f.label)}</label><div class="card card-l" style="box-shadow:none">${F.checklist.map((c,i)=>`<label class="li" style="gap:10px;cursor:pointer"><input type="checkbox" data-ck="${i}" ${c.self?'checked':''} style="width:20px;height:20px;accent-color:var(--accent)"><span class="sm grow">${esc(c.item)}</span></label>`).join('')}</div><span class="hint">รายการตรวจแก้ได้ที่ ตั้งค่าระบบ > ประเภทการขออนุมัติ</span></div>`,
-    photos:f=>`<div class="field"><label>${esc(f.label)} <span class="muted">${F.photos.length} / 9</span></label><div class="pgrid">${F.photos.map((p,i)=>`<div class="pthumb"><img src="${p.url}" alt=""><button type="button" data-delp="${i}" aria-label="ลบรูป">×</button></div>`).join('')}${F.photos.length<9?`<label class="pthumb padd">${IC.camera}<span class="xs">เพิ่มรูป</span><input type="file" accept="image/*" multiple hidden data-ph></label>`:''}</div></div>`
+    photos:f=>`<div class="field"><label>${esc(f.label)}${pMin?' <span style="color:var(--bad)">*</span>':''} <span class="muted" style="${F.photos.length<pMin?'color:var(--bad)':''}">${F.photos.length}${pMin?` / ขั้นต่ำ ${pMin}`:` / ${pMax}`}</span></label><div class="pgrid">${F.photos.map((p,i)=>`<div class="pthumb"><img src="${p.url}" alt=""><button type="button" data-delp="${i}" aria-label="ลบรูป">×</button></div>`).join('')}${F.photos.length<pMax?`<label class="pthumb padd">${IC.camera}<span class="xs">เพิ่มรูป</span><input type="file" accept="image/*" multiple hidden data-ph></label>`:''}</div></div>`
   };
   const keep=()=>{ [['floor','wa_floor'],['element_code','wa_element_code'],['drawing_ref','wa_drawing_ref'],['request_at','wa_at'],['site_id','wa_site']].forEach(([k,id])=>{ const e=$('#'+id); if(e) F[k]=e.value; }); };
   const draw=()=>{ host.innerHTML=`${F.ref_id?'<div class="note n-warn"><span class="xs">ขอตรวจใหม่ อ้างอิงใบเดิมที่ไม่ผ่าน</span></div>':''}${(t.requires||[]).length?`<div class="note n-info"><span class="xs">ต้องผ่าน "${(t.requires||[]).map(r=>waType(r)?.name||r).join(', ')}" ของชิ้นส่วนเดียวกัน (ชั้นและรหัสตรงกัน) ก่อน จึงส่งได้</span></div>`:''}`+FIELDS.map(f=>B[f.key]?B[f.key](f):cfHTML(f,F.extra[f.key])).join('');
     $$('[data-el]',host).forEach(b=>b.onclick=()=>{ keep(); F.element=b.dataset.el; draw(); });
     $$('[data-ck]',host).forEach(c=>c.onchange=()=>{ F.checklist[+c.dataset.ck].self=c.checked; });
     $$('[data-delp]',host).forEach(b=>b.onclick=()=>{ keep(); F.photos.splice(+b.dataset.delp,1); draw(); });
-    const ph=$('[data-ph]',host); if(ph) ph.onchange=async()=>{ keep(); for(const f of [...ph.files].slice(0,9-F.photos.length)){ const bl=await resizeImage(f,1600); F.photos.push({blob:bl,url:URL.createObjectURL(bl)}); } draw(); };
+    const ph=$('[data-ph]',host); if(ph) ph.onchange=async()=>{ keep(); for(const f of [...ph.files].slice(0,pMax-F.photos.length)){ const bl=await resizeImage(f,1600); F.photos.push({blob:bl,url:URL.createObjectURL(bl)}); } draw(); };
     cfBind(host,F.extra,()=>{ keep(); draw(); },FX); };
   draw();
   $('#wabar').innerHTML=`<span class="sm muted grow">ผู้ขอ: ${esc(S.profile.display_name)}</span><button class="btn btn-p" id="wago">ส่งขออนุมัติ</button>`;
@@ -66,15 +66,17 @@ function waForm(typeKey){
     if(!F.site_id) return toast('เลือกไซต์',true); if(fd('floor')?.required&&!F.floor.trim()) return toast('กรอกชั้น/โซน',true);
     if(fd('element')?.required&&!F.element) return toast('เลือกชิ้นส่วนโครงสร้าง',true); if(!F.element_code.trim()) return toast('กรอกตำแหน่ง/รหัสชิ้นส่วน',true);
     if(fd('request_at')?.required&&!F.request_at) return toast('ระบุวันเวลา',true);
+    if(F.photos.length<pMin) return toast(`ต้องแนบรูปอย่างน้อย ${pMin} รูป`,true);
     const cv=cfValidate(FIELDS,F.extra); if(cv) return toast(cv,true);
     signSheet('ลงชื่อผู้ขอ',async(sig)=>{
       busy(ev.target,true,'กำลังส่ง...');
-      try{ const {data,error}=await sb.rpc('create_wa',{p:{type_key:t.key,site_id:F.site_id,floor:F.floor,element:F.element,element_code:F.element_code,drawing_ref:F.drawing_ref,request_at:F.request_at?new Date(F.request_at).toISOString():null,data:F.extra,checklist:F.checklist,ref_id:F.ref_id},p_sig:sig});
+      try{ const {data,error}=await sb.rpc('create_wa',{p:{type_key:t.key,site_id:F.site_id,floor:F.floor,element:F.element,element_code:F.element_code,drawing_ref:F.drawing_ref,request_at:F.request_at?new Date(F.request_at).toISOString():null,data:cfStrip(F.extra),checklist:F.checklist,ref_id:F.ref_id},p_sig:sig});
         if(error) throw error;
         const paths=[]; for(let i=0;i<F.photos.length;i++){ const p=`${data.id}/${Date.now()}_${i+1}.jpg`; const {error:e2}=await sb.storage.from('wa-photos').upload(p,F.photos[i].blob,{contentType:'image/jpeg'}); if(!e2) paths.push(p); }
         await sb.rpc('wa_set_extra',{p_id:data.id,p_photos:paths,p_folder:null});
+        const setBlobs=[]; if(FIELDS.some(f=>!f.core&&f.type==='photos'&&(F.extra[f.key]||[]).length)){ await cfUploadPhotoSets(FIELDS,F.extra,async(bl,f,i)=>{ const path=`${data.id}/${f.key}_${Date.now()}_${i+1}.jpg`; const {error:e3}=await sb.storage.from('wa-photos').upload(path,bl,{contentType:'image/jpeg'}); if(!e3) setBlobs.push({blob:bl,name:`${f.label} ${i+1}.jpg`}); return e3?null:{path}; }); await sb.rpc('wa_merge_data',{p_id:data.id,p:cfStrip(F.extra)}); }
         toast(`ส่งคำขอ ${data.wa_no} แล้ว`); location.hash='#wa/'+data.id;
-        waSyncDrive(data.id,F.photos.map(p=>p.blob)).catch(()=>{});
+        waSyncDrive(data.id,[...F.photos.map((p,i)=>({blob:p.blob,name:`รูปที่ ${i+1}.jpg`})),...setBlobs]).catch(()=>{});
       }catch(e){ busy(ev.target,false); toast(/create_wa/.test(e.message||'')?'ยังไม่ได้รันไฟล์ 21_work_approvals.sql':errText(e),true); } });
   };
 }
@@ -116,7 +118,7 @@ function waDetailPage(id){ setPage(head('ใบขออนุมัติ','',{
 async function waDetail(host,id){
   const {data:w,error}=await sb.from('work_approvals').select('*').eq('id',id).maybeSingle();
   if(error||!w){ host.innerHTML='<div class="empty"><b>ไม่พบใบขออนุมัติ หรือไม่มีสิทธิ์ดู</b></div>'; return; }
-  const t=waType(w.type_key)||{name:w.type_key,signers:[],checklist:[]}, site=S.sites.find(s=>s.id===w.site_id), urls=await waUrls(w.photos);
+  const t=waType(w.type_key)||{name:w.type_key,signers:[],checklist:[]}, site=S.sites.find(s=>s.id===w.site_id), setF=formOf('wa_'+w.type_key).filter(f=>!f.core&&f.type==='photos'&&(w.data?.[f.key]||[]).length), urls=await waUrls([...(w.photos||[]),...setF.flatMap(f=>w.data[f.key].map(p=>p.path))]);
   const FIELDS=formOf('wa_'+w.type_key).filter(f=>!f.core&&w.data&&cfText(f,w.data[f.key])), can=waCanSign(w,t), step=t.signers?.[w.step];
   const [st,sc]=WA_ST[w.status];
   host.innerHTML=`<div class="col" style="gap:12px"><div class="row" style="gap:8px;flex-wrap:wrap"><span style="font-size:24px">${esc(t.icon||'📋')}</span><b class="grow" style="font-size:18px">${esc(t.doc_title||t.name)}</b><span class="tag ${sc}">${st}</span>${w.result?`<span class="tag" style="background:${WA_RES[w.result][1]};color:#fff">${WA_RES[w.result][0]}</span>`:''}</div>
@@ -124,6 +126,7 @@ async function waDetail(host,id){
     <div class="card" style="padding:4px 14px;box-shadow:none">${[['ชิ้นส่วน',`${w.element||''} ${w.element_code||''}`],['ชั้น/โซน',w.floor],['แบบอ้างอิง',w.drawing_ref],['วันเวลา',w.request_at?new Date(w.request_at).toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'}):''],...FIELDS.map(f=>[f.label,cfText(f,w.data[f.key])])].filter(x=>x[1]).map(([a,b])=>`<div class="kv"><span>${esc(a)}</span><span>${esc(b)}</span></div>`).join('')}</div>
     <div class="card" style="padding:0;overflow-x:auto;box-shadow:none"><table class="tbl"><thead><tr><th>รายการตรวจ</th><th style="text-align:center">ผู้ขอ</th><th style="text-align:center">ผลตรวจ</th><th>หมายเหตุ</th></tr></thead><tbody>${(w.checklist||[]).map(c=>`<tr><td>${esc(c.item)}</td><td style="text-align:center">${c.self?'✓':''}</td><td style="text-align:center;font-weight:700;color:${c.result==='pass'?'#16A34A':c.result==='fail'?'#DC2626':'var(--ink2)'}">${c.result==='pass'?'ผ่าน':c.result==='fail'?'ไม่ผ่าน':'-'}</td><td class="xs">${esc(c.note||'')}</td></tr>`).join('')}</tbody></table></div>
     ${w.conditions?`<div class="note n-warn"><span><b>เงื่อนไข:</b> ${esc(w.conditions)}</span></div>`:''}
+    ${setF.map(f=>`<b class="xs">${esc(f.label)}</b><div class="pgrid">${w.data[f.key].map(p=>urls[p.path]?`<a class="pthumb" href="${urls[p.path]}" target="_blank" rel="noopener"><img src="${urls[p.path]}" alt=""></a>`:'').join('')}</div>`).join('')}
     ${(w.photos||[]).length?`<div class="pgrid">${w.photos.map(p=>urls[p]?`<a class="pthumb" href="${urls[p]}" target="_blank" rel="noopener"><img src="${urls[p]}" alt=""></a>`:'').join('')}</div>`:''}
     <b class="sm">การลงนาม</b><div class="wasig">${(t.signers||[]).map((s,i)=>{ const g=(w.signatures||[]).find(x=>x.idx===i); return `<div class="${g?'done':i===w.step&&['submitted','in_review'].includes(w.status)?'now':''}"><span class="xs muted">${esc(s.label)}${s.who==='paper'?' · เซ็นบนกระดาษ':''}</span>${g?.sig?`<img src="${g.sig}" alt="ลายเซ็น">`:'<div class="wasig-blank"></div>'}<b class="xs">${esc(g?.name||'')}</b><span class="xs muted">${g?new Date(g.at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'}):s.who==='paper'?'':'รอลงนาม'}</span></div>`; }).join('')}</div>
     ${can?`<button class="btn btn-p" data-sign>ลงนาม: ${esc(step.label)}</button>`:''}
@@ -160,10 +163,17 @@ async function waEnsureFolder(w){
 async function waSyncDrive(id, newPhotos){
   if(!hasBridge()) return;
   const {data:w}=await sb.from('work_approvals').select('*').eq('id',id).single(); const f=await waEnsureFolder(w);
-  for(let i=0;i<(newPhotos||[]).length;i++) await bridge('wa_upload',{folder_id:f.id,name:`รูปที่ ${i+1}.jpg`,mime:'image/jpeg',data:await blobToB64(newPhotos[i])});
+  for(let i=0;i<(newPhotos||[]).length;i++){ const x=newPhotos[i]; await bridge('wa_upload',{folder_id:f.id,name:x.name||`รูปที่ ${i+1}.jpg`,mime:'image/jpeg',data:await blobToB64(x.blob||x)}); }
   const dd=await waDoc(w,await waPhotoData(w)); await bridge('wa_upload',{folder_id:f.id,name:`${w.wa_no}.pdf`,mime:'application/pdf',data:await pdfB64(dd)});
 }
-async function waPhotoData(w){ const urls=await waUrls(w.photos), out=[]; for(const p of (w.photos||[]).slice(0,9)){ if(!urls[p]) continue; try{ const bl=await (await fetch(urls[p])).blob(); out.push(await new Promise(r=>{ const fr=new FileReader(); fr.onload=()=>r(fr.result); fr.readAsDataURL(bl); })); }catch(_){} } return out; }
+async function waPhotoData(w){
+  const sets=formOf('wa_'+w.type_key).filter(f=>!f.core&&f.type==='photos'&&(w.data?.[f.key]||[]).length);
+  const all=[...(w.photos||[]),...sets.flatMap(f=>w.data[f.key].map(p=>p.path))].filter(Boolean), urls=await waUrls(all);
+  const dataUrl=async p=>{ if(!urls[p]) return null; try{ const bl=await (await fetch(urls[p])).blob(); return await new Promise(r=>{ const fr=new FileReader(); fr.onload=()=>r(fr.result); fr.readAsDataURL(bl); }); }catch(_){ return null; } };
+  const main=[]; for(const p of (w.photos||[]).slice(0,30)){ const d=await dataUrl(p); if(d) main.push(d); }
+  const out=main; out.sets=[]; for(const f of sets){ const imgs=[]; for(const p of w.data[f.key]){ const d=await dataUrl(p.path); if(d) imgs.push(d); } if(imgs.length) out.sets.push({label:f.label,imgs}); }
+  return out;
+}
 async function waShare(id){
   try{ const {data:w,error}=await sb.from('work_approvals').select('*').eq('id',id).single(); if(error) throw error;
     if(hasBridge()&&!w.drive_folder) try{ await waEnsureFolder(w); }catch(_){}

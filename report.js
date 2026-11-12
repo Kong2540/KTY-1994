@@ -77,7 +77,7 @@ async function monthReport(month){
         ruleLine(pageW),
         {table:{headerRows:1,widths,body:[head,...body,totRow],dontBreakRows:true},layout:{hLineWidth:()=>.4,vLineWidth:()=>.4,hLineColor:()=>C_LINE,vLineColor:()=>C_LINE,paddingLeft:()=>2.5,paddingRight:()=>2.5,paddingTop:()=>2,paddingBottom:()=>2,fillColor:(r)=>r>0&&r%2===0?'#FAFBFA':null}},
         ...(cfg.legend?[{text:['ตัวย่อ: ',...legend],fontSize:Math.max(6,cfg.font-1),color:C_LAB,margin:[0,6,0,0]}]:[]),
-        ...(cfg.sign?[{columns:['ผู้จัดทำ','ผู้ตรวจสอบ','ผู้อนุมัติ'].map(t=>({stack:[{text:'..............................................',alignment:'center',color:'#9AA6AA'},{text:t,alignment:'center',fontSize:8.5,margin:[0,2,0,0]}]})),margin:[0,22,0,0],unbreakable:true}]:[])
+        ...(cfg.sign?[{columns:advList('rep_sign').map(t=>({stack:[{text:'..............................................',alignment:'center',color:'#9AA6AA'},{text:t,alignment:'center',fontSize:8.5,margin:[0,2,0,0]}]})),margin:[0,22,0,0],unbreakable:true}]:[])
       ] };
   }
   async function render(){

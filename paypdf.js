@@ -63,7 +63,7 @@ async function summaryDoc(p, slips, cfg, cols){
       ruleLine(pageW),
       {table:{headerRows:1,widths,body:[head,...rows,tot],dontBreakRows:true},
         layout:{hLineWidth:()=>.5,vLineWidth:()=>.5,hLineColor:()=>C_LINE,vLineColor:()=>C_LINE,paddingLeft:()=>4,paddingRight:()=>4,paddingTop:()=>cfg.sign?5:3,paddingBottom:()=>cfg.sign?5:3}},
-      {columns:['ผู้จัดทำ','ผู้ตรวจสอบ','ผู้อนุมัติ'].map(t=>({stack:[{text:'....................................................',alignment:'center',color:C_LAB},{text:t,alignment:'center',fontSize:fs-1,color:C_LAB}]})),margin:[0,28,0,0],unbreakable:true}
+      {columns:advList('pay_sign').map(t=>({stack:[{text:'....................................................',alignment:'center',color:C_LAB},{text:t,alignment:'center',fontSize:fs-1,color:C_LAB}]})),margin:[0,28,0,0],unbreakable:true}
     ] };
 }
 
@@ -81,7 +81,7 @@ async function slipsDoc(p, slips, qrOf){
       kv('อัตราค่าแรง',d.wage_type==='monthly'?`${num(d.rate)} /เดือน`:`${num(d.rate)} /วัน`), kv('วันทำงาน · OT',`${num(d.days)} วัน · ${num(d.ot_hours)} ชม.`),
       kv('รวมก่อนหัก',num(d.gross)), kv('หักประกันสังคม',`−${num(d.sso)}`), kv('หักอื่น ๆ',`−${num(otherDed(d))}`),
       {table:{widths:['*','auto'],body:[[{text:'รับสุทธิ',color:C_LAB,fontSize:9,margin:[4,3,0,0]},{text:num(d.net),bold:true,fontSize:14,color:C_DARK,margin:[0,0,4,0]}]]},layout:{fillColor:()=>C_BAND,hLineWidth:()=>0,vLineWidth:()=>0},margin:[0,2,0,3]},
-      {columns:[{text:'โปรดตรวจสอบจำนวนเงินให้เรียบร้อยก่อนออกจากบริษัทฯ',fontSize:6.3,color:'#8A979C'},{text:'สแกน QR ดูรายละเอียด',fontSize:6.3,color:'#8A979C',alignment:'right',width:'auto'}]}
+      {columns:[{text:advText('slip_note'),fontSize:6.3,color:'#8A979C'},{text:'สแกน QR ดูรายละเอียด',fontSize:6.3,color:'#8A979C',alignment:'right',width:'auto'}]}
     ] };
     content.push({table:{widths:[iw],body:[[node]]},layout:{hLineWidth:()=>0,vLineWidth:()=>0,paddingLeft:()=>0,paddingRight:()=>0,paddingTop:()=>0,paddingBottom:()=>0},absolutePosition:{x,y}}); });
   const cut={canvas:[{type:'line',x1:W,y1:0,x2:W,y2:841.89,lineWidth:.5,dash:{length:3,space:3},lineColor:'#9AA6AA'},...[1,2,3].map(r=>({type:'line',x1:0,y1:r*H,x2:595.28,y2:r*H,lineWidth:.5,dash:{length:3,space:3},lineColor:'#9AA6AA'}))]};
@@ -109,7 +109,7 @@ async function detailDoc(p, s){
   const remain=(d.inst||[]).filter(x=>+x.remain_after>0);
   return { pageSize:'A4', pageMargins:[46,40,46,50], defaultStyle:{font:'Sarabun',fontSize:10,color:'#1B262C',lineHeight:1.15},
     info:{title:`สลิปเงินเดือน ${d.name} ${periodText(p)}`,author:B.company_th},
-    footer:()=>({stack:[{canvas:[{type:'line',x1:0,y1:0,x2:W,y2:0,lineWidth:.5,lineColor:C_LINE}]},{columns:[{text:'โปรดตรวจสอบจำนวนเงินให้เรียบร้อยก่อนออกจากบริษัทฯ · เอกสารนี้เป็นความลับเฉพาะบุคคล',fontSize:7.5,color:'#8A979C'},{text:`สร้างโดย ${B.app} ${new Date().toLocaleDateString('th-TH',{dateStyle:'medium'})}`,fontSize:7.5,color:'#8A979C',alignment:'right',width:'auto'}],margin:[0,4,0,0]}],margin:[46,8,46,0]}),
+    footer:()=>({stack:[{canvas:[{type:'line',x1:0,y1:0,x2:W,y2:0,lineWidth:.5,lineColor:C_LINE}]},{columns:[{text:advText('slip_note')+' · เอกสารนี้เป็นความลับเฉพาะบุคคล',fontSize:7.5,color:'#8A979C'},{text:`สร้างโดย ${B.app} ${new Date().toLocaleDateString('th-TH',{dateStyle:'medium'})}`,fontSize:7.5,color:'#8A979C',alignment:'right',width:'auto'}],margin:[0,4,0,0]}],margin:[46,8,46,0]}),
     content:[
       {columns:[{...logoNode(42),width:46},{stack:[{text:B.company_th,bold:true,fontSize:13,color:C_DARK},{text:B.company_en,fontSize:7.5,color:C_LAB,characterSpacing:.6}],margin:[6,5,0,0]},
         {stack:[{text:'ใบแจ้งเงินเดือน',bold:true,fontSize:18,color:C_DARK,alignment:'right'},{text:'PAYSLIP · รายละเอียด',fontSize:7.5,color:C_LAB,alignment:'right',characterSpacing:1},{text:periodText(p),fontSize:10,alignment:'right',margin:[0,2,0,0]}],width:'auto'}]},
@@ -215,8 +215,8 @@ async function vectorPreview(dd, name, title, extraHTML='', onReady){
 async function dailySummaryDoc(date, rows){
   await pdfReady(); await logoData();
   const W=595.28, M=34, iw=W-M*2, B=BR();
-  const COL={present:'#16A34A',late:'#D97706',half:'#0284C7',sick:'#7C3AED',personal:'#7C3AED',vacation:'#7C3AED',absent:'#DC2626',off:'#64748B'};
-  const LBL={present:'มา',late:'มาสาย',half:'ครึ่งวัน',sick:'ลาป่วย',personal:'ลากิจ',vacation:'ลาพักร้อน',absent:'ขาด',off:'วันหยุดบริษัท'};
+  const COL={present:'#16A34A',late:'#D97706',half:'#0284C7',sick:'#7C3AED',personal:'#7C3AED',vacation:'#7C3AED',absent:'#DC2626',off:'#64748B',...ATT_COL};
+  const LBL=Object.fromEntries(Object.keys(ATT).map(k=>[k,ATT[k].t]));
   const work=rows.filter(r=>['present','late','half'].includes(r.status)), other=rows.filter(r=>!['present','late','half'].includes(r.status));
   const sort=(a,b)=>(a.e.sort_order??1e9)-(b.e.sort_order??1e9)||String(a.e.emp_code).localeCompare(String(b.e.emp_code));
   const groups={}; work.forEach(r=>{ const k=r.site_id||0; (groups[k]=groups[k]||[]).push(r); });
@@ -240,7 +240,7 @@ async function dailySummaryDoc(date, rows){
       {table:{widths:['*','*','*','*','*','*'],body:[[stat('มาทำงานรวม',work.length,C_DARK),stat('มา',cnt(['present']),'#16A34A'),stat('มาสาย',cnt(['late']),'#D97706'),stat('ลา',cnt(['sick','personal','vacation']),'#7C3AED'),stat('ขาด',cnt(['absent']),'#DC2626'),stat('วันหยุด',cnt(['off']),'#64748B')]]},layout:{hLineWidth:()=>.6,vLineWidth:()=>.6,hLineColor:()=>C_LINE,vLineColor:()=>C_LINE},margin:[0,0,0,10]},
       ...(sections.length?sections:[{text:'วันนี้ไม่มีผู้มาทำงาน',color:C_LAB,margin:[0,10,0,10]}]),
       boxes,
-      {columns:['ผู้เช็คชื่อ','ผู้ตรวจสอบ'].map(t=>({stack:[{text:'..............................................',alignment:'center',color:'#9AA6AA'},{text:t,alignment:'center',fontSize:8.5,margin:[0,2,0,0]}]})),margin:[0,26,0,0],unbreakable:true}
+      {columns:advList('dws_sign').map(t=>({stack:[{text:'..............................................',alignment:'center',color:'#9AA6AA'},{text:t,alignment:'center',fontSize:8.5,margin:[0,2,0,0]}]})),margin:[0,26,0,0],unbreakable:true}
     ] };
 }
 
@@ -273,7 +273,7 @@ async function waDoc(w, photos){
   const thDate=d=>`${d.getDate()} ${TH_MONTHS[d.getMonth()]} ${d.getFullYear()+543}`;
   const bd={hLineWidth:()=>.7,vLineWidth:()=>.7,hLineColor:()=>'#1B262C',vLineColor:()=>'#1B262C',paddingLeft:()=>5,paddingRight:()=>5,paddingTop:()=>3.5,paddingBottom:()=>3.5};
   const L=(t)=>({text:t,fillColor:'#F1F3F2'});
-  const extra=(typeof formOf==='function'?formOf('wa_'+w.type_key):[]).filter(f=>!f.core&&f.show_pdf!==0&&w.data&&cfText(f,w.data[f.key])).map(f=>[f.label,cfText(f,w.data[f.key])]);
+  const extra=(typeof formOf==='function'?formOf('wa_'+w.type_key):[]).filter(f=>!f.core&&f.type!=='photos'&&f.show_pdf!==0&&w.data&&cfText(f,w.data[f.key])).map(f=>[f.label,cfText(f,w.data[f.key])]);
   const info=[[L('โครงการ'),{text:site?`${site.name}${site.code?` (${site.code})`:''}`:'-',colSpan:3},{},{}],
     [L('ชิ้นส่วนโครงสร้าง'),`${w.element||''} ${w.element_code||''}`.trim()||'-',L('ชั้น/โซน'),w.floor||'-'],
     [L('แบบอ้างอิง'),w.drawing_ref||'-',L('วันเวลา'),w.request_at?new Date(w.request_at).toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'})+' น.':'-']];
@@ -305,6 +305,7 @@ async function waDoc(w, photos){
       {table:{headerRows:1,widths:[24,'*',40,40,110],body:ck},layout:bd,margin:[0,0,0,8]},
       {table:{widths:['*'],body:[[{stack:res}]]},layout:bd,margin:[0,0,0,10]},
       ...(picRows.length?[{text:'ภาพประกอบ',bold:true,margin:[0,0,0,4]},...picRows]:[]),
+      ...((photos&&photos.sets)||[]).flatMap(st=>{ const cells=st.imgs.map((src,i)=>({stack:[{image:src,fit:[pw,pw*0.72],alignment:'center'},{text:`${st.label} ${i+1}`,fontSize:7.5,color:'#555',alignment:'center',margin:[0,2,0,0]}]})); const rows=[]; for(let i=0;i<cells.length;i+=3){ const r=cells.slice(i,i+3); while(r.length<3) r.push({text:''}); rows.push({columns:r,columnGap:6,margin:[0,0,0,6],unbreakable:true}); } return [{text:st.label,bold:true,margin:[0,4,0,4]},...rows]; }),
       {text:'',margin:[0,8,0,0]},...sgRows,
       {columns:[{text:'',width:'*'},{stack:[{qr,fit:62,alignment:'right'},{text:w.drive_folder?.url?'โฟลเดอร์เอกสาร':'เปิดในแอป',fontSize:6.5,color:'#777',alignment:'right'}],width:80}],margin:[0,6,0,0],unbreakable:true}
     ] };

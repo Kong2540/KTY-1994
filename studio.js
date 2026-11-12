@@ -10,7 +10,8 @@ const STUDIO_SECS = [
   ['rules','📷','กติการายงาน','จำนวนรูปขั้นต่ำ'],
   ['holidays','📅','วันหยุดบริษัท','ประเภท ตัวย่อ ปฏิทินวันหยุด'],
   ['payroll','💰','กติกาเงินเดือน','การลา ประกันสังคม การผ่อน'],
-  ['wa','✅','ประเภทการขออนุมัติ','ตรวจเหล็ก เทคอนกรีต รายการตรวจ ช่องลงนาม']
+  ['wa','✅','ประเภทการขออนุมัติ','ตรวจเหล็ก เทคอนกรีต รายการตรวจ ช่องลงนาม'],
+  ['adv','⚙️','ตั้งค่าขั้นสูง','สถานะ สี ตัวย่อเลขที่ ข้อความเอกสาร ไทล์หน้าหลัก']
 ];
 async function saveSetting(key, value){
   const {error}=await sb.from('app_settings').upsert({key,value,updated_at:new Date().toISOString()});
@@ -24,7 +25,7 @@ function pageStudio(sec){
     `<div class="studio ${isForm?'studio-wide':''}">${(wide&&!isForm)||!cur?`<nav class="studio-nav card card-l">${STUDIO_SECS.map(([k,e,t,d])=>`<a href="#studio/${k}" class="li ${show===k?'on':''}" style="text-decoration:none"><span class="se">${e}</span><div class="grow"><b>${t}</b><span class="xs muted">${d}</span></div>${IC.chev}</a>`).join('')}
       <a href="#manage" class="li" style="text-decoration:none"><span class="se">⚙️</span><div class="grow"><b>จัดการข้อมูลอื่น</b><span class="xs muted">ผู้ใช้ สิทธิ์รายระบบ ไซต์ ตำแหน่ง วัสดุ</span></div>${IC.chev}</a></nav>`:''}
       ${show?'<section class="studio-body col" id="sb" style="gap:14px"></section>':''}</div>`);
-  if(show) ({brand:stBrand,labels:stLabels,forms:stForms,lists:stLists,access:stAccess,rules:stRules,holidays:stHolidays,payroll:stPayroll,wa:stWa})[show]($('#sb'));
+  if(show) ({brand:stBrand,labels:stLabels,forms:stForms,lists:stLists,access:stAccess,rules:stRules,holidays:stHolidays,payroll:stPayroll,wa:stWa,adv:stAdv})[show]($('#sb'));
 }
 
 /* ---------------- แบรนด์ ---------------- */

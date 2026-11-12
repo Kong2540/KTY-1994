@@ -213,7 +213,7 @@ function renderSummary(W,p,slips,cfg,cols){
     const rowHTML=(s,i)=>`<tr>${colsAll.map(k=>k==='#'?`<td>${i+1}</td>`:k==='_sign'?'<td class="sgn"></td>':`<td class="${num(k)?'r':''}">${esc(PCOLS[k].f(s.data))}</td>`).join('')}</tr>`;
     slips.forEach((s,i)=>{ body.insertAdjacentHTML('beforeend',rowHTML(s,i)); const tb=$('table',pg); if(tb.offsetTop+tb.offsetHeight>avail()&&body.rows.length>1){ body.lastElementChild.remove(); pg=page(); pages.push(pg); body=$('tbody',pg); body.insertAdjacentHTML('beforeend',rowHTML(s,i)); } });
     const tot=`<tr class="tt">${colsAll.map(k=>`<td class="r">${k!=='#'&&k!=='_sign'&&PCOLS[k].m?fmtN(slips.reduce((a,s)=>a+(+String(PCOLS[k].f(s.data)).replace(/,/g,'')||0),0)):k===colsAll.find(x=>x!=='#'&&x!=='_sign'&&!PCOLS[x].n)?'รวมทั้งสิ้น':''}</td>`).join('')}</tr>`;
-    const sign=`<div class="pg-sign"><div>ผู้จัดทำ ..............................</div><div>ผู้ตรวจสอบ ..............................</div><div>ผู้อนุมัติ ..............................</div></div>`;
+    const sign=`<div class="pg-sign">${advList('pay_sign').map(x=>`<div>${esc(x)} ..............................</div>`).join('')}</div>`;
     body.insertAdjacentHTML('beforeend',tot); pg.insertAdjacentHTML('beforeend',sign);
     const over=()=>{ const sg=$('.pg-sign',pg); return sg.offsetTop+sg.offsetHeight>avail(); };
     if(over()){ body.lastElementChild.remove(); $('.pg-sign',pg).remove(); pg=page(); pages.push(pg); body=$('tbody',pg); body.insertAdjacentHTML('beforeend',tot); pg.insertAdjacentHTML('beforeend',sign); }
@@ -236,7 +236,7 @@ async function paySlipsPreview(p, slips){
       <div class="sl-r"><span>หักประกันสังคม</span><b>−${fmtN(d.sso)}</b></div>
       <div class="sl-r"><span>หักอื่น ๆ</span><b>−${fmtN(otherDed(d))}</b></div>
       <div class="sl-net"><span>รับสุทธิ</span><b>${fmtN(d.net)}</b></div>
-      <div class="sl-f"><span>โปรดตรวจสอบจำนวนเงินให้เรียบร้อยก่อนออกจากบริษัทฯ</span><span>สแกน QR ดูรายละเอียด</span></div></div>`; }).join('')}</div>`); }
+      <div class="sl-f"><span>${esc(advText('slip_note'))}</span><span>สแกน QR ดูรายละเอียด</span></div></div>`; }).join('')}</div>`); }
   const ov=overlay(`<div class="sheet sheet-wide" role="dialog" aria-modal="true" aria-label="สลิปรายคน"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>สลิปรายคน<small>${slips.length} ใบ · ${pages.length} หน้า A4 (8 ใบ/หน้า ตัดตามเส้นประ)</small></h1></header>
     <div class="sheet-body"><div class="note n-info">${IC.info}<span>QR บนสลิปเปิดหน้าการเงินของพนักงานในแอป (ต้องเข้าสู่ระบบ · พนักงานเห็นเฉพาะของตัวเอง ผู้บริหารเห็นทุกคน)</span></div><div class="pg-wrap">${pages.join('')||'<div class="card empty"><b>ยังไม่มีสลิป</b></div>'}</div></div>
     <div class="sheet-foot"><button class="btn btn-p" data-pdf ${slips.length?'':'disabled'}>ดาวน์โหลด PDF สลิป</button></div></div>`,false,false);
@@ -391,7 +391,7 @@ function detailPageHTML(p,s){
       <table class="pg-tbl"><tr><th>รายการหัก</th><th class="r">บาท</th></tr>${ded}<tr class="tt"><td>รวมรายการหัก</td><td class="r">${fmtN(totDed)}</td></tr></table></div>
     <div class="dt-net"><span>รับสุทธิ</span><b>${fmtN(d.net)} บาท</b></div>${+d.carry_out?`<div class="dt-note">ยอดหักที่เกินรายได้ ${fmtN(d.carry_out)} บาท ยกไปหักงวดถัดไป</div>`:''}
     <table class="pg-tbl dt-att"><tr><th>มา</th><th>สาย</th><th>ครึ่งวัน</th><th>ลาป่วย</th><th>ลากิจ</th><th>พักร้อน</th><th>ขาด</th><th>วันหยุด</th><th>OT (ชม.)</th></tr><tr>${[d.present,d.late,d.half,d.sick,d.personal,d.vacation,d.absent,(+d.hol_paid||0)+(+d.hol_unpaid||0),d.ot_hours].map(v=>`<td class="r">${fmtN(v)}</td>`).join('')}</tr></table>
-    <div class="dt-foot">โปรดตรวจสอบจำนวนเงินให้เรียบร้อยก่อนออกจากบริษัทฯ · เอกสารนี้สร้างโดย ${esc(BR().app)} เมื่อ ${new Date().toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'})}</div></div>`;
+    <div class="dt-foot">${esc(advText('slip_note'))} · เอกสารนี้สร้างโดย ${esc(BR().app)} เมื่อ ${new Date().toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'})}</div></div>`;
 }
 async function payPublish(p, slips, done){
   if(!hasBridge()) return toast('ต้องติดตั้ง Bridge ก่อน',true);

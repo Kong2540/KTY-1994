@@ -148,14 +148,14 @@ async function myHomeCard(){
     const closed=(sl.data||[]).filter(x=>x.pay_periods?.status==='closed').sort((a,b)=>b.pay_periods.start_date.localeCompare(a.pay_periods.start_date))[0];
     const owe=(ins.data||[]).reduce((a,i)=>a+(i.total-i.paid),0);
     const nextPay=d.d<=15?thaiDate(mm+'16'):thaiDate(addDays(m1,1));
-    const DOT={present:'#16A34A',late:'#D97706',half:'#0284C7',sick:'#7C3AED',personal:'#7C3AED',vacation:'#7C3AED',absent:'#DC2626',off:'#64748B'};
+    const DOT={present:'#16A34A',late:'#D97706',half:'#0284C7',sick:'#7C3AED',personal:'#7C3AED',vacation:'#7C3AED',absent:'#DC2626',off:'#64748B',...ATT_COL};
     const LBL={present:'1',late:'1',half:'½',sick:'ป',personal:'ก',vacation:'พ',absent:'0',off:'O'};
     const draw=()=>{ const a=MYH_MODE==='period'?p0:m0, b=MYH_MODE==='period'?p1:m1, days=[]; for(let x=a;x<=b;x=addDays(x,1)) days.push(x);
       const c={present:0,late:0,half:0,leave:0,absent:0,ot:0,hol:0,el:0}; days.forEach(x=>{ if(x>today) return; c.el++; const r=att[x];
         if(!r){ if(hol[x]) c.hol++; return; } c.ot+=+r.ot_hours||0;
         if(r.status==='present') c.present++; else if(r.status==='late') c.late++; else if(r.status==='half') c.half++; else if(r.status==='absent') c.absent++; else if(r.status==='off') c.hol++; else c.leave++; });
       const worked=c.present+c.late+c.half*0.5, base=Math.max(0,c.el-c.hol-c.leave), rate=base?Math.min(100,Math.round(worked/base*100)):null;
-      const col=rate==null?'var(--ink2)':rate>=95?'#16A34A':rate>=85?'#D97706':'#DC2626', R=34, C=2*Math.PI*R;
+      const col=rate==null?'var(--ink2)':rate>=advNum('rate_ok')?'#16A34A':rate>=advNum('rate_warn')?'#D97706':'#DC2626', R=34, C=2*Math.PI*R;
       const lbl=MYH_MODE==='period'?`งวด ${parseISO(a).d}–${parseISO(b).d} ${TH_MON_S[d.m-1]} ${d.y+543}`:`เดือน${TH_MONTHS[d.m-1]} ${d.y+543}`;
       box.innerHTML=`<div class="card col" style="gap:10px"><div class="row"><b class="grow">การมาทำงานของฉัน</b><div class="seg" style="padding:2px;width:160px"><button class="${MYH_MODE==='period'?'on':''}" data-hm="period" style="min-height:30px;font-size:12.5px">งวดนี้</button><button class="${MYH_MODE==='month'?'on':''}" data-hm="month" style="min-height:30px;font-size:12.5px">ทั้งเดือน</button></div></div>
         <div class="row" style="gap:14px"><svg viewBox="0 0 84 84" width="84" height="84" role="img" aria-label="อัตราการมาทำงาน ${rate??'-'}%"><circle cx="42" cy="42" r="${R}" fill="none" stroke="var(--surface2)" stroke-width="9"/><circle cx="42" cy="42" r="${R}" fill="none" stroke="${col}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C*(1-(rate||0)/100)).toFixed(1)}" transform="rotate(-90 42 42)"/><text x="42" y="47" text-anchor="middle" font-size="17" font-weight="700" fill="currentColor">${rate==null?'-':rate+'%'}</text></svg>

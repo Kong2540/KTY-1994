@@ -1,7 +1,7 @@
 /* =====================================================================
    KTY Hub — โครงหน้า: แถบเมนูด้านข้าง / ลิ้นชักเมนูบนมือถือ / ตัวเลือกไซต์
    ===================================================================== */
-const HUB_VERSION = '3.0';
+const HUB_VERSION = '3.1';
 const MOD = {
   wa:       { t:'ขออนุมัติงาน',        hue:'#0E7C86', i:'<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>' },
   att:      { t:'เช็คชื่อ',            hue:'#2E9E5B', i:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>' },
@@ -96,7 +96,7 @@ function bindNav(root){
 }
 function paintBadges(){ $$('[data-badge]').forEach(el=>{ const v=S.badges[el.dataset.badge]; el.textContent=v||''; el.classList.toggle('hidden',!v); }); }
 
-function route(){
+function route(){ if(typeof applyAdv==='function') applyAdv();
   $$('.sheet-bg').forEach(x=>x.remove()); document.body.style.overflow='';
   const cur=keyOf(location.hash); const [k,id,id2]=cur.split('/');
   if(k==='users'){ mgTab='users'; } if(k==='settings'){ mgTab='sites'; }
@@ -148,7 +148,7 @@ const setPage = html => { $('#page').innerHTML = html + '</div>'; const d=$('[da
    ===================================================================== */
 async function collectTasks(){
   const today=localISO(), mgr=isManager(), tasks=[];
-  if(isAdmin()){ const qc=quotaCache(); if(!qc.ts||Date.now()-qc.ts>12*3600e3) quotaRefresh(true).catch(()=>{}); quotaAlerts().forEach(a=>tasks.push({m:'manage',t:`${a.t} ใช้ไป ${a.p}%`,sub:'ใกล้เต็ม ตรวจที่ จัดการ > พื้นที่และสำรอง',tag:a.p>=90?'ใกล้เต็มมาก':'ใกล้เต็ม',c:a.p>=90?'t-bad':'t-warn',href:'#manage/storage'})); }
+  if(isAdmin()){ const qc=quotaCache(); if(!qc.ts||Date.now()-qc.ts>12*3600e3) quotaRefresh(true).catch(()=>{}); quotaAlerts().forEach(a=>tasks.push({m:'manage',t:`${a.t} ใช้ไป ${a.p}%`,sub:'ใกล้เต็ม ตรวจที่ จัดการ > พื้นที่และสำรอง',tag:a.p>=advNum('store_bad')?'ใกล้เต็มมาก':'ใกล้เต็ม',c:a.p>=advNum('store_bad')?'t-bad':'t-warn',href:'#manage/storage'})); }
   const siteIds=S.site?[+S.site]:mySiteIds();
   const q=[ S.hasPhase2&&siteIds.length?sb.from('site_reports').select('site_id,total,updated_at').eq('report_date',today).in('site_id',siteIds):Promise.resolve({data:[]}),
     siteIds.length?sb.from('daily_reports').select('id,site_id,total,no_work,updated_at,line_status').eq('report_date',today).in('site_id',siteIds):Promise.resolve({data:[]}) ];
@@ -216,7 +216,7 @@ const taskHTML = x => `<a href="${x.href}" class="li" style="text-decoration:non
 
 function tileHTML(k, href, label, badgeKey, soon){
   if(!allowed(k)) return '';
-  return `<a href="${href}" class="tile ${soon?'soon':''}">${modIcon(k,64)}${badgeKey?`<span class="tbadge hidden" data-badge="${badgeKey}"></span>`:''}<span class="tl">${T(label||MOD[k].t)}</span>${soon?'<span class="tag" style="height:18px;font-size:10.5px">เร็ว ๆ นี้</span>':''}</a>`;
+  return `<a href="${href}" class="tile ${soon?'soon':''}" data-tile="${k}">${modIcon(k,64)}${badgeKey?`<span class="tbadge hidden" data-badge="${badgeKey}"></span>`:''}<span class="tl">${T(label||MOD[k].t)}</span>${soon?'<span class="tag" style="height:18px;font-size:10.5px">เร็ว ๆ นี้</span>':''}</a>`;
 }
 
 /* =====================================================================
@@ -240,7 +240,7 @@ async function pageHome(){
     t.push(tileHTML('issues','#iss','แจ้งปัญหา','iss'));
     if(p.role==='foreman'||hasMod('wa')) t.push(tileHTML('wa','#wa','ขออนุมัติงาน','wa'));
     t.push(tileHTML('payroll','#my','ข้อมูลของฉัน'), tileHTML('stars','#me/stars','ดาวของฉัน'), tileHTML('me','#me','บัญชีของฉัน'));
-    tiles=t.join('');
+    tiles=(typeof advTiles==='function'?advTiles(t):t).join('');
   }
   let d; try{ d=await collectTasks(); }catch(err){ $('#hb').outerHTML=`<div class="note n-bad">${esc(errText(err))}</div>`; return; }
   S.badges.tasks=d.tasks.length; S.badges.crew=Math.max(0,d.sites-d.sent);
@@ -395,7 +395,7 @@ async function quotaRefresh(withDrive){
   if(withDrive&&hasBridge()){ try{ const j=await bridge('stats'); out.drive=[j.drive_used,j.drive_limit]; }catch(_){} }
   quotaSave(out); return out;
 }
-function quotaAlerts(){ const c=quotaCache(), L=[]; const chk=(k,t)=>{ const v=c[k]; if(v&&v[1]){ const p=Math.round(v[0]/v[1]*100); if(p>=80) L.push({k,t,p}); } };
+function quotaAlerts(){ const c=quotaCache(), L=[]; const chk=(k,t)=>{ const v=c[k]; if(v&&v[1]){ const p=Math.round(v[0]/v[1]*100); if(p>=(typeof advNum==='function'?advNum('store_warn'):80)) L.push({k,t,p}); } };
   chk('db','ฐานข้อมูล Supabase'); chk('files','ไฟล์ใน Supabase (รูปพนักงาน/วัสดุ)'); chk('gh','GitHub (ไฟล์แอป)'); chk('drive','Google Drive บริษัท'); return L; }
 async function mgStorage(){
   const host=$('#mg'); host.innerHTML='<div class="loading"><div class="spin"></div></div>';
