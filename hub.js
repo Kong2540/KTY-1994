@@ -1,13 +1,13 @@
 /* =====================================================================
    KTY Hub — โครงหน้า: แถบเมนูด้านข้าง / ลิ้นชักเมนูบนมือถือ / ตัวเลือกไซต์
    ===================================================================== */
-const HUB_VERSION = '2.8.1';
+const HUB_VERSION = '2.9';
 const MOD = {
   att:      { t:'เช็คชื่อ',            hue:'#2E9E5B', i:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>' },
   daily:    { t:'รายงานประจำวัน',      hue:'#2F6FDB', i:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>' },
   materials:{ t:'เบิก วัสดุ/อุปกรณ์',        hue:'#E07A1F', i:'<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>' },
   borrow:   { t:'คืน วัสดุ/อุปกรณ์',       hue:'#7A5AF8', i:'<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>' },
-  issues:   { t:'ปัญหาหน้างาน',         hue:'#D64545', i:'<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/>' },
+  issues:   { t:'แจ้งปัญหา',         hue:'#D64545', i:'<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/>' },
   people:   { t:'พนักงาน',             hue:'#7A5AF8', i:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><circle cx="17" cy="9" r="2.6"/><path d="M16 14.6c2.7-.2 4.8 1.5 5.5 4.4"/>' },
   payroll:  { t:'เงินเดือน',            hue:'#14918C', i:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/>' },
   sites:    { t:'ไซต์งาน',             hue:'#5B6B73', i:'<path d="M3 21h18M5 21V10l7-5 7 5v11M10 21v-5h4v5"/>' },
@@ -38,7 +38,7 @@ async function loadUserCtx(){
 /* เมนูทั้งหมดตามสิทธิ์ (ใช้ทั้งแถบด้านข้าง/ลิ้นชัก) */
 const ACCESS_MODS=['att','daily','materials','borrow','issues','people','payroll','sites'];
 const allowed = m => isAdmin() || !ACCESS_MODS.includes(m) || (S.settings.menu_access?.[m]?.[S.profile.role]!=='hide');
-const ROUTE_MOD={att:'att',roll:'att',report:'daily',ret:'materials',daily:'daily',mat:'materials',brw:'borrow',employees:'people',emp:'people',pay:'payroll'};
+const ROUTE_MOD={iss:'issues',att:'att',roll:'att',report:'daily',ret:'materials',daily:'daily',mat:'materials',brw:'borrow',employees:'people',emp:'people',pay:'payroll'};
 function navSections(){ return navSections0().map(s=>({...s,items:s.items.filter(x=>allowed(x.m))})).filter(s=>s.items.length); }
 function navSections0(){
   const p=S.profile, mgr=isManager(), out=[];
@@ -46,7 +46,7 @@ function navSections0(){
     out.push({t:'ภาพรวม', items:[{k:'home',m:'home'},{k:'tasks',m:'tasks',b:'tasks'}]});
     out.push({t:'ระบบงาน', items:[
       {k:'att',m:'att',b:'att'}, {k:'roll',m:'att',t:'เช็คชื่อแบบติ๊ก',sub:1}, {k:'att/month',m:'att',t:'ตารางรายเดือน',sub:1}, {k:'att/site',m:'att',t:'คนงานหน้างาน',sub:1,b:'crew'},
-      {k:'daily',m:'daily',b:'daily'}, {k:'mat',m:'materials',b:'mat'}, {k:'ret',m:'borrow',b:'brw'}, {k:'soon/issues',m:'issues'},
+      {k:'daily',m:'daily',b:'daily'}, {k:'mat',m:'materials',b:'mat'}, {k:'ret',m:'borrow',b:'brw'}, {k:'iss',m:'issues',b:'iss'},
       {k:'employees',m:'people'}, {k:'pay',m:'payroll'} ]});
     out.push({t:'ตั้งค่า', items:[{k:'manage/sites',m:'sites'},{k:'manage',m:'manage',b:'users'},...(isAdmin()?[{k:'studio',m:'studio'}]:[])]});
   } else {
@@ -55,7 +55,7 @@ function navSections0(){
     if(p.role==='foreman'||hasMod('daily')) it.push({k:'daily',m:'daily',t:'รายงานประจำวัน',b:'daily'});
     if(hasMod('materials')) it.push({k:'mat',m:'materials',t:'เบิก วัสดุ/อุปกรณ์',b:'mat'});
     if(hasMod('borrow')||hasMod('materials')) it.push({k:'ret',m:'borrow',t:'คืน วัสดุ/อุปกรณ์',b:'brw'});
-    if(hasMod('issues')) it.push({k:'soon/issues',m:'issues',t:'รายงานปัญหาหน้างาน'});
+    it.push({k:'iss',m:'issues',t:'แจ้งปัญหา',b:'iss'});
     out.push({t:'งานของฉัน', items:it});
     if(hasMod('hr',['approver'])) out.push({t:'บุคคล', items:[{k:'reqs',m:'people',t:'คำขอแก้ไขข้อมูล'}]});
     out.push({t:'ของฉัน', items:[{k:'my',m:'payroll',t:'ข้อมูลของฉัน'},{k:'me/stars',m:'stars'},{k:'me',m:'me'}]});
@@ -99,14 +99,14 @@ function route(){
   const cur=keyOf(location.hash); const [k,id,id2]=cur.split('/');
   if(k==='users'){ mgTab='users'; } if(k==='settings'){ mgTab='sites'; }
   const mgr=isManager(), p=S.profile;
-  const can={ home:1, tasks:1, me:1, soon:1, att:mgr, employees:mgr, emp:mgr, manage:mgr, users:mgr, settings:mgr, roll:mgr||p.can_check, report:p.role==='foreman'||mgr||hasMod('daily'), mat:mgr||hasMod('materials'), pay:1, id:1, my:1, reqs:mgr||hasMod('hr',['approver']), brw:mgr||hasMod('borrow')||hasMod('materials'), ret:mgr||hasMod('borrow')||hasMod('materials'), daily:p.role==='foreman'||mgr||hasMod('daily'), studio:isAdmin() };
+  const can={ home:1, tasks:1, me:1, soon:1, att:mgr, employees:mgr, emp:mgr, manage:mgr, users:mgr, settings:mgr, roll:mgr||p.can_check, report:p.role==='foreman'||mgr||hasMod('daily'), mat:mgr||hasMod('materials'), pay:1, id:1, my:1, iss:1, reqs:mgr||hasMod('hr',['approver']), brw:mgr||hasMod('borrow')||hasMod('materials'), ret:mgr||hasMod('borrow')||hasMod('materials'), daily:p.role==='foreman'||mgr||hasMod('daily'), studio:isAdmin() };
   if(ROUTE_MOD[k]&&!allowed(ROUTE_MOD[k])) can[k]=0;
   const key=can[k]?k:'home';
   if(key==='att'&&id&&['day','month','site'].includes(id)) attTab=id;
   if(key==='manage'&&id) mgTab=id;
   if(key==='me'&&id==='stars') profTab='stars';
   renderShell(can[k]?cur:'home');
-  ({home:pageHome, tasks:pageTasks, att:pageAtt, employees:pageEmployees, emp:()=>pageProfile(id), manage:pageManage, users:pageManage, settings:pageManage, report:pageReport, mat:()=>pageMat(id,id2), pay:()=>pagePay(id,id2), id:()=>pageQR(id), my:()=>pageMy(id||null), reqs:pageReqs, brw:()=>pageBrw(id,id2), ret:pageRet, daily:()=>pageDaily(id,id2), roll:pageRoll, studio:()=>pageStudio(id), me:()=>id==='stars'?pageMyStars():pageMe(), soon:()=>pageSoon(id)})[key]();
+  ({home:pageHome, tasks:pageTasks, att:pageAtt, employees:pageEmployees, emp:()=>pageProfile(id), manage:pageManage, users:pageManage, settings:pageManage, report:pageReport, mat:()=>pageMat(id,id2), pay:()=>pagePay(id,id2), iss:()=>pageIss(id,id2), id:()=>pageQR(id), my:()=>pageMy(id||null), reqs:pageReqs, brw:()=>pageBrw(id,id2), ret:pageRet, daily:()=>pageDaily(id,id2), roll:pageRoll, studio:()=>pageStudio(id), me:()=>id==='stars'?pageMyStars():pageMe(), soon:()=>pageSoon(id)})[key]();
   scrollTo(0,0);
 }
 function renderShell(cur){
@@ -169,6 +169,12 @@ async function collectTasks(){
     (res.rc||[]).forEach(d=>tasks.push({m:'materials',t:`รับของ ${d.doc_no}`,sub:sn(d.site_id),tag:'รอรับ',c:'t-acc',href:`#mat/d/${d.id}`}));
     S.badges.mat=(res.ap||[]).length+(res.is||[]).length+(res.rc||[]).length;
   }catch(_){} }
+  try{ const [is,rd]=await Promise.all([sb.from('issues').select('id,title,urgency,status,reporter,assignee,last_actor,updated_at,issue_no').neq('status','closed').limit(200), sb.from('issue_reads').select('issue_id,read_at')]);
+    if(!is.error){ const me=S.profile.id, rds={}; (rd.data||[]).forEach(r=>rds[r.issue_id]=r.read_at); const L=is.data||[]; const unread=i=>i.last_actor&&i.last_actor!==me&&(!rds[i.id]||i.updated_at>rds[i.id]);
+      const UR={critical:'ด่วนมาก',urgent:'ด่วน',normal:'ปกติ'};
+      L.filter(i=>(mgr&&i.status==='new')||unread(i)||(i.reporter===me&&i.status==='resolved')||(i.assignee===me&&['new','acknowledged','in_progress'].includes(i.status)&&!mgr)).sort((a,b)=>({critical:0,urgent:1,normal:2})[a.urgency]-({critical:0,urgent:1,normal:2})[b.urgency])
+        .forEach(i=>tasks.push({m:'issues',t:(i.reporter===me&&i.status==='resolved'?'ยืนยันผลการแก้ไข: ':mgr&&i.status==='new'?'เรื่องใหม่: ':'')+i.title,sub:`${i.issue_no||''}${unread(i)?' · มีความเคลื่อนไหวใหม่':''}`,tag:UR[i.urgency],c:i.urgency==='critical'?'t-bad':i.urgency==='urgent'?'t-warn':'',href:'#iss/'+i.id,top:i.urgency==='critical'}));
+      S.badges.iss=L.filter(i=>(mgr&&i.status==='new')||unread(i)||(i.reporter===me&&i.status==='resolved')).length; } }catch(_){}
   if(!mgr&&hasMod('hr',['approver'])){ try{ const {data:pr}=await sb.rpc('pending_profile_requests'); if((pr||[]).length) tasks.push({m:'people',t:`คำขอแก้ไขข้อมูลพนักงาน ${pr.length} รายการ`,sub:'ตรวจค่าเดิม → ค่าใหม่ แล้วอนุมัติ',tag:'รออนุมัติ',c:'t-warn',href:'#reqs'}); }catch(_){} }
   if(mgr){ try{ const [c1,c2]=await Promise.all([sb.from('emp_change_requests').select('id',{count:'exact',head:true}).eq('status','pending'), isAdmin()?sb.from('link_requests').select('id',{count:'exact',head:true}).eq('status','pending'):Promise.resolve({count:0})]);
     if(c1.count) tasks.push({m:'people',t:`คำขอแก้ไขข้อมูลพนักงาน ${c1.count} รายการ`,sub:'ตรวจค่าเดิม → ค่าใหม่ แล้วอนุมัติ',tag:'รออนุมัติ',c:'t-warn',href:'#reqs'});
@@ -217,14 +223,14 @@ async function pageHome(){
   $$('[data-site]').forEach(b=>b.onclick=()=>{ S.site=b.dataset.site; try{ localStorage.setItem('kty-site',S.site); }catch(_){} route(); });
   let tiles='';
   if(mgr){
-    tiles=[tileHTML('att','#att','เช็คชื่อ','att'), tileHTML('daily','#daily',null,'daily'), tileHTML('materials','#mat',null,'mat'), tileHTML('borrow','#ret',null,'brw'), tileHTML('issues','#soon/issues',null,null,true), tileHTML('people','#employees'), tileHTML('payroll','#pay'), tileHTML('sites','#manage/sites'), tileHTML('manage','#manage','จัดการ','users'), ...(isAdmin()?[tileHTML('studio','#studio')]:[])].filter(x=>x).join('');
+    tiles=[tileHTML('att','#att','เช็คชื่อ','att'), tileHTML('daily','#daily',null,'daily'), tileHTML('materials','#mat',null,'mat'), tileHTML('borrow','#ret',null,'brw'), tileHTML('issues','#iss',null,'iss'), tileHTML('people','#employees'), tileHTML('payroll','#pay'), tileHTML('sites','#manage/sites'), tileHTML('manage','#manage','จัดการ','users'), ...(isAdmin()?[tileHTML('studio','#studio')]:[])].filter(x=>x).join('');
   } else {
     const t=[];
     if(p.can_check) t.push(tileHTML('att','#roll','เช็คชื่อหน้าไซต์งาน'));
     if(p.role==='foreman'||hasMod('daily')) t.push(tileHTML('daily','#daily','รายงานประจำวัน','daily'));
     if(hasMod('materials')) t.push(tileHTML('materials','#mat','เบิก วัสดุ/อุปกรณ์','mat'));
     if(hasMod('borrow')||hasMod('materials')) t.push(tileHTML('borrow','#ret','คืน วัสดุ/อุปกรณ์','brw'));
-    if(hasMod('issues')) t.push(tileHTML('issues','#soon/issues','รายงานปัญหาหน้างาน',null,true));
+    t.push(tileHTML('issues','#iss','แจ้งปัญหา','iss'));
     t.push(tileHTML('payroll','#my','ข้อมูลของฉัน'), tileHTML('stars','#me/stars','ดาวของฉัน'), tileHTML('me','#me','บัญชีของฉัน'));
     tiles=t.join('');
   }
@@ -240,7 +246,7 @@ async function pageHome(){
       ${sites.map(s=>{ const r=d.daily[s.id]; return `<div class="row"><span class="dot ${r?'done':'now'}">${r?svg('<path d="M5 12l5 5 9-10"/>','style="width:14px;height:14px;stroke-width:3"'):''}</span><div class="grow"><b>รายงานเย็น ${sites.length>1?esc(s.name):''}</b><div class="sm muted">${r?`ส่งแล้ว ${new Date(r.updated_at).toTimeString().slice(0,5)}`:'ส่งก่อนเลิกงาน'}</div></div></div>`; }).join('')}</div><a href="#daily" class="btn btn-p">${d.sites>d.sent?'เช็คชื่อคนงาน / รายงานเย็น':'เขียนหรือดูรายงานประจำวัน'}</a></div>`:`<div class="card empty"><b>ยังไม่ได้กำหนดไซต์ที่รับผิดชอบ</b>ติดต่อแอดมิน</div>`;
   }
   $('#hb').outerHTML=`<div class="col" style="gap:16px">${top}<div class="tiles">${tiles}</div>
-    ${!mgr&&hasMod('issues')?`<div class="note n-warn" style="align-items:center">${modIcon('issues',30)}<span>รายงานปัญหาหน้างาน จะส่งแจ้งเตือนถึงผู้บริหารทันที</span></div>`:''}
+    
     <div class="row" style="justify-content:space-between"><h3 class="h2">${mgr?'งานที่รอคุณ':'งานของฉันวันนี้'}</h3>${d.tasks.length>4?'<a href="#tasks" class="sm" style="color:var(--ink2)">ดูทั้งหมด</a>':''}</div>
     ${d.tasks.length?`<div class="card card-l">${d.tasks.slice(0,4).map(taskHTML).join('')}</div>`:`<div class="card empty" style="padding:24px"><b>ไม่มีงานค้าง</b>เรียบร้อยดีทุกอย่าง</div>`}</div>`;
   paintBadges();

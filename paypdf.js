@@ -243,3 +243,24 @@ async function dailySummaryDoc(date, rows){
       {columns:['ผู้เช็คชื่อ','ผู้ตรวจสอบ'].map(t=>({stack:[{text:'..............................................',alignment:'center',color:'#9AA6AA'},{text:t,alignment:'center',fontSize:8.5,margin:[0,2,0,0]}]})),margin:[0,26,0,0],unbreakable:true}
     ] };
 }
+
+/* ---------- ใบแจ้งปัญหา (A5 แนวตั้ง) ---------- */
+async function issueDoc(i, imgs){
+  await pdfReady(); await logoData();
+  const iw=A5W-A5M*2, U={normal:['ปกติ','#64748B'],urgent:['ด่วน','#D97706'],critical:['ด่วนมาก/อันตราย','#DC2626']}[i.urgency]||['ปกติ','#64748B'];
+  const site=S.sites.find(s=>s.id===i.site_id), t=new Date(i.created_at);
+  const extra=formOf('issue').filter(f=>!f.core&&i.extra&&cfText(f,i.extra[f.key])).map(f=>[f.label,cfText(f,i.extra[f.key])]);
+  const pics=imgs.slice(0,4), pw=(iw-6*(Math.min(pics.length,2)-1))/Math.min(Math.max(pics.length,1),2);
+  return { pageSize:{width:A5W,height:595.28}, pageMargins:[A5M,A5M,A5M,A5M+8], defaultStyle:{font:'Sarabun',fontSize:9,color:'#1B262C',lineHeight:1.15}, info:{title:`ใบแจ้งปัญหา ${i.issue_no||''}`},
+    footer:()=>({text:`${BR().app} · ใบแจ้งปัญหา`,fontSize:6.5,color:'#9AA6AA',margin:[A5M,0,A5M,0]}),
+    content:[...docHead('ใบแจ้งปัญหา','ISSUE REPORT',iw),
+      {columns:[{text:['เลขที่ ',{text:i.issue_no||'-',bold:true}],fontSize:8.8},{table:{widths:[80],body:[[{text:U[0],bold:true,color:'#fff',fillColor:U[1],fontSize:8.5,alignment:'center',noWrap:true}]]},layout:'noBorders',width:80}],margin:[0,0,0,6]},
+      {text:i.title,bold:true,fontSize:13,color:C_DARK,margin:[0,0,0,4]},
+      {text:`${i.category}${site?' · '+site.name:''}`,fontSize:8.5,color:C_LAB},
+      {text:`แจ้งโดย ${i.reporter_name||''}${i.reporter_position?' ('+i.reporter_position+')':''} · ${t.toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'})}`,fontSize:8.5,color:C_LAB,margin:[0,0,0,8]},
+      ...(i.detail?[{text:i.detail,fontSize:9.5,margin:[0,0,0,8]}]:[]),
+      ...(extra.length?[{table:{widths:[90,'*'],body:extra.map(([a,b])=>[{text:a,color:C_LAB},{text:b,bold:true}])},layout:'lightHorizontalLines',margin:[0,0,0,8]}]:[]),
+      ...(pics.length?[{columns:pics.slice(0,2).map(src=>({image:src,fit:[pw,150]})),columnGap:6,margin:[0,0,0,6]},...(pics.length>2?[{columns:pics.slice(2,4).map(src=>({image:src,fit:[pw,150]})),columnGap:6}]:[])]:[]),
+      {text:`สถานะ: ${({new:'ใหม่',acknowledged:'รับเรื่อง',in_progress:'กำลังแก้ไข',resolved:'แก้แล้ว',closed:'ปิดเรื่อง'})[i.status]}${i.assignee_name?' · ผู้รับผิดชอบ '+i.assignee_name:''}`,fontSize:8,color:C_LAB,margin:[0,10,0,0]}
+    ] };
+}

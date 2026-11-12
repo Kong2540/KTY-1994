@@ -82,11 +82,11 @@ function stLabels(host){
 /* ---------------- รายการตัวเลือก ---------------- */
 const LIST_DEFS = [
   ['weather','สภาพอากาศ','daily_lists'],['machinery','เครื่องจักร','daily_lists'],['tools','เครื่องมือ','daily_lists'],
-  ['no_work_reasons','เหตุผลที่ไม่มีการทำงาน','daily_lists'],['site_trades','ประเภทช่าง (คนงานหน้างาน)','site_trades']
+  ['no_work_reasons','เหตุผลที่ไม่มีการทำงาน','daily_lists'],['issue_cats','หมวดแจ้งปัญหา','daily_lists'],['site_trades','ประเภทช่าง (คนงานหน้างาน)','site_trades']
 ];
 function stLists(host){
   let cur=LIST_DEFS[0][0];
-  const get=k=>{ const d=LIST_DEFS.find(x=>x[0]===k); return d[2]==='site_trades'?[...(S.settings.site_trades||[])]:[...((S.settings.daily_lists||DL())[k]||[])]; };
+  const get=k=>{ const d=LIST_DEFS.find(x=>x[0]===k); if(d[2]==='site_trades') return [...(S.settings.site_trades||[])]; const v=(S.settings.daily_lists||DL())[k]; return [...(v&&v.length?v:(k==='issue_cats'&&typeof ISS_CATS_DEF!=='undefined'?ISS_CATS_DEF:[]))]; };
   let items=get(cur);
   const draw=()=>{ host.innerHTML=`<div class="card col" style="gap:12px"><div class="chips">${LIST_DEFS.map(([k,t])=>`<button class="chip ${k===cur?'on':''}" data-t="${k}">${t}</button>`).join('')}</div>
     <div class="card card-l" style="box-shadow:none">${items.map((v,i)=>`<div class="li" style="gap:6px"><span class="muted" style="width:22px;text-align:right">${i+1}</span><input class="in grow" data-e="${i}" value="${esc(v)}" style="height:40px"><button class="ibtn" data-u="${i}" ${i?'':'disabled'} aria-label="ขึ้น">${svg('<path d="M6 15l6-6 6 6"/>')}</button><button class="ibtn" data-d="${i}" ${i<items.length-1?'':'disabled'} aria-label="ลง">${svg('<path d="M6 9l6 6 6-6"/>')}</button><button class="ibtn" data-x="${i}" aria-label="ลบ">${IC.close}</button></div>`).join('')||'<div class="empty"><b>ยังไม่มีตัวเลือก</b></div>'}</div>

@@ -250,13 +250,14 @@ async function dailyView(id){
     ${(r.crew_changes||[]).length?`<div class="card col" style="gap:6px"><b class="sm">เปลี่ยนจากรอบเช้า</b>${r.crew_changes.map(c=>`<span class="sm" style="color:var(--warn)">${esc(c.trade)} ${c.from} → ${c.to} (${esc(c.period)}): ${esc(c.reason)}</span>`).join('')}</div>`:''}
     ${!r.no_work?`<div class="card"><b class="sm">งานที่ทำ</b><div style="margin-top:6px;white-space:pre-line">${esc(r.work_items||'')}</div></div>`:''}
     ${(()=>{ const cf=formAll('daily').filter(f=>!f.core&&r.extra&&cfText(f,r.extra[f.key])); return cf.length?`<div class="card card-l">${cf.map(f=>`<div class="kv"><span>${esc(f.label)}</span><span>${f.type==='photo'&&r.extra[f.key]?.url?`<a href="${esc(r.extra[f.key].url)}" target="_blank" rel="noopener">ดูรูป</a>`:f.type==='signature'?`<img src="${r.extra[f.key]}" alt="" style="height:46px;background:#fff;border-radius:6px">`:esc(cfText(f,r.extra[f.key]))}</span></div>`).join('')}</div>`:''; })()}
-    ${r.problems?`<div class="note n-bad"><span><b>ปัญหา / อุปสรรค</b><br>${esc(r.problems).replace(/\n/g,'<br>')}</span></div>`:''}
+    ${r.problems?`<div class="note n-bad"><span><b>ปัญหา / อุปสรรค</b><br>${esc(r.problems).replace(/\n/g,'<br>')}</span><button class="btn btn-sm" data-toiss style="flex:none">ส่งเป็นเรื่องแจ้งปัญหา</button></div>`:''}
     ${(r.photos||[]).length?`<div class="card col" style="gap:8px"><div class="row" style="justify-content:space-between"><b class="sm">รูปถ่าย ${r.photos.length} รูป</b>${r.photo_folder_url?`<a href="${esc(r.photo_folder_url)}" target="_blank" rel="noopener" class="sm">เปิดโฟลเดอร์</a>`:''}</div><div class="pgrid">${r.photos.map(p=>`<a class="pthumb" href="${esc(p.url)}" target="_blank" rel="noopener"><img src="${thumbOf(p)}" alt="" loading="lazy"></a>`).join('')}</div></div>`:''}
     <div class="row" style="gap:8px;flex-wrap:wrap">${r.pdf_url?`<a class="btn" href="${esc(r.pdf_url)}" target="_blank" rel="noopener">${IC.history}เปิด PDF</a>`:''}${mgr&&r.sheet_url?`<a class="btn" href="${esc(r.sheet_url)}" target="_blank" rel="noopener">เปิด Google Sheet</a>`:''}<button class="btn" data-resend>ส่งเข้า LINE</button>${canEdit?'<button class="btn btn-p" data-edit>แก้ไขรายงาน</button>':''}</div>
     ${mgr?`<form class="card col" id="cm" style="gap:8px"><b class="sm">ความเห็นผู้บริหาร</b><textarea class="in" name="c" rows="2" placeholder="เขียนถึงโฟร์แมน">${esc(r.manager_comment||'')}</textarea><button class="btn btn-sm" style="align-self:flex-start">บันทึกความเห็น</button></form>`:(r.manager_comment?`<div class="card"><span class="xs muted">ความเห็นผู้บริหาร · ${esc(r.comment_by_name||'')}</span><br><b class="sm">${esc(r.manager_comment)}</b></div>`:'')}
   </div>`;
   const ed=$('[data-edit]'); if(ed) ed.onclick=()=>dailyForm({site_id:r.site_id,date:r.report_date});
   $('[data-resend]').onclick=()=>dailyPreview(r,null);
+  const ti=$('[data-toiss]'); if(ti) ti.onclick=()=>{ const st=S.sites.find(s=>s.id===r.site_id); ISS_PREFILL={category:'หน้างาน/ความปลอดภัย',site_id:r.site_id,title:`ปัญหาจากรายงานประจำวัน ${st?.name||''} ${thaiDate(r.report_date)}`.trim(),detail:r.problems,source_daily:r.id}; location.hash='#iss/new'; };
   const cm=$('#cm'); if(cm) cm.onsubmit=async ev=>{ ev.preventDefault(); const {error}=await sb.from('daily_reports').update({manager_comment:cm.c.value.trim()||null,comment_by_name:S.profile.display_name,comment_at:new Date().toISOString()}).eq('id',r.id); if(error) return toast(errText(error),true); toast('บันทึกความเห็นแล้ว'); };
 }
 
@@ -276,46 +277,17 @@ async function mgDaily(){
 
 /* ---------------- ใบสรุปคนงานหน้าไซต์ (รูปแชร์ LINE + PDF ลงโฟลเดอร์ Drive ของวันนั้น) ---------------- */
 async function crewSlip(rep){
-  const prog=overlay(`<div class="modal" role="dialog" aria-modal="true"><div class="row" style="gap:10px"><span class="spin" style="margin:0"></span><b>กำลังสร้างใบสรุปคนงาน</b></div></div>`,true,false);
+  const site=S.sites.find(s=>s.id===rep.site_id), p=parseISO(rep.report_date), yy=String(p.y+543).slice(-2);
+  const docNo=`CRW-${site?.code||'S'+rep.site_id}-${yy}${String(p.m).padStart(2,'0')}${String(p.d).padStart(2,'0')}`;
   try{
-    await loadScript(LIB.h2c);
-    const site=S.sites.find(s=>s.id===rep.site_id), B=BR(), logo=B.logo||(S.settings.company_logo?.drive_id?`https://drive.google.com/thumbnail?id=${S.settings.company_logo.drive_id}&sz=w200`:'');
-    const rows=Object.entries(rep.counts||{}).filter(([,n])=>n>0); const p=parseISO(rep.report_date); const t=new Date(rep.updated_at||Date.now()).toTimeString().slice(0,5);
-    const yy=String(p.y+543).slice(-2), docNo=`CRW-${site?.code||'S'+rep.site_id}-${yy}${String(p.m).padStart(2,'0')}${String(p.d).padStart(2,'0')}`;
-    const el=document.createElement('div'); el.className='docslip';
-    el.innerHTML=`<div class="ds-head"><div class="ds-logo">${logo?`<img src="${logo}" crossorigin="anonymous" alt="">`:esc(B.mark)}</div><div class="ds-co"><b>${esc(B.company_th)}</b><span>${esc(B.company_en)}</span></div><div class="ds-ti"><b>ใบสรุปคนงานหน้าไซต์</b><span>SITE MANPOWER REPORT</span></div></div><div class="ds-rule"></div>
-      <div class="ds-no"><span>เลขที่ <b>${docNo}</b></span><span>${dayLong(rep.report_date)} · ${t} น.</span></div>
-      <div class="ds-info"><div>${[['โครงการ',(site?.code?site.code+' ':'')+(site?.contract_name||site?.name||'')],['สถานที่',site?.location||'-'],['ผู้รายงาน',rep.submitted_name||S.profile.display_name]].map(([a,b])=>`<p><span>${a}</span><b>${esc(b||'-')}</b></p>`).join('')}</div>
-        <div class="ds-total"><b>${rep.total||0}</b><span>คนงานรวม (คน)</span></div></div>
-      <table><tr><th>ที่</th><th>ประเภทช่าง / ตำแหน่ง</th><th class="r">จำนวน (คน)</th></tr>${rows.map(([k,n],i)=>`<tr><td>${i+1}</td><td><b>${esc(k)}</b></td><td class="r"><b>${n}</b></td></tr>`).join('')||'<tr><td></td><td>ไม่มีคนงาน</td><td class="r">0</td></tr>'}
-        <tr><td></td><td style="text-align:right"><b>รวมทั้งสิ้น</b></td><td class="r"><b>${rep.total||0}</b></td></tr></table>
-      ${rep.note?`<div class="ds-note">หมายเหตุ: ${esc(rep.note)}</div>`:''}
-      <div class="ds-sign" style="margin-top:22px"><div><b>${esc(rep.submitted_name||S.profile.display_name)}</b><span>ผู้รายงาน · ส่งในระบบ ${t} น.</span></div><div><b style="color:#5B6B73">............................</b><span>ผู้ตรวจสอบ</span></div></div>
-      <div class="ds-foot"><span>สร้างโดย ${esc(B.app)}</span><span>ข้อมูล ณ เวลาที่ส่ง</span></div>`;
-    document.body.appendChild(el); await document.fonts?.ready; await new Promise(r=>setTimeout(r,150));
-    const canvas=await html2canvas(el,{scale:1.8,backgroundColor:'#ffffff',useCORS:true,logging:false}); el.remove();
-    const png=await new Promise(r=>canvas.toBlob(r,'image/png')), url=URL.createObjectURL(png), name=`${docNo}.png`;
-    prog.close();
-    const m=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="ใบสรุปคนงานหน้าไซต์"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>ใบสรุปคนงานหน้าไซต์<small>${esc(site?.name||'')} · ${dayLong(rep.report_date)}</small></h1></header>
-      <div class="sheet-body"><img src="${url}" alt="ใบสรุปคนงาน" style="width:100%;max-width:520px;border-radius:10px;box-shadow:var(--shadow);align-self:center">
-        <div class="note n-info" id="cs_st">${hasBridge()?'<span class="spin" style="width:16px;height:16px;margin:0;border-width:2px"></span><span>กำลังบันทึก PDF และรูปลงโฟลเดอร์ของวันนี้ใน Google Drive...</span>':`${IC.info}<span>ยังไม่ได้ติดตั้ง Bridge จึงบันทึกลง Drive ไม่ได้ (แชร์รูปได้ตามปกติ)</span>`}</div></div>
-      <div class="sheet-foot" style="flex-wrap:wrap"><button class="btn" data-save>บันทึกรูป</button><a class="btn hidden" data-pdf target="_blank" rel="noopener">เปิด PDF</a><button class="btn btn-p" data-share style="background:#06C755;border-color:#06C755;color:#fff">แชร์รูปเข้า LINE</button></div></div>`, false, false);
-    $('[data-x]',m.el).onclick=()=>{ URL.revokeObjectURL(url); m.close(); };
-    $('[data-save]',m.el).onclick=()=>{ const a=document.createElement('a'); a.href=url; a.download=name; a.click(); };
-    $('[data-share]',m.el).onclick=async()=>{ const file=new File([png],name,{type:'image/png'});
-      try{ if(navigator.canShare&&navigator.canShare({files:[file]})) await navigator.share({files:[file],title:'ใบสรุปคนงานหน้าไซต์'}); else { const a=document.createElement('a'); a.href=url; a.download=name; a.click(); toast('อุปกรณ์นี้แชร์ไฟล์ไม่ได้ บันทึกรูปให้แล้ว'); } }catch(e){ if(e.name!=='AbortError') toast(errText(e),true); } };
-    if(hasBridge()){
-      try{
-        await loadScript(LIB.pdf);
-        const pdf=new jspdf.jsPDF({unit:'mm',format:'a4'}), W=190, H=W*canvas.height/canvas.width;
-        pdf.addImage(canvas.toDataURL('image/jpeg',.92),'JPEG',10,10,W,Math.min(H,277));
-        const pdfB64=pdf.output('datauristring').split(',')[1];
-        const [pd,im]=await Promise.all([ bridge('upload_doc',{site_id:rep.site_id,date:rep.report_date,name:`${docNo}.pdf`,mime:'application/pdf',data:pdfB64}),
-          bridge('upload_photo',{site_id:rep.site_id,date:rep.report_date,name:`${docNo}.jpg`,data:canvas.toDataURL('image/jpeg',.88).split(',')[1]}) ]);
+    const dd=await crewSlipDoc(rep,site,docNo);
+    vectorPreview(dd, docNo, 'ใบสรุปคนงานหน้าไซต์', `<div class="note n-info" id="cs_st">${hasBridge()?'<span class="spin" style="width:16px;height:16px;margin:0;border-width:2px"></span><span>กำลังบันทึก PDF และรูปลงโฟลเดอร์ของวันนี้ใน Google Drive...</span>':`${IC.info}<span>ยังไม่ได้ติดตั้ง Bridge จึงบันทึกลง Drive ไม่ได้ (แชร์รูปได้ตามปกติ)</span>`}</div>`, async ({m,blob,png64})=>{
+      if(!hasBridge()) return;
+      try{ const pdf64=await new Promise(res=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.readAsDataURL(blob); });
+        const [pd,im]=await Promise.all([ bridge('upload_doc',{site_id:rep.site_id,date:rep.report_date,name:`${docNo}.pdf`,mime:'application/pdf',data:pdf64}), bridge('upload_doc',{site_id:rep.site_id,date:rep.report_date,name:`${docNo}.png`,mime:'image/png',data:png64}) ]);
         await sb.from('site_reports').update({pdf_url:pd.url,image_url:im.url}).eq('id',rep.id);
-        $('#cs_st',m.el).innerHTML=`${IC.check}<span>บันทึก PDF และรูปลงโฟลเดอร์ของวันนี้แล้ว · <a href="${esc(pd.folder_url||pd.url)}" target="_blank" rel="noopener">เปิดโฟลเดอร์</a></span>`;
-        const a=$('[data-pdf]',m.el); a.href=pd.url; a.classList.remove('hidden');
-      }catch(e){ $('#cs_st',m.el).innerHTML=`${IC.info}<span>บันทึกลง Drive ไม่สำเร็จ: ${esc(errText(e))} (แชร์รูปได้ตามปกติ)</span>`; }
-    }
-  }catch(e){ prog.close(); toast(errText(e),true); }
+        const st=$('#cs_st',m.el); if(st) st.innerHTML=`${IC.check}<span>บันทึก PDF (เวกเตอร์) และรูปลงโฟลเดอร์ของวันนี้แล้ว · <a href="${esc(pd.folder_url||pd.url)}" target="_blank" rel="noopener">เปิดโฟลเดอร์</a></span>`; }
+      catch(e){ const st=$('#cs_st',m.el); if(st) st.innerHTML=`${IC.info}<span>บันทึกลง Drive ไม่สำเร็จ: ${esc(errText(e))} (แชร์รูปได้ตามปกติ)</span>`; }
+    });
+  }catch(e){ toast(errText(e),true); }
 }

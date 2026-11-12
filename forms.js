@@ -15,6 +15,14 @@ const FORM_DEFS = {
     {key:'photos',    type:'photos',   label:'รูปถ่าย',               core:1, locked:1, show_pdf:1}
   ]}
 };
+FORM_DEFS.issue = { name:'แจ้งปัญหา', fields:[
+  {key:'category', type:'single',   label:'หมวด',               core:1, required:1, list:'issue_cats'},
+  {key:'urgency',  type:'single',   label:'ความเร่งด่วน',        core:1, required:1, locked:1},
+  {key:'site_id',  type:'single',   label:'ไซต์ที่เกี่ยวข้อง',     core:1},
+  {key:'title',    type:'text',     label:'หัวข้อ',              core:1, required:1, locked:1},
+  {key:'detail',   type:'longtext', label:'รายละเอียด',          core:1, required:1},
+  {key:'photos',   type:'photos',   label:'รูปถ่าย (สูงสุด 6)',   core:1, locked:1}
+]};
 const ROLE_OPTS = [['foreman','โฟร์แมน'],['executive','ผู้บริหาร'],['writer','ผู้มีสิทธิ์เขียนรายงาน']];
 function formOf(name){ const f=S.settings.forms?.[name]?.published; return (f&&f.length?f:FORM_DEFS[name].fields).filter(x=>!x.hidden); }
 function formAll(name, draft){ const s=S.settings.forms?.[name]||{}; const f=(draft&&s.draft)||s.published; return JSON.parse(JSON.stringify(f&&f.length?f:FORM_DEFS[name].fields)); }
@@ -68,9 +76,9 @@ function stForms(host){
     <span class="tag ${f.core?'t-acc':'t-ok'}" style="height:20px;font-size:10.5px">${f.core?'หลัก':'เพิ่มเอง'}</span>
     <span class="fbmv"><button class="ibtn" data-up="${i}" ${i?'':'disabled'} aria-label="ขึ้น">${svg('<path d="M6 15l6-6 6 6"/>')}</button><button class="ibtn" data-dn="${i}" ${i<F.length-1?'':'disabled'} aria-label="ลง">${svg('<path d="M6 9l6 6 6-6"/>')}</button></span></div>`;
   const f=F[FB.sel];
-  host.innerHTML=`<div class="card col" style="gap:10px"><div class="row" style="gap:8px;flex-wrap:wrap"><div class="grow"><span class="xs muted">ตัวสร้างฟอร์ม</span><br><b style="font-size:18px">${esc(FORM_DEFS[FB.form].name)}</b> ${FB.dirty?'<span class="tag t-warn">มีการแก้ที่ยังไม่เผยแพร่</span>':'<span class="tag t-ok">ตรงกับที่ใช้งานอยู่</span>'}${fs.version?` <span class="xs muted">เวอร์ชัน ${fs.version}</span>`:''}</div>
+  host.innerHTML=`<div class="card col" style="gap:10px"><div class="row" style="gap:8px;flex-wrap:wrap"><div class="grow"><span class="xs muted">ตัวสร้างฟอร์ม</span><br><span class="chips" style="display:inline-flex;margin-right:8px">${Object.entries(FORM_DEFS).map(([k,v])=>`<button class="chip ${FB.form===k?'on':''}" data-fbf="${k}">${esc(v.name)}</button>`).join('')}</span><br><b style="font-size:18px">${esc(FORM_DEFS[FB.form].name)}</b> ${FB.dirty?'<span class="tag t-warn">มีการแก้ที่ยังไม่เผยแพร่</span>':'<span class="tag t-ok">ตรงกับที่ใช้งานอยู่</span>'}${fs.version?` <span class="xs muted">เวอร์ชัน ${fs.version}</span>`:''}</div>
       <button class="btn btn-sm" data-hist ${fs.history?.length?'':'disabled'}>ประวัติ</button><button class="btn btn-sm" data-discard ${FB.dirty?'':'disabled'}>ยกเลิกที่แก้</button><button class="btn btn-sm btn-p" data-pub>เผยแพร่ฟอร์ม</button></div>
-      <span class="xs muted">เพิ่มฟอร์มอื่น (คนงานรอบเช้า ขอเบิก ขอยืม แจ้งปัญหา) จะตามมาบนตัวสร้างเดียวกัน · แก้แล้วบันทึกเป็นร่างอัตโนมัติ โฟร์แมนเห็นเมื่อกด "เผยแพร่ฟอร์ม"</span></div>
+      <span class="xs muted">แก้แล้วบันทึกเป็นร่างอัตโนมัติ โฟร์แมนเห็นเมื่อกด "เผยแพร่ฟอร์ม"</span></div>
     <div class="fbgrid ${wide?'wide':''}">
       <div class="card col" style="gap:6px"><div class="row"><b class="grow sm">ช่องในฟอร์ม (${F.length})</b><button class="btn btn-sm" data-add>+ เพิ่มช่อง</button></div>
         <div class="fbrow fixed"><span class="grip"></span><span class="fbt">🏗️</span><span class="grow"><b>ไซต์ · วันที่</b><span class="xs muted" style="display:block">ช่องระบบ อยู่บนสุดเสมอ</span></span></div>
@@ -81,6 +89,7 @@ function stForms(host){
   const save=async()=>{ FB.dirty=true; try{ await saveSetting('forms',{...(S.settings.forms||{}),[FB.form]:{...fs,draft:FB.fields}}); }catch(e){ toast(e.message,true); } };
   const redraw=(persist=true)=>{ if(persist) save(); const y=scrollY; stForms(host); scrollTo(0,y); };
   $$('[data-pick]',host).forEach(x=>x.onclick=()=>{ FB.sel=+x.dataset.pick; redraw(false); });
+  $$('[data-fbf]',host).forEach(b=>b.onclick=()=>{ FB.form=b.dataset.fbf; FB.fields=null; FB.sel=0; stForms(host); });
   $$('[data-up]',host).forEach(b=>b.onclick=()=>{ const i=+b.dataset.up; [F[i-1],F[i]]=[F[i],F[i-1]]; if(FB.sel===i) FB.sel=i-1; redraw(); });
   $$('[data-dn]',host).forEach(b=>b.onclick=()=>{ const i=+b.dataset.dn; [F[i+1],F[i]]=[F[i],F[i+1]]; if(FB.sel===i) FB.sel=i+1; redraw(); });
   let dragI=null;
@@ -145,6 +154,11 @@ function formPreview(fields){
     machinery:f=>`<div class="field"><label>${esc(f.label)}</label><div class="chips">${(L.machinery||[]).slice(0,3).map(w=>`<span class="chip">${esc(w)}</span>`).join('')}</div></div>`,
     tools:f=>`<div class="field"><label>${esc(f.label)}</label><div class="chips">${(L.tools||[]).slice(0,3).map(w=>`<span class="chip">${esc(w)}</span>`).join('')}</div></div>`,
     problems:f=>`<div class="field"><label>${esc(f.label)}</label><div class="in" style="height:44px"></div></div>`,
-    photos:f=>`<div class="field"><label>${esc(f.label)} * · อย่างน้อย ${minPhotos()} รูป</label><div class="pgrid"><div class="pthumb padd">${IC.camera}</div></div></div>` };
+    category:f=>`<div class="field"><label>${esc(f.label)}${f.required?' *':''}</label><div class="chips">${((S.settings.daily_lists?.issue_cats)||['หน้างาน/ความปลอดภัย','เครื่องจักร/อุปกรณ์','วัสดุ','อื่น ๆ']).slice(0,6).map((c,i)=>`<span class="chip ${i?'':'on'}">${esc(c)}</span>`).join('')}</div></div>`,
+    urgency:f=>`<div class="field"><label>${esc(f.label)} *</label><div class="seg"><button class="on">ปกติ</button><button>ด่วน</button><button>ด่วนมาก</button></div></div>`,
+    site_id:f=>`<div class="field"><label>${esc(f.label)}${f.required?' *':''}</label><div class="in">— เลือกไซต์ —</div></div>`,
+    title:f=>`<div class="field"><label>${esc(f.label)} *</label><div class="in"></div></div>`,
+    detail:f=>`<div class="field"><label>${esc(f.label)}${f.required?' *':''}</label><div class="in" style="height:56px"></div></div>`,
+    photos:f=>FB.form==='issue'?`<div class="field"><label>${esc(f.label)}</label><div class="pgrid"><div class="pthumb padd">${IC.camera}</div></div></div>`:`<div class="field"><label>${esc(f.label)} * · อย่างน้อย ${minPhotos()} รูป</label><div class="pgrid"><div class="pthumb padd">${IC.camera}</div></div></div>` };
   return `<div class="col" style="gap:10px">${fields.filter(f=>!f.hidden).map(f=>core[f.key]?core[f.key](f):cfHTML(f,null,'pv')).join('')}</div>`;
 }
