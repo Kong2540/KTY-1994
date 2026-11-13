@@ -510,3 +510,6 @@ details.perm>summary::-webkit-details-marker{display:none}
 
 .mark.mark-kty{background:transparent!important;box-shadow:none!important;padding:0;overflow:visible}.mark.mark-kty img{width:100%;height:100%;object-fit:contain;display:block}
 .mark.mark-kty::after,.mark.mark-kty::before{display:none!important}
+
+.modal{max-height:calc(100dvh - 16px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.sigpad,.sigpad canvas{touch-action:none}

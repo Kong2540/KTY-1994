@@ -1,7 +1,7 @@
 /* =====================================================================
    KTY Hub — โครงหน้า: แถบเมนูด้านข้าง / ลิ้นชักเมนูบนมือถือ / ตัวเลือกไซต์
    ===================================================================== */
-const HUB_VERSION = '3.2';
+const HUB_VERSION = '3.2.1';
 const MOD = {
   wa:       { t:'ขออนุมัติงาน',        hue:'#0E7C86', i:'<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>' },
   att:      { t:'เช็คชื่อ',            hue:'#2E9E5B', i:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>' },
@@ -157,8 +157,8 @@ async function collectTasks(){
   const daily={}; (dly.error?[]:(dly.data||[])).forEach(r=>daily[r.site_id]=r);
   const sent=new Set((rep.data||[]).map(r=>r.site_id));
   const missing=siteIds.filter(id=>!sent.has(id)).map(id=>S.sites.find(s=>s.id===id)).filter(Boolean);
-  missing.forEach(s=>tasks.push({m:'daily',t:`${s.name} ยังไม่เช็คชื่อคนงานหน้าไซต์`,sub:mgr?'แตะเพื่อบันทึกแทน':'ส่งก่อนเริ่มงาน',tag:'ยังไม่ส่ง',c:'t-warn',href:mgr?'#att/site':'#report'}));
-  if(!dly.error) siteIds.filter(id=>!daily[id]).map(id=>S.sites.find(s=>s.id===id)).filter(Boolean).forEach(s=>tasks.push({m:'daily',t:`${s.name} ยังไม่ส่งรายงานเย็น`,sub:mgr?'แตะเพื่อดูหรือเขียนแทน':'ส่งก่อนเลิกงาน',tag:'รอส่ง',c:'',href:'#daily'}));
+  missing.forEach(s=>tasks.push({m:'daily',site:s.id,at:today,t:`${s.name} ยังไม่เช็คชื่อคนงานหน้าไซต์`,sub:mgr?'แตะเพื่อบันทึกแทน':'ส่งก่อนเริ่มงาน',tag:'ยังไม่ส่ง',c:'t-warn',href:mgr?'#att/site':'#report'}));
+  if(!dly.error) siteIds.filter(id=>!daily[id]).map(id=>S.sites.find(s=>s.id===id)).filter(Boolean).forEach(s=>tasks.push({m:'daily',site:s.id,at:today,t:`${s.name} ยังไม่ส่งรายงานเย็น`,sub:mgr?'แตะเพื่อดูหรือเขียนแทน':'ส่งก่อนเลิกงาน',tag:'รอส่ง',c:'',href:'#daily'}));
   S.badges.daily=dly.error?0:siteIds.filter(id=>!daily[id]).length;
   if(hasMod('materials')){ try{
     const roleQ=[], push=(k,q)=>roleQ.push(q.then(r=>[k,r.data||[]]));
@@ -166,21 +166,21 @@ async function collectTasks(){
     if(hasMod('materials',['store','admin'])) push('is',sb.from('docs').select('id,doc_no,site_id').eq('doc_type','REQ').in('status',['approved','partial','review']));
     push('rc',sb.from('docs').select('id,doc_no,site_id').eq('doc_type','REQ').in('status',['partial','issued']).in('site_id',siteIds.length?siteIds:[0]));
     const res=Object.fromEntries(await Promise.all(roleQ)); const sn=id=>S.sites.find(s=>s.id===id)?.name||'';
-    (res.ap||[]).forEach(d=>tasks.push({m:'materials',t:`อนุมัติใบเบิก ${d.doc_no}`,sub:`${sn(d.site_id)} · ${d.requester_name||''}`,tag:'รออนุมัติ',c:'t-warn',href:`#mat/d/${d.id}`}));
-    (res.is||[]).forEach(d=>tasks.push({m:'materials',t:`จ่ายของ ${d.doc_no}`,sub:sn(d.site_id),tag:'รอจ่าย',c:'t-acc',href:`#mat/d/${d.id}`}));
-    (res.rc||[]).forEach(d=>tasks.push({m:'materials',t:`รับของ ${d.doc_no}`,sub:sn(d.site_id),tag:'รอรับ',c:'t-acc',href:`#mat/d/${d.id}`}));
+    (res.ap||[]).forEach(d=>tasks.push({m:'materials',site:d.site_id,at:d.created_at||d.updated_at,t:`อนุมัติใบเบิก ${d.doc_no}`,sub:`${sn(d.site_id)} · ${d.requester_name||''}`,tag:'รออนุมัติ',c:'t-warn',href:`#mat/d/${d.id}`}));
+    (res.is||[]).forEach(d=>tasks.push({m:'materials',site:d.site_id,at:d.updated_at||d.created_at,t:`จ่ายของ ${d.doc_no}`,sub:sn(d.site_id),tag:'รอจ่าย',c:'t-acc',href:`#mat/d/${d.id}`}));
+    (res.rc||[]).forEach(d=>tasks.push({m:'materials',site:d.site_id,at:d.updated_at||d.created_at,t:`รับของ ${d.doc_no}`,sub:sn(d.site_id),tag:'รอรับ',c:'t-acc',href:`#mat/d/${d.id}`}));
     S.badges.mat=(res.ap||[]).length+(res.is||[]).length+(res.rc||[]).length;
   }catch(_){} }
-  try{ const [is,rd]=await Promise.all([sb.from('issues').select('id,title,urgency,status,reporter,assignee,last_actor,updated_at,issue_no').neq('status','closed').limit(200), sb.from('issue_reads').select('issue_id,read_at')]);
+  try{ const [is,rd]=await Promise.all([sb.from('issues').select('id,title,urgency,status,reporter,assignee,last_actor,updated_at,issue_no,site_id,created_at').neq('status','closed').limit(200), sb.from('issue_reads').select('issue_id,read_at')]);
     if(!is.error){ const me=S.profile.id, rds={}; (rd.data||[]).forEach(r=>rds[r.issue_id]=r.read_at); const L=is.data||[]; const unread=i=>i.last_actor&&i.last_actor!==me&&(!rds[i.id]||i.updated_at>rds[i.id]);
       const UR={critical:'ด่วนมาก',urgent:'ด่วน',normal:'ปกติ'};
       L.filter(i=>(mgr&&i.status==='new')||unread(i)||(i.reporter===me&&i.status==='resolved')||(i.assignee===me&&['new','acknowledged','in_progress'].includes(i.status)&&!mgr)).sort((a,b)=>({critical:0,urgent:1,normal:2})[a.urgency]-({critical:0,urgent:1,normal:2})[b.urgency])
-        .forEach(i=>tasks.push({m:'issues',t:(i.reporter===me&&i.status==='resolved'?'ยืนยันผลการแก้ไข: ':mgr&&i.status==='new'?'เรื่องใหม่: ':'')+i.title,sub:`${i.issue_no||''}${unread(i)?' · มีความเคลื่อนไหวใหม่':''}`,tag:UR[i.urgency],c:i.urgency==='critical'?'t-bad':i.urgency==='urgent'?'t-warn':'',href:'#iss/'+i.id,top:i.urgency==='critical'}));
+        .forEach(i=>tasks.push({m:'issues',site:i.site_id,at:i.created_at||i.updated_at,t:(i.reporter===me&&i.status==='resolved'?'ยืนยันผลการแก้ไข: ':mgr&&i.status==='new'?'เรื่องใหม่: ':'')+i.title,sub:`${i.issue_no||''}${unread(i)?' · มีความเคลื่อนไหวใหม่':''}`,tag:UR[i.urgency],c:i.urgency==='critical'?'t-bad':i.urgency==='urgent'?'t-warn':'',href:'#iss/'+i.id,top:i.urgency==='critical'}));
       S.badges.iss=L.filter(i=>(mgr&&i.status==='new')||unread(i)||(i.reporter===me&&i.status==='resolved')).length; } }catch(_){}
-  try{ if(mgr||hasMod('wa')||S.profile.role==='foreman'){ const {data:wl}=await sb.from('work_approvals').select('id,wa_no,type_key,status,step,requester,element,element_code,floor,result').in('status',['submitted','in_review','rejected']).limit(200);
+  try{ if(mgr||hasMod('wa')||S.profile.role==='foreman'){ const {data:wl}=await sb.from('work_approvals').select('id,wa_no,type_key,status,step,requester,element,element_code,floor,result,site_id,created_at,updated_at').in('status',['submitted','in_review','rejected']).limit(200);
       if(wl&&typeof waType==='function'){ const mine=wl.filter(w=>waCanSign(w,waType(w.type_key)));
-        mine.forEach(w=>{ const t=waType(w.type_key)||{}; tasks.push({m:'wa',t:`ลงนาม${t.signers?.[w.step]?.label||''}: ${t.name||''} ${w.element||''} ${w.element_code||''} ${w.floor||''}`.replace(/\s+/g,' '),sub:w.wa_no||'',tag:'รอลงนาม',c:'t-warn',href:'#wa/'+w.id}); });
-        wl.filter(w=>w.status==='rejected'&&w.requester===S.profile.id).forEach(w=>tasks.push({m:'wa',t:`ไม่ผ่าน: ${(waType(w.type_key)||{}).name||''} ${w.element_code||''}`,sub:'แก้ไขแล้วกด "ขอตรวจใหม่"',tag:'ไม่ผ่าน',c:'t-bad',href:'#wa/'+w.id}));
+        mine.forEach(w=>{ const t=waType(w.type_key)||{}; tasks.push({m:'wa',site:w.site_id,at:w.updated_at||w.created_at,t:`ลงนาม${t.signers?.[w.step]?.label||''}: ${t.name||''} ${w.element||''} ${w.element_code||''} ${w.floor||''}`.replace(/\s+/g,' '),sub:w.wa_no||'',tag:'รอลงนาม',c:'t-warn',href:'#wa/'+w.id}); });
+        wl.filter(w=>w.status==='rejected'&&w.requester===S.profile.id).forEach(w=>tasks.push({m:'wa',site:w.site_id,at:w.updated_at||w.created_at,t:`ไม่ผ่าน: ${(waType(w.type_key)||{}).name||''} ${w.element_code||''}`,sub:'แก้ไขแล้วกด "ขอตรวจใหม่"',tag:'ไม่ผ่าน',c:'t-bad',href:'#wa/'+w.id}));
         S.badges.wa=mine.length; } } }catch(_){}
   if(!mgr&&hasMod('hr',['approver'])){ try{ const {data:pr}=await sb.rpc('pending_profile_requests'); if((pr||[]).length) tasks.push({m:'people',t:`คำขอแก้ไขข้อมูลพนักงาน ${pr.length} รายการ`,sub:'ตรวจค่าเดิม → ค่าใหม่ แล้วอนุมัติ',tag:'รออนุมัติ',c:'t-warn',href:'#reqs'}); }catch(_){} }
   if(mgr){ try{ const [c1,c2]=await Promise.all([sb.from('emp_change_requests').select('id',{count:'exact',head:true}).eq('status','pending'), isAdmin()?sb.from('link_requests').select('id',{count:'exact',head:true}).eq('status','pending'):Promise.resolve({count:0})]);
@@ -192,8 +192,8 @@ async function collectTasks(){
     const [pb,ib,ob]=await Promise.all([ appr?sb.from('docs').select('id,doc_no,site_id,requester_name,ext_due,status').eq('doc_type','BRW').or('status.eq.pending,ext_due.not.is.null'):Promise.resolve({data:[]}),
       store?sb.from('docs').select('id,doc_no,site_id').eq('doc_type','BRW').in('status',['approved','partial']):Promise.resolve({data:[]}), sb.rpc('open_borrows') ]);
     const sn=id=>S.sites.find(s=>s.id===id)?.name||''; let n=0;
-    (pb.data||[]).forEach(d=>{ n++; tasks.push({m:'borrow',t:d.status==='pending'?`อนุมัติใบยืม ${d.doc_no}`:`ขอขยายเวลา ${d.doc_no}`,sub:`${sn(d.site_id)} · ${d.requester_name||''}`,tag:'รออนุมัติ',c:'t-warn',href:`#brw/d/${d.id}`}); });
-    (ib.data||[]).forEach(d=>{ n++; tasks.push({m:'borrow',t:`ส่งอุปกรณ์ ${d.doc_no}`,sub:sn(d.site_id),tag:'รอส่ง',c:'t-acc',href:`#brw/d/${d.id}`}); });
+    (pb.data||[]).forEach(d=>{ n++; tasks.push({m:'borrow',site:d.site_id,at:d.created_at,t:d.status==='pending'?`อนุมัติใบยืม ${d.doc_no}`:`ขอขยายเวลา ${d.doc_no}`,sub:`${sn(d.site_id)} · ${d.requester_name||''}`,tag:'รออนุมัติ',c:'t-warn',href:`#brw/d/${d.id}`}); });
+    (ib.data||[]).forEach(d=>{ n++; tasks.push({m:'borrow',site:d.site_id,at:d.updated_at||d.created_at,t:`ส่งอุปกรณ์ ${d.doc_no}`,sub:sn(d.site_id),tag:'รอส่ง',c:'t-acc',href:`#brw/d/${d.id}`}); });
     const seen=new Set(); (ob.data||[]).filter(o=>(appr||siteIds.includes(o.site_id))&&(o.overdue_days>0||o.due_date===addDays(today,1)||o.due_date===today)).forEach(o=>{ if(seen.has(o.doc_id)) return; seen.add(o.doc_id); n++;
       tasks.unshift({m:'borrow',t:o.overdue_days>0?`ค้างคืนเกิน ${o.overdue_days} วัน ${o.doc_no}`:`ครบกำหนดคืน${o.due_date===today?'วันนี้':'พรุ่งนี้'} ${o.doc_no}`,sub:`${sn(o.site_id)} · ${o.requester_name||''}`,tag:o.overdue_days>0?'เกินกำหนด':'ใกล้ครบ',c:o.overdue_days>0?'t-bad':'t-warn',href:`#brw/d/${o.doc_id}`}); });
     S.badges.brw=n;
@@ -212,7 +212,7 @@ async function collectTasks(){
   }
   return {tasks, sent:sent.size, sites:siteIds.length, crew, rep:rep.data||[], daily};
 }
-const taskHTML = x => `<a href="${x.href}" class="li" style="text-decoration:none">${modIcon(x.m,40)}<div class="grow"><b style="font-size:14.5px">${esc(x.t)}</b><span class="xs muted">${esc(x.sub||'')}</span></div>${x.tag?`<span class="tag ${x.c}">${esc(x.tag)}</span>`:''}${svg('<path d="M9 6l6 6-6 6"/>','style="width:18px;color:var(--ink2)"')}</a>`;
+const taskHTML = x => `<a href="${x.href}" class="li" style="text-decoration:none">${modIcon(x.m,40)}<div class="grow"><b style="font-size:14.5px">${esc(x.t)}</b><span class="xs muted">${esc(x.sub||'')}${x.at&&String(x.at).length>10?' · '+new Date(x.at).toLocaleDateString('th-TH',{day:'numeric',month:'short'})+' '+new Date(x.at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}):''}</span></div>${x.tag?`<span class="tag ${x.c}">${esc(x.tag)}</span>`:''}${svg('<path d="M9 6l6 6-6 6"/>','style="width:18px;color:var(--ink2)"')}</a>`;
 
 function tileHTML(k, href, label, badgeKey, soon){
   if(!allowed(k)) return '';
@@ -261,11 +261,26 @@ async function pageHome(){
   if(S.profile.employee_id&&typeof myHomeCard==='function') myHomeCard();
   if(typeof iosInstallHint==='function') setTimeout(iosInstallHint,1500);
 }
+let TASK_F={m:'',site:'',sort:'prio'};
 async function pageTasks(){
   setPage(head('งานที่รอ',siteLabel()) + `<div id="tb"><div class="loading"><div class="spin"></div></div></div>`);
   const d=await collectTasks(); S.badges.tasks=d.tasks.length;
-  $('#tb').outerHTML=d.tasks.length?`<div class="card card-l" style="max-width:760px">${d.tasks.map(taskHTML).join('')}</div>`:`<div class="card empty"><b>ไม่มีงานค้าง</b>เรียบร้อยดีทุกอย่าง</div>`;
-  paintBadges();
+  const all=d.tasks.map((t,i)=>({...t,_i:i})), host=document.createElement('div'); host.className='col'; host.style.cssText='gap:10px;max-width:760px'; $('#tb').replaceWith(host);
+  const draw=()=>{
+    const mods=[...new Set(all.map(t=>t.m))], sites=[...new Set(all.map(t=>t.site).filter(Boolean))];
+    let L=all.filter(t=>(!TASK_F.m||t.m===TASK_F.m)&&(!TASK_F.site||String(t.site)===TASK_F.site));
+    const ts=t=>t.at?new Date(t.at).getTime():Date.now();
+    if(TASK_F.sort==='new') L.sort((a,b)=>ts(b)-ts(a)||a._i-b._i); else if(TASK_F.sort==='old') L.sort((a,b)=>ts(a)-ts(b)||a._i-b._i); else L.sort((a,b)=>a._i-b._i);
+    host.innerHTML=`<div class="chips scroll" style="margin:0 -16px;padding:0 16px"><button class="chip ${!TASK_F.m?'on':''}" data-tm="">ทุกหมวด ${all.length}</button>${mods.map(m=>`<button class="chip ${TASK_F.m===m?'on':''}" data-tm="${m}">${esc(T((MOD[m]||MOD.home).t))} ${all.filter(t=>t.m===m).length}</button>`).join('')}</div>
+      <div class="row" style="gap:8px;flex-wrap:wrap"><select class="in" id="tsite" style="height:40px;flex:1;min-width:160px" aria-label="ไซต์"><option value="">ทุกไซต์</option>${sites.map(id=>{ const s=S.sites.find(x=>x.id===+id); return s?`<option value="${s.id}" ${TASK_F.site===String(s.id)?'selected':''}>${esc(s.name)}</option>`:''; }).join('')}</select>
+        <select class="in" id="tsort" style="height:40px;width:auto" aria-label="เรียงลำดับ"><option value="prio" ${TASK_F.sort==='prio'?'selected':''}>เรียงตามความสำคัญ</option><option value="new" ${TASK_F.sort==='new'?'selected':''}>ล่าสุดก่อน</option><option value="old" ${TASK_F.sort==='old'?'selected':''}>เก่าสุดก่อน</option></select></div>
+      ${L.length?`<div class="card card-l">${L.map(t=>taskHTML(t)).join('')}</div>`:`<div class="card empty"><b>${all.length?'ไม่มีงานตามตัวกรองนี้':'ไม่มีงานค้าง'}</b>${all.length?'ลองเปลี่ยนหมวดหรือไซต์':'เรียบร้อยดีทุกอย่าง'}</div>`}
+      ${TASK_F.site?'<span class="xs muted">งานที่ไม่ผูกกับไซต์ (เช่น งานบุคคล/เงินเดือน) แสดงเมื่อเลือก "ทุกไซต์"</span>':''}`;
+    $$('[data-tm]',host).forEach(b=>b.onclick=()=>{ TASK_F.m=b.dataset.tm; draw(); });
+    $('#tsite',host).onchange=e=>{ TASK_F.site=e.target.value; draw(); };
+    $('#tsort',host).onchange=e=>{ TASK_F.sort=e.target.value; draw(); };
+  };
+  draw(); paintBadges();
 }
 function pageSoon(k){
   const meta=MOD[k]||MOD.home;
