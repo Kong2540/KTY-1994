@@ -3,7 +3,7 @@
    ข้อมูลต้องตรวจและกด "ใช้ข้อมูลนี้" ก่อนเสมอ · ไม่เก็บรูปบัตร
    ===================================================================== */
 const AGENT = 'http://127.0.0.1:47321';
-const AGENT_EXE = 'agent/KTY-Card-Agent.exe';
+const AGENT_EXE = 'agent/KTY-Card-Agent.exe', AGENT_APK = 'agent/KTY-Card-Agent.apk', IS_ANDROID = /Android/.test(navigator.userAgent);
 async function agentCall(path, ms=4000){
   const c=new AbortController(), t=setTimeout(()=>c.abort(),ms);
   try{ const r=await fetch(AGENT+path,{headers:{'X-KTY':'1'},signal:c.signal,cache:'no-store'}); return await r.json(); }
@@ -52,7 +52,7 @@ const IDC_ADDR=[['addr_no','บ้านเลขที่'],['addr_moo','หม
 /* กล่องเลือกวิธี (ใส่ไว้บนสุดของขั้นข้อมูลส่วนตัว) */
 function idCardBox(){
   return `<div class="card col idcbox" style="gap:10px"><div class="row" style="gap:10px"><span style="font-size:24px">🪪</span><div class="grow"><b>กรอกจากบัตรประชาชน</b><div class="xs muted">ระบบเติมข้อมูลให้ แล้วตรวจก่อนใช้</div></div></div>
-    <div class="idcgrid">${/Android|iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)?'':'<button type="button" class="btn" data-idc="reader">🖥️ อ่านจากเครื่องอ่านบัตร</button>'}<button type="button" class="btn" data-idc="photo">📷 ถ่ายรูป / เลือกรูปหน้าบัตร</button></div></div>`;
+    <div class="idcgrid">${/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)?'':'<button type="button" class="btn" data-idc="reader">🖥️ อ่านจากเครื่องอ่านบัตร</button>'}<button type="button" class="btn" data-idc="photo">📷 ถ่ายรูป / เลือกรูปหน้าบัตร</button></div></div>`;
 }
 function bindIdCard(host, onUse){
   const r=$('[data-idc="reader"]',host), p=$('[data-idc="photo"]',host);
@@ -64,7 +64,8 @@ async function idcReader(onUse){
   let st;
   try{ st=await agentCall('/status'); }
   catch(_){ prog.close(); return agentHelp(); }
-  if(!st.readers||!st.readers.length){ prog.close(); return toast('ไม่พบเครื่องอ่านบัตร กรุณาเสียบเครื่องอ่าน (USB) แล้วลองใหม่',true); }
+  if(!st.readers||!st.readers.length){ prog.close(); return toast(IS_ANDROID?'ไม่พบเครื่องอ่านบัตร กรุณาเสียบเครื่องอ่านเข้ามือถือ (USB-C) แล้วลองใหม่':'ไม่พบเครื่องอ่านบัตร กรุณาเสียบเครื่องอ่าน (USB) แล้วลองใหม่',true); }
+  if(st.reader_error&&/อนุญาต/.test(st.reader_error)){ prog.close(); return toast(st.reader_error,true); }
   $('#idst',prog.el).textContent='กำลังอ่านข้อมูลจากชิปบัตร...';
   try{ const r=await agentCall('/read?photo=1',20000); prog.close();
     if(!r.ok) return toast(r.error||'อ่านบัตรไม่สำเร็จ',true);
@@ -73,7 +74,12 @@ async function idcReader(onUse){
   }catch(e){ prog.close(); toast('อ่านบัตรไม่สำเร็จ: '+errText(e),true); }
 }
 function agentHelp(){
-  const ov=overlay(`<div class="modal" role="dialog" aria-modal="true" style="max-width:520px"><div class="row" style="gap:8px"><b class="grow" style="font-size:17px">ไม่พบโปรแกรม KTY Card Agent</b><span class="tag t-warn">ยังไม่เปิด</span></div>
+  const ov=overlay(IS_ANDROID?`<div class="modal" role="dialog" aria-modal="true" style="max-width:520px"><div class="row" style="gap:8px"><b class="grow" style="font-size:17px">ไม่พบแอป KTY Card Agent</b><span class="tag t-warn">ยังไม่เปิด</span></div>
+    <span class="sm muted">การอ่านชิปบัตรบนมือถือต้องติดตั้งแอปตัวกลาง 1 ครั้ง (Android 8 ขึ้นไป · เครื่องอ่าน USB-C)</span>
+    <div class="card col" style="gap:6px;box-shadow:none"><div class="sm">1. ดาวน์โหลด <b>KTY-Card-Agent.apk</b> แล้วเปิดติดตั้ง (อนุญาต "ติดตั้งแอปที่ไม่รู้จัก" ครั้งเดียว)</div><div class="sm">2. เปิดแอป · เสียบเครื่องอ่าน · กดอนุญาต และติ๊ก "ใช้เสมอ"</div><div class="sm">3. ในแอปกด "ไม่จำกัดการใช้แบตเตอรี่" แล้วกลับมากดอ่านบัตรอีกครั้ง</div></div>
+    <div class="xs muted">ความปลอดภัย: แอปทำงานเฉพาะในเครื่องนี้ ตอบเฉพาะเว็บไซต์ของบริษัท อ่านบัตรเมื่อกดปุ่มเท่านั้น และไม่เก็บข้อมูลบัตร</div>
+    <div class="row" style="gap:8px;justify-content:flex-end"><button class="btn" data-x>ปิด</button><a class="btn btn-p" href="${AGENT_APK}" download>ดาวน์โหลดแอป</a></div></div>`
+  :`<div class="modal" role="dialog" aria-modal="true" style="max-width:520px"><div class="row" style="gap:8px"><b class="grow" style="font-size:17px">ไม่พบโปรแกรม KTY Card Agent</b><span class="tag t-warn">ยังไม่เปิด</span></div>
     <span class="sm muted">การอ่านชิปบัตรต้องใช้โปรแกรมตัวกลางบนคอมพิวเตอร์เครื่องนี้ (Windows 10/11) ติดตั้งครั้งเดียว</span>
     <div class="card col" style="gap:6px;box-shadow:none"><div class="sm">1. ดาวน์โหลด <b>KTY-Card-Agent.exe</b> แล้วเปิด (ถ้า Windows เตือน กด "ข้อมูลเพิ่มเติม" > "เรียกใช้ต่อไป")</div><div class="sm">2. เปิดหน้าต่างโปรแกรมทิ้งไว้ (ย่อได้) แล้วกดอ่านบัตรอีกครั้ง</div><div class="sm">3. ให้เปิดเองตอนเปิดเครื่อง: ดับเบิลคลิก <b>ติดตั้งให้เปิดเอง.cmd</b> ที่มากับโปรแกรม</div></div>
     <div class="xs muted">ความปลอดภัย: โปรแกรมทำงานเฉพาะในเครื่องนี้ ไม่ส่งข้อมูลออกอินเทอร์เน็ต ตอบเฉพาะเว็บไซต์ของบริษัท และอ่านบัตรเมื่อกดปุ่มเท่านั้น</div>
