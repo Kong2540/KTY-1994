@@ -5,7 +5,7 @@ const SELF_GROUPS = [
   ['ข้อมูลส่วนตัว', [['title','คำนำหน้า','sel',['นาย','นาง','นางสาว']],['first_name','ชื่อ'],['last_name','นามสกุล'],['nickname','ชื่อเล่น'],['first_name_en','ชื่อ (อังกฤษ)'],['last_name_en','นามสกุล (อังกฤษ)'],
     ['gender','เพศ','sel',[['male','ชาย'],['female','หญิง']]],['birth_date','วันเกิด','date'],['nationality','สัญชาติ'],['marital_status','สถานภาพ','sel',[['single','โสด'],['married','สมรส'],['divorced','หย่า'],['widowed','หม้าย'],['separated','แยกกันอยู่']]],
     ['military_status','สถานะทางทหาร','sel',[['completed','ผ่านการเกณฑ์'],['exempt','ได้รับการยกเว้น'],['reserve','ทหารกองหนุน'],['pending','ยังไม่ผ่าน']]],['blood_type','กรุ๊ปเลือด','sel',['A','B','AB','O']]]],
-  ['บัตรประชาชน / ประกันสังคม', [['national_id','เลขบัตรประชาชน','secret'],['id_issue_date','วันออกบัตร','date'],['id_expiry_date','วันบัตรหมดอายุ','date'],['social_security_no','เลขประกันสังคม','secret'],['sso_hospital','โรงพยาบาลประกันสังคม']]],
+  ['บัตรประชาชน / ประกันสังคม', [['national_id','เลขบัตรประชาชน','secret'],['id_issue_date','วันออกบัตร','date'],['id_expiry_date','วันบัตรหมดอายุ','date'],['health_scheme','สิทธิ์การรักษา','ro-hs'],['social_security_no','เลขประกันสังคม','secret'],['sso_hospital','โรงพยาบาลประกันสังคม']]],
   ['ที่อยู่ตามบัตร', [['addr_no','บ้านเลขที่'],['addr_moo','หมู่'],['addr_soi','ซอย'],['addr_road','ถนน'],['addr_subdistrict','ตำบล'],['addr_district','อำเภอ'],['addr_province','จังหวัด'],['addr_zip','รหัสไปรษณีย์']]],
   ['ที่อยู่ปัจจุบัน', [['cur_same','ที่อยู่ปัจจุบันตรงกับบัตร','bool'],['cur_no','บ้านเลขที่'],['cur_moo','หมู่'],['cur_soi','ซอย'],['cur_road','ถนน'],['cur_subdistrict','ตำบล'],['cur_district','อำเภอ'],['cur_province','จังหวัด'],['cur_zip','รหัสไปรษณีย์']]],
   ['ติดต่อ', [['phone','โทรศัพท์'],['line_id','LINE ID'],['email','อีเมล'],['emergency_name','ผู้ติดต่อฉุกเฉิน'],['emergency_relation','ความสัมพันธ์'],['emergency_phone','โทรผู้ติดต่อฉุกเฉิน']]],
@@ -16,8 +16,10 @@ const SELF_LABEL = Object.fromEntries(SELF_GROUPS.flatMap(g=>g[1]).map(f=>[f[0],
 const maskId = (k,v) => { const s=String(v||''); if(!s) return '-'; if(k==='national_id'&&s.length===13) return `x-xxxx-xxxxx-${s.slice(10,12)}-${s[12]}`; return s.replace(/.(?=.{3})/g,'x'); };
 let REVEAL = {}; // employee_id → true เมื่อยืนยันรหัสผ่านแล้ว (เฉพาะหน้านี้)
 function selfVal(f,e){ const [k,,t,opt]=f, v=e[k];
+  if(t==='ro-hs') return (typeof hsOf==='function'&&hsOf(v)?.name)||'ยังไม่ระบุ';
   if(v==null||v==='') return '-';
   if(t==='bool') return v?'ใช่':'ไม่ใช่'; if(t==='date'||t==='ro-date') return thaiDate(v);
+  if(t==='ro-hs') return (typeof hsOf==='function'&&hsOf(v)?.name)||'ยังไม่ระบุ';
   if(k==='position_id') return posName(v)||'-'; if(k==='wage_type') return v==='monthly'?'รายเดือน':'รายวัน'; if(k==='wage_rate'||k==='ot_rate') return fmtN(v);
   if(t==='sel'&&Array.isArray(opt?.[0])) return (opt.find(o=>o[0]===v)||[,v])[1];
   if(t&&t.startsWith('secret')) return REVEAL[e.id]?(k==='national_id'&&String(v).length===13?`${v[0]}-${v.slice(1,5)}-${v.slice(5,10)}-${v.slice(10,12)}-${v[12]}`:v):maskId(k,v);

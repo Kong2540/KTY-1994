@@ -1,7 +1,7 @@
 /* =====================================================================
    KTY Hub — โครงหน้า: แถบเมนูด้านข้าง / ลิ้นชักเมนูบนมือถือ / ตัวเลือกไซต์
    ===================================================================== */
-const HUB_VERSION = '3.2.1';
+const HUB_VERSION = '3.3';
 const MOD = {
   wa:       { t:'ขออนุมัติงาน',        hue:'#0E7C86', i:'<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>' },
   att:      { t:'เช็คชื่อ',            hue:'#2E9E5B', i:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>' },
@@ -48,7 +48,7 @@ function navSections0(){
     out.push({t:'ระบบงาน', items:[
       {k:'att',m:'att',b:'att'}, {k:'roll',m:'att',t:'เช็คชื่อแบบติ๊ก',sub:1}, {k:'att/month',m:'att',t:'ตารางรายเดือน',sub:1}, {k:'att/site',m:'att',t:'คนงานหน้างาน',sub:1,b:'crew'},
       {k:'daily',m:'daily',b:'daily'}, {k:'mat',m:'materials',b:'mat'}, {k:'ret',m:'borrow',b:'brw'}, {k:'iss',m:'issues',b:'iss'},{k:'wa',m:'wa',b:'wa'},
-      {k:'employees',m:'people'}, {k:'pay',m:'payroll'} ]});
+      {k:'employees',m:'people'},{k:'health',m:'people',t:'สิทธิ์การรักษา'}, {k:'pay',m:'payroll'} ]});
     out.push({t:'ตั้งค่า', items:[{k:'manage/sites',m:'sites'},{k:'manage',m:'manage',b:'users'},...(isAdmin()?[{k:'studio',m:'studio'}]:[])]});
   } else {
     const it=[{k:'home',m:'home'}];
@@ -101,14 +101,14 @@ function route(){ if(typeof applyAdv==='function') applyAdv();
   const cur=keyOf(location.hash); const [k,id,id2]=cur.split('/');
   if(k==='users'){ mgTab='users'; } if(k==='settings'){ mgTab='sites'; }
   const mgr=isManager(), p=S.profile;
-  const can={ home:1, tasks:1, me:1, soon:1, att:mgr, employees:mgr, emp:mgr, manage:mgr, users:mgr, settings:mgr, roll:mgr||p.can_check, report:p.role==='foreman'||mgr||hasMod('daily'), mat:mgr||hasMod('materials'), pay:1, id:1, my:1, iss:1, wa:mgr||hasMod('wa')||p.role==='foreman', reqs:mgr||hasMod('hr',['approver']), brw:mgr||hasMod('borrow')||hasMod('materials'), ret:mgr||hasMod('borrow')||hasMod('materials'), daily:p.role==='foreman'||mgr||hasMod('daily'), studio:isAdmin() };
+  const can={ home:1, tasks:1, me:1, soon:1, att:mgr, employees:mgr, emp:mgr, manage:mgr, users:mgr, settings:mgr, roll:mgr||p.can_check, report:p.role==='foreman'||mgr||hasMod('daily'), mat:mgr||hasMod('materials'), pay:1, id:1, my:1, iss:1, health:mgr, wa:mgr||hasMod('wa')||p.role==='foreman', reqs:mgr||hasMod('hr',['approver']), brw:mgr||hasMod('borrow')||hasMod('materials'), ret:mgr||hasMod('borrow')||hasMod('materials'), daily:p.role==='foreman'||mgr||hasMod('daily'), studio:isAdmin() };
   if(ROUTE_MOD[k]&&!allowed(ROUTE_MOD[k])) can[k]=0;
   const key=can[k]?k:'home';
   if(key==='att'&&id&&['day','month','site'].includes(id)) attTab=id;
   if(key==='manage'&&id) mgTab=id;
   if(key==='me'&&id==='stars') profTab='stars';
   renderShell(can[k]?cur:'home');
-  ({home:pageHome, tasks:pageTasks, att:pageAtt, employees:pageEmployees, emp:()=>pageProfile(id), manage:pageManage, users:pageManage, settings:pageManage, report:pageReport, mat:()=>pageMat(id,id2), pay:()=>pagePay(id,id2), iss:()=>pageIss(id,id2), wa:()=>pageWa(id,id2), id:()=>pageQR(id), my:()=>pageMy(id||null), reqs:pageReqs, brw:()=>pageBrw(id,id2), ret:pageRet, daily:()=>pageDaily(id,id2), roll:pageRoll, studio:()=>pageStudio(id), me:()=>id==='stars'?pageMyStars():pageMe(), soon:()=>pageSoon(id)})[key]();
+  ({home:pageHome, tasks:pageTasks, att:pageAtt, employees:pageEmployees, emp:()=>pageProfile(id), manage:pageManage, users:pageManage, settings:pageManage, report:pageReport, mat:()=>pageMat(id,id2), pay:()=>pagePay(id,id2), iss:()=>pageIss(id,id2), health:pageHealth, wa:()=>pageWa(id,id2), id:()=>pageQR(id), my:()=>pageMy(id||null), reqs:pageReqs, brw:()=>pageBrw(id,id2), ret:pageRet, daily:()=>pageDaily(id,id2), roll:pageRoll, studio:()=>pageStudio(id), me:()=>id==='stars'?pageMyStars():pageMe(), soon:()=>pageSoon(id)})[key]();
   scrollTo(0,0);
 }
 function renderShell(cur){

@@ -23,7 +23,7 @@ const PAY_EMP_FIELDS=[
   ['first_name_en','ชื่อ (อังกฤษ)'],['last_name_en','นามสกุล (อังกฤษ)'],['gender','เพศ',e=>MAP_TH[e.gender]||''],['national_id','เลขบัตรประชาชน',e=>_nid(e.national_id)],
   ['social_security_no','เลขประกันสังคม'],['birth_date','วันเกิด',e=>_d(e.birth_date)],['age','อายุ (ปี)',e=>_yrs(e.birth_date)],['nationality','สัญชาติ'],['marital_status','สถานภาพ',e=>MAP_TH[e.marital_status]||''],
   ['military_status','สถานะทางทหาร',e=>MAP_TH[e.military_status]||''],['blood_type','กรุ๊ปเลือด'],['id_issue_date','วันออกบัตร',e=>_d(e.id_issue_date)],['id_expiry_date','วันบัตรหมดอายุ',e=>_d(e.id_expiry_date)],
-  ['sso_hospital','โรงพยาบาลประกันสังคม'],['id_address','ที่อยู่ตามบัตร',e=>_addr(e,'addr')||e.id_address||''],['cur_address','ที่อยู่ปัจจุบัน',e=>e.cur_same?(_addr(e,'addr')||e.id_address||''):_addr(e,'cur')],
+  ['health_scheme','สิทธิ์การรักษา',e=>(typeof hsOf==='function'&&hsOf(e.health_scheme)?.name)||'ยังไม่ระบุ'],['sso_hospital','โรงพยาบาลประกันสังคม'],['id_address','ที่อยู่ตามบัตร',e=>_addr(e,'addr')||e.id_address||''],['cur_address','ที่อยู่ปัจจุบัน',e=>e.cur_same?(_addr(e,'addr')||e.id_address||''):_addr(e,'cur')],
   ['addr_subdistrict','ตำบล'],['addr_district','อำเภอ'],['addr_province','จังหวัด'],['addr_zip','รหัสไปรษณีย์'],
   ['phone','โทรศัพท์'],['line_id','LINE ID'],['email','อีเมล'],['emergency_name','ผู้ติดต่อฉุกเฉิน'],['emergency_relation','ความสัมพันธ์'],['emergency_phone','โทรผู้ติดต่อฉุกเฉิน'],
   ['employment_type','ประเภทการจ้าง'],['start_date','วันเริ่มงาน',e=>_d(e.start_date)],['service','อายุงาน',e=>_svc(e.start_date)],['probation_end','วันสิ้นสุดทดลองงาน',e=>_d(e.probation_end)],

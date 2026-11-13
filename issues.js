@@ -129,7 +129,7 @@ async function issueDetail(host, id, reload){
   const sv=$('[data-save]',host); if(sv) sv.onclick=()=>save();
   $$('[data-qs]',host).forEach(b=>b.onclick=()=>save(b.dataset.qs));
   $$('[data-cf]',host).forEach(b=>b.onclick=async()=>{ const ok=b.dataset.cf==='1'; let note=null; if(!ok){ note=await promptBox('ยังมีปัญหาอะไรอยู่',''); if(note===null) return; } const {error}=await sb.rpc('confirm_issue',{p_id:id,p_ok:ok,p_note:note}); if(error) return toast(errText(error),true); toast(ok?'ปิดเรื่องแล้ว ขอบคุณครับ':'เปิดเรื่องอีกครั้งแล้ว'); reload(); });
-  let cph=[]; const icp=$('#icp',host); if(icp) icp.onchange=async()=>{ for(const f of [...icp.files].slice(0,4)) cph.push(await resizeImage(f,1600)); $('#icpn',host).textContent=`แนบรูป ${cph.length} รูป`; };
+  let cph=[]; const icp=$('#icp',host); if(icp) icp.onchange=async()=>{ for(const f of [...icp.files].slice(0,Math.max(0,prRule('issue_comment').max-cph.length))) cph.push(await resizeImage(f,1600)); $('#icpn',host).textContent=`แนบรูป ${cph.length} รูป`; };
   const ics=$('#ics',host); if(ics) ics.onclick=async ev=>{ const body=$('#icm',host).value.trim(); if(!body&&!cph.length) return; busy(ev.target,true);
     try{ const paths=[]; for(let k=0;k<cph.length;k++){ const p=`${id}/c${Date.now()}_${k}.jpg`; const {error}=await sb.storage.from('issue-photos').upload(p,cph[k],{contentType:'image/jpeg'}); if(!error) paths.push(p); }
       const {error}=await sb.rpc('add_issue_comment',{p_id:id,p_body:body,p_photos:paths}); if(error) throw error; reload(); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };

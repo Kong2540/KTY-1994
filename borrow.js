@@ -146,9 +146,9 @@ function returnSheet(doc, lines, done){
       <div class="field"><label>ลายเซ็นผู้คืน *</label><div id="rtsig"></div><span class="hint">${esc(S.profile.display_name)} · ${new Date().toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'})}</span></div></div>
     <div class="sheet-foot"><button class="btn" data-x2>ยกเลิก</button><button class="btn btn-p" data-go ${tools.length||mats.length?'':'disabled'}>ยืนยันคืน</button></div></div>`, false, false);
   const pad=signaturePad($('#rtsig',m.el));
-  const drawPh=()=>{ $('#rtph',m.el).innerHTML=photos.map((p,i)=>`<div class="pthumb"><img src="${p.url}" alt=""><button type="button" data-dp="${i}" aria-label="ลบรูป">×</button></div>`).join('')+(photos.length<6&&hasBridge()?`<label class="pthumb padd">${IC.camera}<span class="xs">เพิ่มรูป</span><input type="file" accept="image/*" multiple hidden data-ph></label>`:'');
+  const drawPh=()=>{ $('#rtph',m.el).innerHTML=photos.map((p,i)=>`<div class="pthumb"><img src="${p.url}" alt=""><button type="button" data-dp="${i}" aria-label="ลบรูป">×</button></div>`).join('')+(photos.length<prRule('return').max&&hasBridge()?`<label class="pthumb padd">${IC.camera}<span class="xs">เพิ่มรูป</span><input type="file" accept="image/*" multiple hidden data-ph></label>`:'');
     $$('[data-dp]',m.el).forEach(b=>b.onclick=()=>{ photos.splice(+b.dataset.dp,1); drawPh(); });
-    const ph=$('[data-ph]',m.el); if(ph) ph.onchange=async()=>{ for(const f of [...ph.files].slice(0,6-photos.length)){ const bl=await resizeImage(f,1600); photos.push({blob:bl,url:URL.createObjectURL(bl)}); } drawPh(); }; };
+    const ph=$('[data-ph]',m.el); if(ph) ph.onchange=async()=>{ for(const f of [...ph.files].slice(0,prRule('return').max-photos.length)){ const bl=await resizeImage(f,1600); photos.push({blob:bl,url:URL.createObjectURL(bl)}); } drawPh(); }; };
   drawPh();
   $('[data-x]',m.el).onclick=m.close; $('[data-x2]',m.el).onclick=m.close;
   $('[data-go]',m.el).onclick=async ev=>{
@@ -157,6 +157,7 @@ function returnSheet(doc, lines, done){
     if(!rows.length) return toast('ระบุจำนวนที่คืนอย่างน้อย 1 รายการ',true);
     const bad=rows.find(r=>{ const x=all.find(y=>y.id===r.line_id); return r.ok+r.damaged+r.lost>x.out; }); if(bad) return toast('จำนวนคืนเกินที่รับไป',true);
     const note=$('#rt_note',m.el).value.trim(); if(rows.some(r=>r.damaged+r.lost>0)&&!note) return toast('ระบุหมายเหตุของที่ชำรุด/สูญหาย',true);
+    { const R=prRule('return'), need=Math.max(R.min,rows.some(r=>r.damaged+r.lost>0)?R.dmg_min:0); if(photos.length<need) return toast(`ต้องแนบรูปอย่างน้อย ${need} รูป`,true); }
     if(pad.empty()) return toast('ลงลายเซ็นผู้คืนก่อน',true);
     busy(ev.target,true,'กำลังบันทึก...');
     try{
@@ -165,6 +166,7 @@ function returnSheet(doc, lines, done){
       if(res.error&&/return_items/.test(res.error.message)) res=await sb.rpc('return_brw',{p_doc:doc.id,p_lines:rows,p_signature:pad.data(),p_photos:up,p_note:note||null});
       if(res.error) throw res.error;
       m.close(); toast(res.data==='returned'?'คืนอุปกรณ์ครบแล้ว ปิดรายการยืม':'บันทึกการคืนแล้ว'); done();
+      try{ const {data:rr}=await sb.from('returns').select('*').eq('doc_id',doc.id).order('returned_at',{ascending:false}).limit(1).single(); if(rr) vectorPreview(await returnSlipDoc(doc,rr,S.sites.find(s=>s.id===doc.site_id)),`RTN-${doc.doc_no}`,'ใบคืน วัสดุ/อุปกรณ์'); }catch(_){}
     }catch(e){ busy(ev.target,false); toast(errText(e),true); }
   };
 }
