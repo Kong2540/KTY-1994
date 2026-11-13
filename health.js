@@ -53,41 +53,64 @@ function hsOptions(done){
 
 /* ---------- กติการูปถ่ายรวม ---------- */
 const PR_SYS=[['receive','📦','รับของตามใบเบิก','รูปของที่รับ',0,6],['return','↩️','คืน วัสดุ/อุปกรณ์','รูปของที่คืน',0,6],['issue_comment','💬','แจ้งปัญหา: การพูดคุย','รูปต่อ 1 ข้อความ',0,4]];
-const prRule=(k)=>{ const d=PR_SYS.find(x=>x[0]===k)||[k,'','','',0,6]; const r=(S.settings.photo_rules||{})[k]||{}; return {min:r.min??d[4],max:r.max??d[5],help:r.help||'',dmg_min:r.dmg_min??0}; };
+const PR_FIXED=[['👤','รูปพนักงาน','ทะเบียนพนักงาน · คำขอแก้ไขข้อมูล'],['🧱','รูปวัสดุ/อุปกรณ์','ทะเบียนวัสดุ (1 รูปต่อรายการ)'],['🪪','ถ่ายรูปบัตรประชาชน','อ่านข้อมูลจากรูป (ไม่เก็บรูป)'],['🏷️','โลโก้บริษัท','ตั้งค่าระบบ > แบรนด์และโลโก้']];
+const prCap=()=>Math.max(1,Math.min(50,+((S.settings.photo_rules||{}).cap)||30));
+const prRule=(k)=>{ const d=PR_SYS.find(x=>x[0]===k)||[k,'','','',0,6]; const r=(S.settings.photo_rules||{})[k]||{}, cap=prCap(); return {min:Math.min(r.min??d[4],cap),max:Math.min(r.max??d[5],cap),help:r.help||'',dmg_min:r.dmg_min??0}; };
 function stPhotos(host){
   if(typeof waSyncForms==='function') waSyncForms();
   const forms=JSON.parse(JSON.stringify(S.settings.forms||{})), rules=JSON.parse(JSON.stringify(S.settings.photo_rules||{}));
+  if(!rules.cap) rules.cap=30;
   const fieldsOf=k=>forms[k]?.published?forms[k].published:JSON.parse(JSON.stringify(FORM_DEFS[k].fields));
   const work={}; Object.keys(FORM_DEFS).forEach(k=>work[k]=fieldsOf(k));
   const icon=k=>k==='daily'?'📄':k==='issue'?'⚠️':(typeof waType==='function'&&waType(k.slice(3))?.icon)||'✅';
+  const defMax=k=>k==='daily'?30:k==='issue'?6:9;
+  const clamp=(v,lo)=>v===''?'':Math.max(lo,Math.min(+rules.cap,+v||0));
   const draw=()=>{
-    const fcard=k=>{ const ph=work[k].filter(f=>f.type==='photos'&&!f.hidden);
-      return `<div class="card col" style="gap:4px"><div class="row" style="gap:8px"><span style="font-size:20px">${icon(k)}</span><b class="grow">${esc(FORM_DEFS[k].name)}</b><button class="btn btn-sm" data-addp="${k}">+ หัวข้อรูป</button></div>
-        ${ph.map(f=>`<div class="prrow"><div class="grow" style="min-width:0"><input class="in" data-pl="${k}|${f.key}" value="${esc(f.label)}" ${f.core?'readonly':''} style="height:36px"><input class="in xs" data-ph="${k}|${f.key}" value="${esc(f.help||'')}" placeholder="คำแนะนำ เช่น ถ่ายให้เห็นระยะหุ้ม" style="height:32px;margin-top:4px"></div>
-          <label class="field"><span class="xs muted">ขั้นต่ำ</span><input class="in num" type="number" min="0" max="30" data-pmin="${k}|${f.key}" value="${esc(f.min??(k==='daily'&&f.core?minPhotos():0))}" style="height:36px;width:70px"></label>
-          <label class="field"><span class="xs muted">สูงสุด</span><input class="in num" type="number" min="1" max="30" data-pmax="${k}|${f.key}" value="${esc(f.max??(k==='daily'?30:k==='issue'?6:9))}" style="height:36px;width:70px"></label>
-          ${f.core?'<span class="tag" style="height:18px;font-size:10px">หลัก</span>':`<button class="ibtn" data-pdel="${k}|${f.key}" aria-label="ลบหัวข้อรูป">${IC.close}</button>`}</div>`).join('')||'<span class="xs muted">ไม่มีช่องรูป</span>'}</div>`; };
+    const cap=+rules.cap;
+    const count=Object.values(work).reduce((a,fs)=>a+fs.filter(f=>f.type==='photos'||f.type==='photo').length,0)+PR_SYS.length+PR_FIXED.length;
+    const num=(attr,val,lo)=>`<input class="in num" type="number" min="${lo}" max="${cap}" ${attr} value="${esc(val)}" style="height:36px;width:70px">`;
+    const fcard=k=>{ const ph=work[k].filter(f=>f.type==='photos'||f.type==='photo');
+      return `<div class="card col" style="gap:4px"><div class="row" style="gap:8px"><span style="font-size:20px">${icon(k)}</span><div class="grow"><b>${esc(FORM_DEFS[k].name)}</b><div class="xs muted">${ph.length} หัวข้อที่ใช้รูปถ่าย</div></div><button class="btn btn-sm" data-addp="${k}">+ หัวข้อรูป</button></div>
+        ${ph.map(f=>{ const id=`${k}|${f.key}`, multi=f.type==='photos', mn=f.min??(k==='daily'&&f.core?minPhotos():0), mx=f.max??defMax(k);
+          return `<div class="prrow"><div class="grow" style="min-width:0"><div class="row" style="gap:6px"><input class="in" data-pl="${id}" value="${esc(f.label)}" ${f.core?'readonly':''} style="height:36px;flex:1">${f.core?'<span class="tag" style="height:18px;font-size:10px">หลัก</span>':''}${multi?'':'<span class="tag t-acc" style="height:18px;font-size:10px">รูปเดียว</span>'}${f.hidden?'<span class="tag" style="height:18px;font-size:10px">ซ่อนอยู่</span>':''}</div>
+            <input class="in xs" data-ph="${id}" value="${esc(f.help||'')}" placeholder="คำแนะนำ เช่น ถ่ายให้เห็นระยะหุ้ม" style="height:32px;margin-top:4px"></div>
+            ${multi?`<label class="field"><span class="xs muted">ขั้นต่ำ</span>${num(`data-pmin="${id}"`,mn,0)}</label><label class="field"><span class="xs muted">สูงสุด</span>${num(`data-pmax="${id}"`,Math.min(+mx,cap),1)}</label>`
+              :`<label class="row xs" style="gap:6px;align-self:center"><input type="checkbox" data-preq="${id}" ${f.required?'checked':''}> บังคับ 1 รูป</label><button class="btn btn-sm" data-pmulti="${id}" style="align-self:center">เปลี่ยนเป็นหลายรูป</button>`}
+            ${f.core?'':`<button class="ibtn" data-pdel="${id}" aria-label="ลบหัวข้อรูป" style="align-self:center">${IC.close}</button>`}</div>`; }).join('')||'<span class="xs muted">ไม่มีช่องรูป</span>'}</div>`; };
     const scard=([k,e,t,lbl])=>{ const r={...prRule(k),...(rules[k]||{})};
       return `<div class="card col" style="gap:4px"><div class="row" style="gap:8px"><span style="font-size:20px">${e}</span><b class="grow">${t}</b><span class="xs muted">ระบบ</span></div><div class="prrow"><div class="grow"><b class="sm">${lbl}</b><input class="in xs" data-sh="${k}" value="${esc(r.help)}" placeholder="คำแนะนำ" style="height:32px;margin-top:4px"></div>
-        <label class="field"><span class="xs muted">ขั้นต่ำ</span><input class="in num" type="number" min="0" max="30" data-smin="${k}" value="${r.min}" style="height:36px;width:70px"></label><label class="field"><span class="xs muted">สูงสุด</span><input class="in num" type="number" min="1" max="30" data-smax="${k}" value="${r.max}" style="height:36px;width:70px"></label></div>
-        ${k==='return'?`<label class="row sm" style="gap:8px">เมื่อมีของชำรุด/สูญหาย บังคับอย่างน้อย <input class="in num" type="number" min="0" max="10" data-sdmg value="${r.dmg_min}" style="height:34px;width:64px"> รูป</label>`:''}</div>`; };
-    host.innerHTML=`<div class="col" style="gap:12px"><div class="note n-info">${IC.info}<span>ขั้นต่ำ 0 = ไม่บังคับ · "+ หัวข้อรูป" เพิ่มชุดรูปในฟอร์มนั้นทันที · ค่าตรงกับตัวสร้างฟอร์มเสมอ</span></div>
+        <label class="field"><span class="xs muted">ขั้นต่ำ</span>${num(`data-smin="${k}"`,Math.min(r.min,cap),0)}</label><label class="field"><span class="xs muted">สูงสุด</span>${num(`data-smax="${k}"`,Math.min(r.max,cap),1)}</label></div>
+        ${k==='return'?`<label class="row sm" style="gap:8px">เมื่อมีของชำรุด/สูญหาย บังคับอย่างน้อย ${num('data-sdmg',Math.min(r.dmg_min,cap),0)} รูป</label>`:''}</div>`; };
+    host.innerHTML=`<div class="col" style="gap:12px">
+      <div class="card row" style="gap:12px;flex-wrap:wrap"><div class="grow"><b>เพดานจำนวนรูปต่อหัวข้อ</b><div class="xs muted">ทุกหัวข้อตั้ง "สูงสุด" ได้ไม่เกินค่านี้ (แอดมินกำหนด 1–50)</div></div><input class="in num" type="number" min="1" max="50" data-cap value="${cap}" style="height:42px;width:90px"><span class="sm muted">รูป</span></div>
+      <div class="note n-info">${IC.info}<span>พบ <b>${count}</b> หัวข้อที่ใช้รูปถ่ายในระบบ · ขั้นต่ำ 0 = ไม่บังคับ · "+ หัวข้อรูป" เพิ่มชุดรูปในฟอร์มนั้นทันที · ค่าตรงกับตัวสร้างฟอร์มเสมอ</span></div>
       <div class="prgrid">${Object.keys(FORM_DEFS).map(fcard).join('')}${PR_SYS.map(scard).join('')}</div>
+      <div class="card col" style="gap:2px"><div class="row" style="gap:8px"><span style="font-size:20px">📌</span><b class="grow">รูปเดียวแบบกำหนดตายตัว</b><span class="xs muted">${PR_FIXED.length} หัวข้อ</span></div>
+        ${PR_FIXED.map(([e,t,d])=>`<div class="prrow"><span style="font-size:18px">${e}</span><div class="grow"><b class="sm">${t}</b><div class="xs muted">${d}</div></div><span class="tag" style="height:20px">1 รูป</span></div>`).join('')}</div>
       <button class="btn btn-p" data-save style="align-self:flex-start">บันทึกกติการูปถ่าย</button></div>`;
     const fld=(s)=>{ const [k,key]=s.split('|'); return work[k].find(f=>f.key===key); };
+    $('[data-cap]',host).onchange=e=>{ rules.cap=Math.max(1,Math.min(50,+e.target.value||30));
+      Object.values(work).forEach(fs=>fs.forEach(f=>{ if(f.type==='photos'){ if(f.max!==''&&f.max!=null&&+f.max>rules.cap) f.max=rules.cap; if(+f.min>rules.cap) f.min=rules.cap; } }));
+      PR_SYS.forEach(([k])=>{ const r=rules[k]; if(r){ if(r.max>rules.cap) r.max=rules.cap; if(r.min>rules.cap) r.min=rules.cap; } }); setTimeout(draw,0); toast(`เพดาน ${rules.cap} รูป (ปรับค่าที่เกินให้แล้ว)`); };
     $$('[data-pl]',host).forEach(i=>i.oninput=()=>{ fld(i.dataset.pl).label=i.value; });
     $$('[data-ph]',host).forEach(i=>i.oninput=()=>{ fld(i.dataset.ph).help=i.value; });
-    $$('[data-pmin]',host).forEach(i=>i.oninput=()=>{ fld(i.dataset.pmin).min=i.value===''?'':Math.max(0,+i.value); });
-    $$('[data-pmax]',host).forEach(i=>i.oninput=()=>{ fld(i.dataset.pmax).max=i.value===''?'':Math.max(1,+i.value); });
+    $$('[data-pmin]',host).forEach(i=>i.onchange=()=>{ const v=clamp(i.value,0); fld(i.dataset.pmin).min=v; i.value=v; });
+    $$('[data-pmax]',host).forEach(i=>i.onchange=()=>{ const v=clamp(i.value,1); fld(i.dataset.pmax).max=v; i.value=v; });
+    $$('[data-preq]',host).forEach(i=>i.onchange=()=>{ fld(i.dataset.preq).required=i.checked?1:0; });
+    $$('[data-pmulti]',host).forEach(b=>b.onclick=()=>{ const f=fld(b.dataset.pmulti); f.type='photos'; f.min=f.required?1:0; f.max=Math.min(6,+rules.cap); delete f.required; setTimeout(draw,0); toast(`"${f.label}" เป็นชุดหลายรูปแล้ว (รูปเดิมที่บันทึกไว้ยังเปิดดูได้)`); });
     $$('[data-pdel]',host).forEach(b=>b.onclick=()=>{ const [k,key]=b.dataset.pdel.split('|'); work[k]=work[k].filter(f=>f.key!==key); draw(); });
-    $$('[data-addp]',host).forEach(b=>b.onclick=()=>{ const k=b.dataset.addp, f={key:'cf_'+Date.now().toString(36),type:'photos',label:'ชุดรูปใหม่',min:1,max:6,show_pdf:1}; const ci=work[k].findIndex(x=>x.key==='photos'); work[k].splice(ci>=0?ci+1:work[k].length,0,f); draw(); });
-    const sv=(a,f)=>$$(`[${a}]`,host).forEach(i=>i.oninput=()=>f(i));
-    sv('data-smin',i=>{ const k=i.dataset.smin; rules[k]={...(rules[k]||{}),min:Math.max(0,+i.value||0)}; });
-    sv('data-smax',i=>{ const k=i.dataset.smax; rules[k]={...(rules[k]||{}),max:Math.max(1,+i.value||1)}; });
-    sv('data-sh',i=>{ const k=i.dataset.sh; rules[k]={...(rules[k]||{}),help:i.value}; });
-    const dm=$('[data-sdmg]',host); if(dm) dm.oninput=()=>{ rules.return={...(rules.return||{}),dmg_min:Math.max(0,+dm.value||0)}; };
+    $$('[data-addp]',host).forEach(b=>b.onclick=()=>{ const k=b.dataset.addp, f={key:'cf_'+Date.now().toString(36),type:'photos',label:'ชุดรูปใหม่',min:1,max:Math.min(6,+rules.cap),show_pdf:1}; const ci=work[k].findIndex(x=>x.key==='photos'); work[k].splice(ci>=0?ci+1:work[k].length,0,f); draw(); });
+    $$('[data-smin]',host).forEach(i=>i.onchange=()=>{ const k=i.dataset.smin, v=clamp(i.value,0)||0; rules[k]={...(rules[k]||{}),min:v}; i.value=v; });
+    $$('[data-smax]',host).forEach(i=>i.onchange=()=>{ const k=i.dataset.smax, v=clamp(i.value,1)||1; rules[k]={...(rules[k]||{}),max:v}; i.value=v; });
+    $$('[data-sh]',host).forEach(i=>i.oninput=()=>{ const k=i.dataset.sh; rules[k]={...(rules[k]||{}),help:i.value}; });
+    const dm=$('[data-sdmg]',host); if(dm) dm.onchange=()=>{ const v=clamp(dm.value,0)||0; rules.return={...(rules.return||{}),dmg_min:v}; dm.value=v; };
     $('[data-save]',host).onclick=async ev=>{
-      for(const k of Object.keys(work)) for(const f of work[k].filter(f=>f.type==='photos')){ if(f.min!==''&&f.max!==''&&+f.min>+f.max) return toast(`"${f.label}" ขั้นต่ำมากกว่าสูงสุด`,true); if(!String(f.label).trim()) return toast('ตั้งชื่อหัวข้อรูปทุกช่อง',true); }
+      for(const k of Object.keys(work)) for(const f of work[k].filter(f=>f.type==='photos')){
+        if(!String(f.label).trim()) return toast('ตั้งชื่อหัวข้อรูปทุกช่อง',true);
+        const mn=+(f.min||0), mx=f.max===''||f.max==null?Math.min(defMax(k),rules.cap):+f.max;
+        if(mx>rules.cap) return toast(`"${f.label}" สูงสุดเกินเพดาน ${rules.cap} รูป`,true);
+        if(mn>mx) return toast(`"${f.label}" ขั้นต่ำมากกว่าสูงสุด`,true); }
+      for(const [k,,t] of PR_SYS){ const r={...prRule(k),...(rules[k]||{})}; if(r.min>r.max) return toast(`"${t}" ขั้นต่ำมากกว่าสูงสุด`,true); }
       busy(ev.target,true);
       try{ const nf={...(S.settings.forms||{})}; Object.keys(work).forEach(k=>{ const old=nf[k]||{}; nf[k]={...old,published:work[k],version:(old.version||0)+(JSON.stringify(old.published||FORM_DEFS[k].fields)===JSON.stringify(work[k])?0:1)}; delete nf[k].draft; });
         await saveSetting('forms',nf); S.settings.forms=nf; await saveSetting('photo_rules',rules); S.settings.photo_rules=rules; busy(ev.target,false); toast('บันทึกกติการูปถ่ายแล้ว'); }
