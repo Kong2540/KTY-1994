@@ -3,13 +3,13 @@
    ตั้งค่าการเชื่อมต่อ Supabase — Project Settings > API Keys
    ใส่ Project URL และ Publishable key (sb_publishable_...) เท่านั้น
    ===================================================================== */
-const SUPABASE_URL = (window.KTY_CONFIG&&window.KTY_CONFIG.url) || 'https://mydytzlrevzjpqusaohu.supabase.co';
-const SUPABASE_ANON_KEY = (window.KTY_CONFIG&&window.KTY_CONFIG.key) || 'sb_publishable_btZKjUqx12VOyTnyMAZOGQ_jpmiLHfl';
+const SUPABASE_URL = (window.KTY_CONFIG&&window.KTY_CONFIG.url) || 'https://YOUR-PROJECT.supabase.co';
+const SUPABASE_ANON_KEY = (window.KTY_CONFIG&&window.KTY_CONFIG.key) || 'YOUR-ANON-KEY';
 /* ---------- แบรนด์ (แอดมินแก้ได้ที่ ตั้งค่าระบบ > แบรนด์) ---------- */
 const BRAND_DEFAULT = { app:'KTY Hub', mark:'KTY', tagline:'ระบบบริหารงานก่อสร้าง', company_th:'ห้างหุ้นส่วนจำกัด กิตติยาก่อสร้าง 1994',
   company_short:'หจก.กิตติยาก่อสร้าง 1994', company_en:'KITTIYA CONSTRUCTION 1994 LIMITED PARTNERSHIP', logo:'', color:'#F2B705' };
 const BR = () => ({ ...BRAND_DEFAULT, ...Object.fromEntries(Object.entries((typeof S!=='undefined'&&(S.settings?.brand||S.brand))||{}).filter(([,v])=>v!==''&&v!=null)) });
-const markHTML = (px) => { const b=BR(), st=px?`width:${px}px;height:${px}px;font-size:${Math.round(px*.3)}px`:''; return b.logo?`<div class="mark mark-img" style="${st}"><img src="${b.logo}" alt="${b.app}"></div>`:`<div class="mark" style="${st}"><span>${b.mark}</span></div>`; };
+const markHTML = (px) => { const b=BR(), st=px?`width:${px}px;height:${px}px;font-size:${Math.round(px*.3)}px`:''; return b.logo?`<div class="mark mark-img" style="${st}"><img src="${b.logo}" alt="${b.app}"></div>`:`<div class="mark mark-kty" style="${st}"><img src="brand/kty-icon.svg" alt="${b.app}"></div>`; };
 const T = s => (typeof S!=='undefined'&&S.settings?.labels?.[s]) || s;
 function applyBrand(){
   const b=BR(); document.title=b.app;

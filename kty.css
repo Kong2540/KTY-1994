@@ -507,3 +507,6 @@ details.perm>summary::-webkit-details-marker{display:none}
 /* ================= ตั้งค่าขั้นสูง ================= */
 .advrow{display:flex;align-items:center;gap:8px}.advrow .in{height:38px;flex:1}.advrow input[type=color]{width:40px;height:38px;border:1px solid var(--line);border-radius:8px;padding:2px;background:var(--surface)}
 .advgrid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+
+.mark.mark-kty{background:transparent!important;box-shadow:none!important;padding:0;overflow:visible}.mark.mark-kty img{width:100%;height:100%;object-fit:contain;display:block}
+.mark.mark-kty::after,.mark.mark-kty::before{display:none!important}

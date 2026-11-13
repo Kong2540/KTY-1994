@@ -168,7 +168,7 @@ const MM=3.7795;
 const PPRINT_DEF={margin:{t:12,r:10,b:12,l:10},font:11,sign:true,sign_w:34,widths:{}};
 const pprint = () => { const s={...(S.settings.payroll_print||{}),...(activeSet()?.print||{})}; return {...PPRINT_DEF,...s,margin:{...PPRINT_DEF.margin,...(s.margin||{})},widths:{...(s.widths||{})}}; };
 const qrSvgOf = t => { const q=qrcode(0,'M'); q.addData(t); q.make(); return q.createSvgTag({cellSize:2,margin:0,scalable:true}); };
-function pgHead(p,t,qrUrl){ const B=BR(); return `<div class="pg-head">${B.logo?`<img src="${B.logo}" crossorigin="anonymous" alt="">`:`<span class="pg-mark">${esc(B.mark)}</span>`}<div class="grow"><b>${esc(B.company_th)}</b><span>${esc(B.company_en)}</span></div><div class="pg-ti"><b>${t}</b><span>งวดวันที่ ${periodLabel(p)}</span></div>${qrUrl&&window.qrcode?`<div class="pg-qr">${qrSvgOf(qrUrl)}<small>สแกนดูย้อนหลัง</small></div>`:''}</div>`; }
+function pgHead(p,t,qrUrl){ const B=BR(); return `<div class="pg-head">${B.logo?`<img src="${B.logo}" crossorigin="anonymous" alt="">`:`<img src="brand/kty-mark.svg" alt="">`}<div class="grow"><b>${esc(B.company_th)}</b><span>${esc(B.company_en)}</span></div><div class="pg-ti"><b>${t}</b><span>งวดวันที่ ${periodLabel(p)}</span></div>${qrUrl&&window.qrcode?`<div class="pg-qr">${qrSvgOf(qrUrl)}<small>สแกนดูย้อนหลัง</small></div>`:''}</div>`; }
 async function pdfFromPages(els, orient, name){
   await Promise.all([loadScript(LIB.h2c),loadScript(LIB.pdf)]); await document.fonts?.ready;
   const L=orient==='l', pdf=new jspdf.jsPDF({unit:'mm',format:'a4',orientation:L?'landscape':'portrait'});
@@ -228,7 +228,7 @@ async function paySlipsPreview(p, slips){
   const qrSvg=t=>{ const q=qrcode(0,'M'); q.addData(t); q.make(); return q.createSvgTag({cellSize:2,margin:0,scalable:true}); };
   const base=`${location.origin}${location.pathname}#pay/s/`, qrOf=s=>s.data.__emp?.qr_token?`${location.origin}${location.pathname}#id/${s.data.__emp.qr_token}`:base+s.id;
   for(let i=0;i<slips.length;i+=8){ const chunk=slips.slice(i,i+8);
-    pages.push(`<div class="a4 a4slips">${chunk.map(s=>{ const d=s.data; return `<div class="slip"><div class="sl-h">${logo?`<img src="${logo}" crossorigin="anonymous" alt="">`:`<span class="pg-mark sm">${esc(B.mark)}</span>`}<div class="grow"><b>${esc(B.company_short)}</b><span>สลิปเงินเดือน · งวด ${periodLabel(p)}</span></div><div class="sl-qr">${qrSvg(qrOf(s))}</div></div>
+    pages.push(`<div class="a4 a4slips">${chunk.map(s=>{ const d=s.data; return `<div class="slip"><div class="sl-h">${logo?`<img src="${logo}" crossorigin="anonymous" alt="">`:`<img src="brand/kty-mark.svg" alt="" style="width:26px;height:28px">`}<div class="grow"><b>${esc(B.company_short)}</b><span>สลิปเงินเดือน · งวด ${periodLabel(p)}</span></div><div class="sl-qr">${qrSvg(qrOf(s))}</div></div>
       <div class="sl-n"><b>${esc(d.name)}</b><span>${esc(d.emp_code||'')}${d.position?' · '+esc(d.position):''}</span></div>
       <div class="sl-r"><span>อัตราค่าแรง</span><b>${d.wage_type==='monthly'?`${fmtN(d.rate)} /เดือน`:`${fmtN(d.rate)} /วัน`}</b></div>
       <div class="sl-r"><span>วันทำงาน · OT</span><b>${fmtN(d.days)} วัน · ${fmtN(d.ot_hours)} ชม.</b></div>
