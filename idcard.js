@@ -4,10 +4,16 @@
    ===================================================================== */
 const AGENT = 'http://127.0.0.1:47321';
 const AGENT_EXE = 'agent/KTY-Card-Agent.exe', AGENT_APK = 'agent/KTY-Card-Agent.apk', IS_ANDROID = /Android/.test(navigator.userAgent);
-async function agentCall(path, ms=4000){
+async function agentCall(path, ms=8000){
   const c=new AbortController(), t=setTimeout(()=>c.abort(),ms);
-  try{ const r=await fetch(AGENT+path,{headers:{'X-KTY':'1'},signal:c.signal,cache:'no-store'}); return await r.json(); }
-  finally{ clearTimeout(t); }
+  const base={headers:{'X-KTY':'1'},signal:c.signal,cache:'no-store'};
+  try{
+    let r;
+    try{ r=await fetch(AGENT+path,{...base,targetAddressSpace:'loopback'}); }
+    catch(e){ if(e.name==='AbortError') throw e; r=await fetch(AGENT+path,{...base,targetAddressSpace:'local'}).catch(()=>fetch(AGENT+path,base)); }
+    if(r.status===403){ const j=await r.json().catch(()=>({})); const er=new Error('origin'); er.origin=j.origin; throw er; }
+    return await r.json();
+  } finally{ clearTimeout(t); }
 }
 const idCheck = id => { const s=String(id||'').replace(/\D/g,''); if(s.length!==13) return false; let n=0; for(let i=0;i<12;i++) n+=(+s[i])*(13-i); return (11-n%11)%10===+s[12]; };
 const TH_MON_FULL=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
@@ -63,7 +69,7 @@ async function idcReader(onUse){
   const prog=overlay(`<div class="modal" role="dialog" aria-modal="true"><div class="row" style="gap:10px"><span class="spin" style="margin:0"></span><b id="idst">กำลังเชื่อมต่อเครื่องอ่านบัตร...</b></div></div>`,true,false);
   let st;
   try{ st=await agentCall('/status'); }
-  catch(_){ prog.close(); return agentHelp(); }
+  catch(e){ prog.close(); if(e.message==='origin') return toast(`ตัวกลางไม่อนุญาตเว็บไซต์นี้ (${location.origin}) · เพิ่มในช่อง "เว็บไซต์ที่อนุญาต" ของแอป/โปรแกรม KTY Card Agent`,true); return agentHelp(e.name==='AbortError'?'timeout':'network'); }
   if(!st.readers||!st.readers.length){ prog.close(); return toast(IS_ANDROID?'ไม่พบเครื่องอ่านบัตร กรุณาเสียบเครื่องอ่านเข้ามือถือ (USB-C) แล้วลองใหม่':'ไม่พบเครื่องอ่านบัตร กรุณาเสียบเครื่องอ่าน (USB) แล้วลองใหม่',true); }
   if(st.reader_error&&/อนุญาต/.test(st.reader_error)){ prog.close(); return toast(st.reader_error,true); }
   $('#idst',prog.el).textContent='กำลังอ่านข้อมูลจากชิปบัตร...';
@@ -73,10 +79,15 @@ async function idcReader(onUse){
     delete c.photo; idcReview(c, new Set(c.check_digit_ok===false?['national_id']:[]), 'chip', photo, onUse);
   }catch(e){ prog.close(); toast('อ่านบัตรไม่สำเร็จ: '+errText(e),true); }
 }
-function agentHelp(){
+function agentHelp(why){
   const ov=overlay(IS_ANDROID?`<div class="modal" role="dialog" aria-modal="true" style="max-width:520px"><div class="row" style="gap:8px"><b class="grow" style="font-size:17px">ไม่พบแอป KTY Card Agent</b><span class="tag t-warn">ยังไม่เปิด</span></div>
     <span class="sm muted">การอ่านชิปบัตรบนมือถือต้องติดตั้งแอปตัวกลาง 1 ครั้ง (Android 8 ขึ้นไป · เครื่องอ่าน USB-C)</span>
     <div class="card col" style="gap:6px;box-shadow:none"><div class="sm">1. ดาวน์โหลด <b>KTY-Card-Agent.apk</b> แล้วเปิดติดตั้ง (อนุญาต "ติดตั้งแอปที่ไม่รู้จัก" ครั้งเดียว)</div><div class="sm">2. เปิดแอป · เสียบเครื่องอ่าน · กดอนุญาต และติ๊ก "ใช้เสมอ"</div><div class="sm">3. ในแอปกด "ไม่จำกัดการใช้แบตเตอรี่" แล้วกลับมากดอ่านบัตรอีกครั้ง</div></div>
+    <div class="card col" style="gap:6px;box-shadow:none;background:var(--surface2)"><b class="sm">ติดตั้งแล้วแต่ยังเชื่อมไม่ได้?</b>
+      <div class="sm">• Chrome อาจถามว่า <b>"อนุญาตให้เข้าถึงอุปกรณ์ในเครือข่ายท้องถิ่น"</b> ให้กด <b>อนุญาต</b> · ถ้าเคยกดไม่อนุญาต: แตะไอคอนหน้าที่อยู่เว็บ > สิทธิ์ > เปิด "เครือข่ายท้องถิ่น/อุปกรณ์ในเครือข่าย"</div>
+      <div class="sm">• ทดสอบตัวกลาง: เปิด <a href="http://127.0.0.1:47321/status" target="_blank" rel="noopener">http://127.0.0.1:47321/status</a> ใน Chrome ต้องขึ้น "ตัวกลางทำงานอยู่"</div>
+      <div class="sm">• ใช้ <b>Chrome</b> (Samsung Internet บางเวอร์ชันบล็อกการเชื่อมต่อในเครื่อง) และเปิดแอป KTY Card Agent ค้างไว้</div>
+      ${why?`<div class="xs muted">สาเหตุ: ${why==='timeout'?'ตัวกลางตอบช้าเกินไป (ลองใหม่อีกครั้ง)':'เบราว์เซอร์เชื่อมต่อตัวกลางไม่ได้'}</div>`:''}</div>
     <div class="xs muted">ความปลอดภัย: แอปทำงานเฉพาะในเครื่องนี้ ตอบเฉพาะเว็บไซต์ของบริษัท อ่านบัตรเมื่อกดปุ่มเท่านั้น และไม่เก็บข้อมูลบัตร</div>
     <div class="row" style="gap:8px;justify-content:flex-end"><button class="btn" data-x>ปิด</button><a class="btn btn-p" href="${AGENT_APK}" download>ดาวน์โหลดแอป</a></div></div>`
   :`<div class="modal" role="dialog" aria-modal="true" style="max-width:520px"><div class="row" style="gap:8px"><b class="grow" style="font-size:17px">ไม่พบโปรแกรม KTY Card Agent</b><span class="tag t-warn">ยังไม่เปิด</span></div>
