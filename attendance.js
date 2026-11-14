@@ -127,7 +127,7 @@ function openWizard(e, startStep=0, onSaved){
   const isNew=!e;
   const F = isNew ? {title:'นาย',gender:'male',nationality:'ไทย',cur_same:true,employment_type:'permanent',status:'active',wage_type:'daily',wage_rate:0,ot_rate:0,_dp:{}} : {...e,_dp:{}};
   const orig=e?{...e}:null;
-  let step=startStep, photoBlob=null, photoPreview=null;
+  let step=startStep, photoBlob=null, photoPreview=null, idPhotoBlob=null;
   const m=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="${isNew?'เพิ่มพนักงาน':'แก้ไขข้อมูลพนักงาน'}"></div>`, false, false);
   const sheet=$('.sheet',m.el);
   const wageChanged=()=>!isNew&&(Number(F.wage_rate)!==Number(orig.wage_rate)||Number(F.ot_rate)!==Number(orig.ot_rate)||F.wage_type!==orig.wage_type);
@@ -232,7 +232,7 @@ function openWizard(e, startStep=0, onSaved){
         h.textContent = !r.value?'': k==='birth_date'?`อายุ ${ageText(r.value)}`: k==='start_date'?`อายุงาน ${serviceText(r.value)}`: k==='id_expiry_date'?(daysUntil(r.value)<0?'บัตรหมดอายุแล้ว':`ใช้ได้อีก ${untilText(r.value)||daysUntil(r.value)+' วัน'}`): k==='probation_end'?(daysUntil(r.value)<0?'ผ่านแล้ว':`อีก ${daysUntil(r.value)} วัน`):''; if(k==='id_expiry_date'&&daysUntil(r.value)<=60) h.className='hint warn'; } }
       else if(h){ h.className='hint bad'; h.textContent=r.msg; }
     }); });
-    if(typeof bindIdCard==='function') bindIdCard(sheet,(out,ph)=>{ Object.assign(F,out); if(ph){ photoBlob=ph; if(photoPreview) URL.revokeObjectURL(photoPreview); photoPreview=URL.createObjectURL(ph); } rerender(); });
+    if(typeof bindIdCard==='function') bindIdCard(sheet,(out,ph)=>{ Object.assign(F,out); if(ph){ idPhotoBlob=ph; if(!photoBlob&&(!orig?.photo_path||orig?.photo_is_id)){ if(photoPreview) URL.revokeObjectURL(photoPreview); photoPreview=URL.createObjectURL(ph); } } rerender(); });
     $$('[data-photo]',sheet).forEach(inpEl=>inpEl.onchange=async()=>{ const f=inpEl.files[0]; if(!f) return; try{ photoBlob=await resizeImage(f); if(photoPreview) URL.revokeObjectURL(photoPreview); photoPreview=URL.createObjectURL(photoBlob); rerender(); }catch(_){ toast('อ่านไฟล์รูปไม่ได้ ลองเลือกรูปอื่น',true); } });
     const cs=$('[data-consent]',sheet); if(cs) cs.onchange=()=>{ if(cs.checked) F.blood_consent_at=orig?.blood_consent_at||new Date().toISOString(); else { F.blood_consent_at=null; F.blood_type=null; } rerender(); };
     const si=$('[data-sameid]',sheet); if(si) si.onclick=()=>{ const id=digits(F.national_id); if(!id) return toast('กรอกเลขบัตรประชาชนก่อน',true); F.social_security_no=id; rerender(); };
@@ -262,6 +262,7 @@ function openWizard(e, startStep=0, onSaved){
     busy(btn,true);
     try{
       const id = isNew ? (crypto.randomUUID ? crypto.randomUUID() : null) : orig.id;
+      if(idPhotoBlob&&id){ const ip=`idc/${id}.jpg`; const u2=await sb.storage.from(PHOTO_BUCKET).upload(ip, idPhotoBlob, {upsert:true, contentType:'image/jpeg'}); if(!u2.error){ row.id_photo_path=ip; delete S.photoUrl[ip]; } }
       if(photoBlob){
         if(!id) throw new Error('อุปกรณ์นี้ไม่รองรับการอัปโหลดรูป');
         const path=`emp/${id}.jpg`;

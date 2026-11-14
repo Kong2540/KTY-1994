@@ -12,6 +12,9 @@ const SELF_GROUPS = [
   ['บัญชีธนาคาร (แก้ไขผ่านแอดมิน)', [['bank_name','ธนาคาร','ro'],['bank_account_no','เลขบัญชี','secret-ro'],['bank_account_name','ชื่อบัญชี','ro']]],
   ['การจ้างงาน (แก้ไขผ่านแอดมิน)', [['emp_code','รหัสพนักงาน','ro'],['position_id','ตำแหน่ง','ro'],['start_date','วันเริ่มงาน','ro-date'],['wage_type','ประเภทค่าจ้าง','ro'],['wage_rate','อัตราค่าจ้าง','ro'],['ot_rate','อัตรา OT','ro']]]
 ];
+const SE_BANK=['bank_name','bank_account_no','bank_account_name'];
+const seMode=k=>{ const v=(S.settings.self_edit||{})[k]; return v||(SE_BANK.includes(k)?'deny':'approve'); };
+const SE_TAG={approve:'<span class="tag t-warn idb">ต้องอนุมัติ</span>',direct:'<span class="tag t-ok idb">บันทึกทันที</span>',deny:'<span class="tag idb">แจ้งแอดมิน</span>'};
 const SELF_LABEL = Object.fromEntries(SELF_GROUPS.flatMap(g=>g[1]).map(f=>[f[0],f[1]]).concat([['photo_path','รูปถ่าย']]));
 const maskId = (k,v) => { const s=String(v||''); if(!s) return '-'; if(k==='national_id'&&s.length===13) return `x-xxxx-xxxxx-${s.slice(10,12)}-${s[12]}`; return s.replace(/.(?=.{3})/g,'x'); };
 let REVEAL = {}; // employee_id → true เมื่อยืนยันรหัสผ่านแล้ว (เฉพาะหน้านี้)
@@ -63,7 +66,8 @@ async function myProfile(host, eid, own){
   const hasSecret=SELF_GROUPS.some(g=>g[1].some(f=>f[2]?.startsWith?.('secret')&&e[f[0]]));
   host.innerHTML=`<div class="col" style="gap:12px;max-width:760px">
     <div class="card row" style="gap:14px">${avatar(e)}<div class="grow"><b style="font-size:18px">${esc([e.title,e.first_name,e.last_name].filter(Boolean).join(' '))}${e.nickname?` (${esc(e.nickname)})`:''}</b><div class="sm muted">${esc(e.emp_code||'')} · ${esc(posName(e.position_id)||'')}</div></div>
-      ${own?`<button class="btn btn-sm btn-p" data-edit ${pend?'':''}>ขอแก้ไขข้อมูล</button>`:`<a class="btn btn-sm" href="#emp/${e.id}">แก้ในทะเบียน</a>`}</div>
+      ${own?`<button class="btn btn-sm btn-p" data-edit>ขอแก้ไขข้อมูล</button>`:`<a class="btn btn-sm" href="#emp/${e.id}">แก้ในทะเบียน</a>`}</div>
+    ${e.photo_path?`<div class="row xs muted" style="gap:8px;margin-top:-4px;flex-wrap:wrap"><span>รูปที่แสดง: <b>${e.photo_is_id?'รูปจากบัตรประชาชน':'รูปที่ตั้งเอง'}</b></span>${!own&&isManager()&&e.id_photo_path&&!e.photo_is_id?'<button class="linkbtn" data-useid>กลับไปใช้รูปจากบัตร</button>':''}</div>`:''}
     ${pend?`<div class="note n-warn">${IC.info}<span>มีคำขอแก้ไขรออนุมัติ (${Object.keys(pend.changes).map(k=>esc(SELF_LABEL[k]||k)).join(', ')}) ส่งเมื่อ ${new Date(pend.created_at).toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'})}</span></div>`:''}
     ${hasSecret?`<div class="row" style="gap:8px"><span class="xs muted grow">${REVEAL[e.id]?'แสดงข้อมูลสำคัญแบบเต็มแล้ว (เฉพาะหน้านี้)':'เลขบัตร/เลขประกันสังคม/เลขบัญชี ถูกปิดบังไว้เพื่อความปลอดภัย'}</span>${REVEAL[e.id]?'<button class="btn btn-sm" data-hide>ซ่อน</button>':'<button class="btn btn-sm" data-reveal>แสดงแบบเต็ม (ใส่รหัสผ่าน)</button>'}</div>`:''}
     ${SELF_GROUPS.map(([g,fs])=>`<div class="card" style="padding:4px 16px"><div class="sm" style="font-weight:700;padding:10px 0 4px">${g}</div>${fs.map(f=>`<div class="kv"><span>${f[1]}</span><span style="text-align:right">${esc(selfVal(f,e))}</span></div>`).join('')}</div>`).join('')}
@@ -71,6 +75,7 @@ async function myProfile(host, eid, own){
   const rv=$('[data-reveal]',host); if(rv) rv.onclick=()=>revealSheet(e,()=>myProfile(host,eid,own));
   const hd=$('[data-hide]',host); if(hd) hd.onclick=()=>{ delete REVEAL[e.id]; myProfile(host,eid,own); };
   const ed=$('[data-edit]',host); if(ed) ed.onclick=()=>editRequestSheet(e,()=>myProfile(host,eid,own));
+  const ui=$('[data-useid]',host); if(ui) ui.onclick=async()=>{ const {error}=await sb.rpc('use_id_photo',{p_emp:e.id}); if(error) return toast(errText(error),true); toast('กลับไปใช้รูปจากบัตรแล้ว'); myProfile(host,eid,own); };
 }
 function revealSheet(e, done){
   const ov=overlay(`<div class="modal" role="dialog" aria-modal="true"><h3 class="h2" style="font-size:18px">ยืนยันตัวตน</h3><span class="sm muted">ใส่รหัสผ่านของบัญชี ${esc(S.session?.user?.email||'')} เพื่อดูข้อมูลสำคัญแบบเต็ม (ระบบบันทึกการดูไว้)</span>
@@ -85,27 +90,30 @@ function revealSheet(e, done){
 }
 function editRequestSheet(e, done){
   const F={}; let photo=null;
-  const editable=SELF_GROUPS.slice(0,5);
-  const field=f=>{ const [k,l,t,opt]=f, v=e[k]??'';
-    if(t==='bool') return `<label class="row sm" style="gap:8px;min-height:40px"><input type="checkbox" data-f="${k}" ${v?'checked':''}> ${l}</label>`;
-    if(t==='sel') return `<label class="field"><span class="xs muted">${l}</span><select class="in" data-f="${k}"><option value="">-</option>${opt.map(o=>Array.isArray(o)?o:[o,o]).map(([a,b])=>`<option value="${a}" ${v===a?'selected':''}>${b}</option>`).join('')}</select></label>`;
-    return `<label class="field"><span class="xs muted">${l}</span><input class="in" data-f="${k}" ${t==='date'?'type="date"':''} ${k==='national_id'?'inputmode="numeric" maxlength="13"':''} value="${esc(v)}"></label>`; };
+  const editable=SELF_GROUPS.slice(0,6).map(([g,fs])=>[g.replace(' (แก้ไขผ่านแอดมิน)',''),fs.map(f=>f[0]==='bank_account_no'?[f[0],f[1]]:f[2]==='ro'?[f[0],f[1]]:f)]).filter(([g,fs])=>fs.some(f=>seMode(f[0])!=='deny'));
+  const field=f=>{ const [k,l,t,opt]=f, v=e[k]??'', md=seMode(k);
+    if(md==='deny') return `<div class="field"><span class="xs muted">${l} ${SE_TAG.deny}</span><div class="in" style="opacity:.6">${esc(selfVal(f,e))}</div></div>`;
+    const L=`${l} ${SE_TAG[md]}`;
+    if(t==='bool') return `<label class="row sm" style="gap:8px;min-height:40px"><input type="checkbox" data-f="${k}" ${v?'checked':''}> ${L}</label>`;
+    if(t==='sel') return `<label class="field"><span class="xs muted">${L}</span><select class="in" data-f="${k}"><option value="">-</option>${opt.map(o=>Array.isArray(o)?o:[o,o]).map(([a,b])=>`<option value="${a}" ${v===a?'selected':''}>${b}</option>`).join('')}</select></label>`;
+    return `<label class="field"><span class="xs muted">${L}</span><input class="in" data-f="${k}" ${t==='date'?'type="date"':''} ${k==='national_id'?'inputmode="numeric" maxlength="13"':''} value="${esc(v)}"></label>`; };
   const ov=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="ขอแก้ไขข้อมูล"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>ขอแก้ไขข้อมูล<small>ส่งให้ผู้บริหารตรวจสอบก่อนเปลี่ยนจริง</small></h1></header>
-    <div class="sheet-body"><div class="card row" style="gap:12px">${avatar(e)}<div class="grow"><b class="sm">รูปถ่าย</b><div class="xs muted" id="phn">ถ้าต้องการเปลี่ยน เลือกรูปใหม่</div></div><label class="btn btn-sm">เลือกรูป<input type="file" accept="image/*" hidden data-photo></label></div>
+    <div class="sheet-body">${seMode('photo_path')==='deny'?'':`<div class="card row" style="gap:12px">${avatar(e)}<div class="grow"><b class="sm">รูปถ่าย ${SE_TAG[seMode('photo_path')]}</b><div class="xs muted" id="phn">${e.photo_is_id?'ตอนนี้ใช้รูปจากบัตรประชาชน · ':''}ถ้าต้องการเปลี่ยน เลือกรูปใหม่</div></div><label class="btn btn-sm">เลือกรูป<input type="file" accept="image/*" hidden data-photo></label></div>`}
       ${editable.map(([g,fs])=>`<div class="card col" style="gap:8px"><b class="sm">${g}</b><div class="g2">${fs.map(field).join('')}</div></div>`).join('')}
-      <div class="note n-info">${IC.info}<span>บัญชีธนาคาร ตำแหน่ง ค่าจ้าง แก้ไขผ่านแอดมินเท่านั้น</span></div></div>
+      <div class="note n-info">${IC.info}<span>"บันทึกทันที" เปลี่ยนเลย · "ต้องอนุมัติ" รอผู้อนุมัติตรวจ · ตำแหน่ง ค่าจ้าง และช่อง "แจ้งแอดมิน" แก้ไขผ่านแอดมินเท่านั้น</span></div></div>
     <div class="sheet-foot"><span class="xs muted grow" id="chn">ยังไม่มีการแก้ไข</span><button class="btn" data-x2>ยกเลิก</button><button class="btn btn-p" data-go>ส่งคำขอแก้ไข</button></div></div>`,false,false);
   const collect=()=>{ Object.keys(F).forEach(k=>delete F[k]); $$('[data-f]',ov.el).forEach(i=>{ const k=i.dataset.f; let v=i.type==='checkbox'?i.checked:i.value.trim(); if(v==='') v=null; const old=e[k]??null;
       if(String(old??'')!==String(v??'')) F[k]=v; }); const n=Object.keys(F).length+(photo?1:0); $('#chn',ov.el).textContent=n?`แก้ไข ${n} ช่อง`:'ยังไม่มีการแก้ไข'; };
   $$('[data-f]',ov.el).forEach(i=>i.addEventListener(i.tagName==='SELECT'||i.type==='checkbox'?'change':'input',collect));
-  $('[data-photo]',ov.el).onchange=async ev=>{ const f=ev.target.files[0]; if(!f) return; photo=await resizeImage(f,800); $('#phn',ov.el).textContent='เลือกรูปใหม่แล้ว (รออนุมัติ)'; collect(); };
+  if($('[data-photo]',ov.el)) $('[data-photo]',ov.el).onchange=async ev=>{ const f=ev.target.files[0]; if(!f) return; photo=await resizeImage(f,800); $('#phn',ov.el).textContent='เลือกรูปใหม่แล้ว (รออนุมัติ)'; collect(); };
   $('[data-x]',ov.el).onclick=ov.close; $('[data-x2]',ov.el).onclick=ov.close;
   $('[data-go]',ov.el).onclick=async ev=>{ collect(); if(!Object.keys(F).length&&!photo) return toast('ยังไม่มีการแก้ไข',true);
     if(F.national_id&&!/^\d{13}$/.test(F.national_id)) return toast('เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก',true);
     busy(ev.target,true,'กำลังส่ง...');
     try{ if(photo){ const path=`req/${e.id}-${Date.now()}.jpg`; const {error}=await sb.storage.from(PHOTO_BUCKET).upload(path,photo,{contentType:'image/jpeg'}); if(error) throw error; F.photo_path=path; }
-      const {error}=await sb.rpc('submit_profile_change',{p_changes:F}); if(error) throw error;
-      ov.close(); toast('ส่งคำขอแล้ว รอผู้บริหารอนุมัติ'); done(); }
+      const {data:pid,error}=await sb.rpc('submit_profile_change',{p_changes:F}); if(error) throw error;
+      const nDir=Object.keys(F).filter(k=>seMode(k)==='direct').length, nAp=Object.keys(F).length-nDir;
+      ov.close(); toast(nAp&&nDir?`บันทึกทันที ${nDir} ช่อง · ส่งคำขออนุมัติ ${nAp} ช่อง`:nAp?'ส่งคำขอแล้ว รอผู้อนุมัติตรวจ':'บันทึกแล้ว'); done(); }
     catch(err){ busy(ev.target,false); toast(errText(err),true); } };
 }
 
@@ -192,4 +200,20 @@ function iosInstallHint(){
     <div class="sm">1. แตะปุ่ม <b>แชร์</b> <span class="a2hs-ic">⬆︎</span> ที่แถบของ Safari</div><div class="sm">2. เลือก <b>"เพิ่มลงหน้าจอโฮม"</b></div><div class="sm">3. แตะ <b>"เพิ่ม"</b> แล้วเปิดจากไอคอนบนหน้าจอโฮม</div>`;
   document.body.appendChild(el);
   $('[data-x]',el).onclick=()=>{ el.remove(); try{ localStorage.setItem('kty-a2hs','1'); }catch(_){} };
+}
+
+/* ---------- ตั้งค่าระบบ > สิทธิ์แก้ข้อมูลส่วนตัว (รายช่อง) ---------- */
+function stSelfEdit(host){
+  const M=JSON.parse(JSON.stringify(S.settings.self_edit||{}));
+  const groups=[...SELF_GROUPS.slice(0,6).map(([g,fs])=>[g.replace(' (แก้ไขผ่านแอดมิน)',''),fs.filter(f=>!(f[2]||'').startsWith('ro')||SE_BANK.includes(f[0]))]),['รูปถ่าย',[['photo_path','รูปถ่ายพนักงาน']]]];
+  const mode=k=>M[k]||(SE_BANK.includes(k)?'deny':'approve');
+  const draw=()=>{ host.innerHTML=`<div class="col" style="gap:12px"><div class="note n-info">${IC.info}<span>กำหนดว่าพนักงานแก้ข้อมูลของตัวเองช่องไหนได้ · <b>ต้องอนุมัติ</b> = ส่งคำขอให้ผู้อนุมัติ · <b>แก้ได้ทันที</b> = เปลี่ยนเลย (บันทึกประวัติ) · <b>ห้ามแก้</b> = แจ้งแอดมิน · ตำแหน่ง ค่าจ้าง สถานะ แก้ไม่ได้เสมอ</span></div>
+    ${groups.map(([g,fs])=>`<div class="card col" style="gap:2px"><div class="row" style="gap:8px"><b class="grow">${g}</b><div class="seg" style="width:auto;padding:2px">${[['approve','อนุมัติทั้งหมด'],['direct','ทันทีทั้งหมด'],['deny','ห้ามทั้งหมด']].map(([m,t])=>`<button style="min-height:30px;font-size:12px" data-gall="${g}|${m}">${t}</button>`).join('')}</div></div>
+      ${fs.map(f=>`<div class="li" style="gap:8px;padding:6px 0"><span class="grow sm">${esc(f[1])}</span><div class="seg" style="width:auto;padding:2px">${[['approve','ต้องอนุมัติ'],['direct','แก้ได้ทันที'],['deny','ห้ามแก้']].map(([m,t])=>`<button class="${mode(f[0])===m?'on':''}" style="min-height:30px;font-size:12px" data-sm="${f[0]}|${m}">${t}</button>`).join('')}</div></div>`).join('')}</div>`).join('')}
+    <button class="btn btn-p" data-save style="align-self:flex-start">บันทึกสิทธิ์แก้ข้อมูล</button></div>`;
+    $$('[data-sm]',host).forEach(b=>b.onclick=()=>{ const [k,m]=b.dataset.sm.split('|'); M[k]=m; draw(); });
+    $$('[data-gall]',host).forEach(b=>b.onclick=()=>{ const [g,m]=b.dataset.gall.split('|'); (groups.find(x=>x[0]===g)||[,[]])[1].forEach(f=>M[f[0]]=m); draw(); });
+    $('[data-save]',host).onclick=async ev=>{ busy(ev.target,true); try{ await saveSetting('self_edit',M); S.settings.self_edit=M; busy(ev.target,false); toast('บันทึกแล้ว มีผลกับคำขอแก้ไขครั้งถัดไป'); }catch(e){ busy(ev.target,false); toast(/row-level|ไม่มีสิทธิ์/.test(e.message)?'ต้องรันไฟล์ 24_idphoto_selfedit.sql และต้องเป็นแอดมิน':e.message,true); } };
+  };
+  draw();
 }
