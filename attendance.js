@@ -6,8 +6,9 @@ async function pageEmployees(){
   setPage(head('พนักงาน','<span id="cnt">กำลังโหลด</span>',{dActions:`${isAdmin()?'<button class="btn" data-order>จัดลำดับ / รหัส</button>':''}<button class="btn btn-p" data-add>${IC.plus}เพิ่มพนักงาน</button>`, mActions:isAdmin()?'<button class="btn btn-sm btn-acc" data-order>จัดลำดับ</button>':''}) +
     `<div class="row" style="gap:10px"><label class="grow" style="position:relative;display:block"><span style="position:absolute;left:14px;top:13px;color:var(--ink2)">${IC.search}</span><input class="in" id="q" placeholder="ค้นหาชื่อ ชื่อเล่น รหัส หรือเลขบัตร" style="padding-left:46px" value="${esc(listFilter.q)}" aria-label="ค้นหา"></label>
       <select class="in" id="st" style="width:auto;flex:none" aria-label="สถานะ"><option value="active">ทำงานอยู่</option><option value="resigned">ลาออกแล้ว</option><option value="">ทั้งหมด</option></select></div>
-    <div class="chips scroll" id="pc"></div><div id="el"><div class="loading"><div class="spin"></div></div></div>` +
+    <div class="chips scroll" id="pc"></div><div id="rqn"></div><div id="el"><div class="loading"><div class="spin"></div></div></div>` +
     `<button class="fab" data-add>${IC.plus}เพิ่มพนักงาน</button>`);
+  sb.from('emp_change_requests').select('id',{count:'exact',head:true}).eq('status','pending').then(({count})=>{ const h=$('#rqn'); if(h&&count) h.innerHTML=`<a class="note n-warn" href="#reqs" style="text-decoration:none">${IC.info}<span><b>มีคำขอแก้ไขข้อมูลส่วนตัวรออนุมัติ ${count} รายการ</b> (เช่น เปลี่ยนรูปโปรไฟล์) — แตะเพื่อตรวจและอนุมัติ</span></a>`; });
   $('#st').value=listFilter.st;
   $$('[data-add]').forEach(b=>b.onclick=()=>openWizard(null));
   $$('[data-order]').forEach(b=>b.onclick=staffOrderSheet);
@@ -42,6 +43,7 @@ function drawList(){
 let profTab='personal';
 async function pageProfile(id, readonly=false, preload=null){
   if(!readonly) setPage(head('ข้อมูลพนักงาน','',{back:'#employees', mActions:`<button class="btn btn-sm btn-acc" data-edit>แก้ไข</button>`, dActions:`<button class="btn btn-p" data-edit>แก้ไขข้อมูล</button>`}) + `<div id="pb"><div class="loading"><div class="spin"></div></div></div>`);
+  if(!readonly&&isManager()) sb.from('emp_change_requests').select('id',{count:'exact',head:true}).eq('status','pending').eq('employee_id',id).then(({count})=>{ const pb=$('#pb'); if(pb&&count) pb.insertAdjacentHTML('beforebegin',`<a class="note n-warn" href="#reqs" style="text-decoration:none;margin-bottom:10px">${IC.info}<span><b>พนักงานคนนี้มีคำขอแก้ไขข้อมูลรออนุมัติ</b> — แตะเพื่อดูค่าเดิม/ค่าใหม่ แล้วอนุมัติ</span></a>`); });
   let e=preload;
   if(!e){ const {data,error}=await sb.from('employees').select('*').eq('id',id).single(); if(error){ $('#pb').innerHTML=`<div class="card empty"><b>ไม่พบข้อมูลพนักงาน</b>${esc(errText(error))}</div>`; return; } e=data; }
   const tabs=[['personal','ส่วนตัว'],['card','บัตร'],['addr','ที่อยู่'],['contact','ติดต่อ'],['job','งาน']]; if(S.hasPhase2) tabs.push(['stars','ดาว']); if(!readonly) tabs.push(['hist','ประวัติ']);

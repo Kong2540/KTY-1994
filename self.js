@@ -126,7 +126,7 @@ async function pageReqs(){
   const list=cr.data||[], links=lr.data||[];
   const paths=list.map(r=>r.changes.photo_path).filter(Boolean); let urls={};
   if(paths.length){ const {data}=await sb.storage.from(PHOTO_BUCKET).createSignedUrls(paths,3600); (data||[]).forEach(x=>urls[x.path]=x.signedUrl); }
-  const show=(k,v)=>k==='photo_path'?(v&&urls[v]?`<img src="${urls[v]}" alt="" style="height:70px;border-radius:8px">`:'(รูปใหม่)'):(['national_id','social_security_no'].includes(k)?esc(maskId(k,v))+' <span class="xs muted">(ปิดบัง)</span>':esc(v==null||v===''?'-':typeof v==='boolean'?(v?'ใช่':'ไม่ใช่'):String(v)));
+  const show=(k,v)=>k==='photo_path'?(v&&urls[v]?`<img src="${urls[v]}" alt="" style="height:120px;max-width:120px;object-fit:cover;border-radius:10px">`:'(รูปใหม่)'):(['national_id','social_security_no'].includes(k)?esc(maskId(k,v))+' <span class="xs muted">(ปิดบัง)</span>':esc(v==null||v===''?'-':typeof v==='boolean'?(v?'ใช่':'ไม่ใช่'):String(v)));
   $('#rqb').outerHTML=`<div class="col" style="gap:12px;max-width:820px">
     ${links.length?`<h3 class="h2">คำขอผูกบัญชี (${links.length})</h3><div class="card card-l">${links.map(l=>`<div class="li"><div class="grow"><b>${esc(l.user_name||'')}</b><span class="xs muted">ขอผูกกับ ${esc(l.employees?.emp_code||'')} ${esc((l.employees?.first_name||'')+' '+(l.employees?.last_name||''))} · ${new Date(l.created_at).toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'})}</span></div><button class="btn btn-sm btn-bad" data-lno="${l.id}">ไม่อนุมัติ</button><button class="btn btn-sm btn-p" data-lok="${l.id}">อนุมัติ</button></div>`).join('')}</div>`:''}
     <h3 class="h2">คำขอแก้ไขข้อมูล (${list.length})</h3>

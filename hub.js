@@ -1,7 +1,7 @@
 /* =====================================================================
    KTY Hub — โครงหน้า: แถบเมนูด้านข้าง / ลิ้นชักเมนูบนมือถือ / ตัวเลือกไซต์
    ===================================================================== */
-const HUB_VERSION = '3.5.1';
+const HUB_VERSION = '3.5.2';
 const MOD = {
   wa:       { t:'ขออนุมัติงาน',        hue:'#0E7C86', i:'<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>' },
   att:      { t:'เช็คชื่อ',            hue:'#2E9E5B', i:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>' },
@@ -48,7 +48,7 @@ function navSections0(){
     out.push({t:'ระบบงาน', items:[
       {k:'att',m:'att',b:'att'}, {k:'roll',m:'att',t:'เช็คชื่อแบบติ๊ก',sub:1}, {k:'att/month',m:'att',t:'ตารางรายเดือน',sub:1}, {k:'att/site',m:'att',t:'คนงานหน้างาน',sub:1,b:'crew'},
       {k:'daily',m:'daily',b:'daily'}, {k:'mat',m:'materials',b:'mat'}, {k:'ret',m:'borrow',b:'brw'}, {k:'iss',m:'issues',b:'iss'},{k:'wa',m:'wa',b:'wa'},
-      {k:'employees',m:'people'},{k:'health',m:'people',t:'สิทธิ์การรักษา'}, {k:'pay',m:'payroll'} ]});
+      {k:'employees',m:'people'},{k:'reqs',m:'people',t:'คำขอแก้ไขข้อมูล',sub:1,b:'reqs'},{k:'health',m:'people',t:'สิทธิ์การรักษา'}, {k:'pay',m:'payroll'} ]});
     out.push({t:'ตั้งค่า', items:[{k:'manage/sites',m:'sites'},{k:'manage',m:'manage',b:'users'},...(isAdmin()?[{k:'studio',m:'studio'}]:[])]});
   } else {
     const it=[{k:'home',m:'home'}];
@@ -59,7 +59,7 @@ function navSections0(){
     it.push({k:'iss',m:'issues',t:'แจ้งปัญหา',b:'iss'});
     if(p.role==='foreman'||hasMod('wa')) it.push({k:'wa',m:'wa',t:'ขออนุมัติงาน',b:'wa'});
     out.push({t:'งานของฉัน', items:it});
-    if(hasMod('hr',['approver'])) out.push({t:'บุคคล', items:[{k:'reqs',m:'people',t:'คำขอแก้ไขข้อมูล'}]});
+    if(hasMod('hr',['approver'])) out.push({t:'บุคคล', items:[{k:'reqs',m:'people',t:'คำขอแก้ไขข้อมูล',b:'reqs'}]});
     out.push({t:'ของฉัน', items:[{k:'my',m:'payroll',t:'ข้อมูลของฉัน'},{k:'me/stars',m:'stars'},{k:'me',m:'me'}]});
   }
   return out;
@@ -182,8 +182,9 @@ async function collectTasks(){
         mine.forEach(w=>{ const t=waType(w.type_key)||{}; tasks.push({m:'wa',site:w.site_id,at:w.updated_at||w.created_at,t:`ลงนาม${t.signers?.[w.step]?.label||''}: ${t.name||''} ${w.element||''} ${w.element_code||''} ${w.floor||''}`.replace(/\s+/g,' '),sub:w.wa_no||'',tag:'รอลงนาม',c:'t-warn',href:'#wa/'+w.id}); });
         wl.filter(w=>w.status==='rejected'&&w.requester===S.profile.id).forEach(w=>tasks.push({m:'wa',site:w.site_id,at:w.updated_at||w.created_at,t:`ไม่ผ่าน: ${(waType(w.type_key)||{}).name||''} ${w.element_code||''}`,sub:'แก้ไขแล้วกด "ขอตรวจใหม่"',tag:'ไม่ผ่าน',c:'t-bad',href:'#wa/'+w.id}));
         S.badges.wa=mine.length; } } }catch(_){}
-  if(!mgr&&hasMod('hr',['approver'])){ try{ const {data:pr}=await sb.rpc('pending_profile_requests'); if((pr||[]).length) tasks.push({m:'people',t:`คำขอแก้ไขข้อมูลพนักงาน ${pr.length} รายการ`,sub:'ตรวจค่าเดิม → ค่าใหม่ แล้วอนุมัติ',tag:'รออนุมัติ',c:'t-warn',href:'#reqs'}); }catch(_){} }
+  if(!mgr&&hasMod('hr',['approver'])){ try{ const {data:pr}=await sb.rpc('pending_profile_requests'); S.badges.reqs=(pr||[]).length; if((pr||[]).length) tasks.push({m:'people',t:`คำขอแก้ไขข้อมูลพนักงาน ${pr.length} รายการ`,sub:'ตรวจค่าเดิม → ค่าใหม่ แล้วอนุมัติ',tag:'รออนุมัติ',c:'t-warn',href:'#reqs'}); }catch(_){} }
   if(mgr){ try{ const [c1,c2]=await Promise.all([sb.from('emp_change_requests').select('id',{count:'exact',head:true}).eq('status','pending'), isAdmin()?sb.from('link_requests').select('id',{count:'exact',head:true}).eq('status','pending'):Promise.resolve({count:0})]);
+    S.badges.reqs=(c1.count||0)+(c2.count||0);
     if(c1.count) tasks.push({m:'people',t:`คำขอแก้ไขข้อมูลพนักงาน ${c1.count} รายการ`,sub:'ตรวจค่าเดิม → ค่าใหม่ แล้วอนุมัติ',tag:'รออนุมัติ',c:'t-warn',href:'#reqs'});
     if(c2.count) tasks.push({m:'people',t:`คำขอผูกบัญชีกับพนักงาน ${c2.count} รายการ`,sub:'จากการสแกน QR บนสลิป',tag:'รออนุมัติ',c:'t-warn',href:'#reqs'}); }catch(_){} }
   if(mgr){ try{ const {data:eo}=await sb.from('emp_orders').select('id,total,requested_name').eq('status','pending'); (eo||[]).forEach(o=>tasks.push({m:'payroll',t:`อนุมัติคำสั่งซื้อสินค้าบริษัท ${baht(o.total)}`,sub:o.requested_name||'',tag:'รออนุมัติ',c:'t-warn',href:'#pay'})); }catch(_){} }
