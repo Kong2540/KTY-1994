@@ -456,6 +456,7 @@ details.perm>summary::-webkit-details-marker{display:none}
 /* ================= รายงานการมาทำงาน ================= */
 .arwrap{display:grid;gap:14px}@media (min-width:980px){.arwrap{grid-template-columns:360px minmax(0,1fr);align-items:start}.arctl{position:sticky;top:0;max-height:calc(100vh - 170px);overflow:auto;padding-right:4px}}
 .arprev{display:flex;flex-direction:column;align-items:center;gap:14px;background:var(--surface2);border-radius:14px;padding:14px;min-height:300px}
+.pv-busy .arimg{opacity:.55;transition:opacity .2s}
 .arimg{width:100%;max-width:1000px;box-shadow:0 4px 18px rgba(0,0,0,.2);background:#fff;border-radius:2px}
 .archips{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:8px}.archk{display:flex;align-items:center;gap:6px;font-size:13px;min-height:30px}.archk input{width:17px;height:17px;accent-color:var(--accent)}
 

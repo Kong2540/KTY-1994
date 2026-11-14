@@ -18,10 +18,16 @@ async function pdfReady(){
   try{ await PDF_READY; }catch(e){ PDF_READY=null; throw e; }
   return PDF_READY;
 }
-async function logoData(){
-  if(LOGO_DATA!==undefined) return LOGO_DATA;
-  const u=BR().logo; LOGO_DATA=null;
-  if(u){ try{ const r=await fetch(u); const bl=await r.blob(); LOGO_DATA=await new Promise(res=>{ const f=new FileReader(); f.onload=()=>res(f.result); f.readAsDataURL(bl); }); }catch(_){} }
+let LOGO_SVG=null, LOGO_URL;
+async function logoData(){ // โลโก้บริษัทที่ใช้ในหัวกระดาษ — โหลดใหม่ทุกครั้งที่แอดมินเปลี่ยนโลโก้ (SVG/WebP แปลงให้ pdfmake ใช้ได้)
+  const u=BR().logo||'';
+  if(LOGO_URL===u&&LOGO_DATA!==undefined) return LOGO_DATA;
+  LOGO_URL=u; LOGO_DATA=null; LOGO_SVG=null;
+  if(u){ try{ const r=await fetch(u,{cache:'no-cache'}); if(!r.ok) throw 0; const bl=await r.blob();
+      if(/svg/i.test(bl.type)||/\.svg(\?|$)/i.test(u)){ LOGO_SVG=await bl.text(); return LOGO_DATA; }
+      const url=URL.createObjectURL(bl); try{ const im=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=url; });
+        const k=Math.min(1,600/Math.max(im.naturalWidth,im.naturalHeight)), c=document.createElement('canvas'); c.width=Math.round(im.naturalWidth*k)||1; c.height=Math.round(im.naturalHeight*k)||1;
+        c.getContext('2d').drawImage(im,0,0,c.width,c.height); LOGO_DATA=c.toDataURL('image/png'); } finally{ URL.revokeObjectURL(url); } }catch(_){ LOGO_DATA=null; LOGO_SVG=null; } }
   return LOGO_DATA;
 }
 const pdfBlob = dd => new Promise(res=>pdfMake.createPdf(dd).getBlob(res));
@@ -35,7 +41,7 @@ async function pdfToPngs(blob, scale=3){ // ภาพ PNG ความละเ�
 }
 const markBox = (size) => ({ table:{widths:[size],heights:[size],body:[[{text:BR().mark,bold:true,color:'#F2B705',fontSize:size*.3,alignment:'center',margin:[0,size*.3,0,0]}]]}, layout:{fillColor:()=>C_DARK,hLineWidth:()=>0,vLineWidth:()=>0,paddingLeft:()=>0,paddingRight:()=>0,paddingTop:()=>0,paddingBottom:()=>0} });
 const KTY_MARK_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 452.2 493.2"><polygon points="18.0,127.8 224.9,18.0 434.2,125.1 228.2,266.9" fill="#3A5866"/><polygon points="18.0,127.8 228.2,266.9 228.8,475.2 49.2,333.8" fill="#22394A"/><polygon points="228.2,266.9 434.2,125.1 404.6,330.9 228.8,475.2" fill="#162830"/><polygon points="158.9,93.3 206.9,93.3 206.9,139.0 251.7,93.3 306.1,93.3 245.3,148.7 309.3,213.7 254.9,213.7 206.9,165.5 206.9,213.7 158.9,213.7" fill="#9C7400"/><polygon points="158.9,91.1 206.9,91.1 206.9,136.8 251.7,91.1 306.1,91.1 245.3,146.5 309.3,211.5 254.9,211.5 206.9,163.3 206.9,211.5 158.9,211.5" fill="#9C7400"/><polygon points="158.9,88.9 206.9,88.9 206.9,134.6 251.7,88.9 306.1,88.9 245.3,144.3 309.3,209.3 254.9,209.3 206.9,161.1 206.9,209.3 158.9,209.3" fill="#9C7400"/><polygon points="158.9,86.7 206.9,86.7 206.9,132.4 251.7,86.7 306.1,86.7 245.3,142.1 309.3,207.1 254.9,207.1 206.9,158.9 206.9,207.1 158.9,207.1" fill="#9C7400"/><polygon points="158.9,84.5 206.9,84.5 206.9,130.2 251.7,84.5 306.1,84.5 245.3,139.9 309.3,204.9 254.9,204.9 206.9,156.7 206.9,204.9 158.9,204.9" fill="#9C7400"/><polygon points="158.9,82.3 206.9,82.3 206.9,128.0 251.7,82.3 306.1,82.3 245.3,137.7 309.3,202.7 254.9,202.7 206.9,154.5 206.9,202.7 158.9,202.7" fill="#F2B705"/><polygon points="68.2,187.1 201.4,275.2 207.6,316.0 161.8,285.7 175.4,375.4 133.8,347.9 120.2,258.1 74.4,227.9" fill="#9C7400"/><polygon points="66.7,188.1 199.9,276.2 206.1,317.0 160.3,286.7 173.9,376.4 132.3,348.9 118.7,259.1 72.9,228.9" fill="#9C7400"/><polygon points="65.2,189.1 198.4,277.2 204.6,318.0 158.8,287.7 172.4,377.4 130.8,349.9 117.2,260.1 71.4,229.9" fill="#9C7400"/><polygon points="63.7,190.1 196.9,278.2 203.1,319.0 157.3,288.7 170.9,378.4 129.3,350.9 115.7,261.1 69.9,230.9" fill="#9C7400"/><polygon points="62.2,191.1 195.4,279.2 201.6,320.0 155.8,289.7 169.4,379.4 127.8,351.9 114.2,262.1 68.4,231.9" fill="#F2B705"/><polygon points="257.3,277.0 302.2,246.1 325.4,272.8 348.4,214.3 393.3,183.4 345.9,290.4 346.1,348.1 305.3,376.2 305.1,318.5" fill="#9C7400"/><polygon points="258.8,278.0 303.7,247.1 326.9,273.8 349.9,215.3 394.8,184.4 347.4,291.4 347.6,349.1 306.8,377.2 306.6,319.5" fill="#9C7400"/><polygon points="260.3,279.0 305.2,248.1 328.4,274.8 351.4,216.3 396.3,185.4 348.9,292.4 349.1,350.1 308.3,378.2 308.1,320.5" fill="#9C7400"/><polygon points="261.8,280.0 306.7,249.1 329.9,275.8 352.9,217.3 397.8,186.4 350.4,293.4 350.6,351.1 309.8,379.2 309.6,321.5" fill="#9C7400"/><polygon points="263.3,281.0 308.2,250.1 331.4,276.8 354.4,218.3 399.3,187.4 351.9,294.4 352.1,352.1 311.3,380.2 311.1,322.5" fill="#F2B705"/><path d="M18,127.84 L224.88,18 L434.2,125.14 L404.6,330.94 L228.8,475.24 L49.2,333.84 Z M228.2,266.94 L18,127.84 M228.2,266.94 L434.2,125.14 M228.2,266.94 L228.8,475.24" fill="none" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="3" stroke-linejoin="round"/></svg>';
-const logoNode = (size) => LOGO_DATA?{image:LOGO_DATA,fit:[size,size]}:{svg:KTY_MARK_SVG,width:size*0.92,height:size};
+const logoNode = (size) => LOGO_SVG?{svg:LOGO_SVG,fit:[size,size]}:LOGO_DATA?{image:LOGO_DATA,fit:[size,size]}:{svg:KTY_MARK_SVG,width:size*0.92,height:size};
 const periodText = p => `งวดวันที่ ${periodLabel(p)}`;
 const ruleLine = (w) => ({ canvas:[{type:'line',x1:0,y1:0,x2:w,y2:0,lineWidth:1.6,lineColor:C_DARK},{type:'line',x1:0,y1:2.6,x2:w,y2:2.6,lineWidth:.7,lineColor:C_GOLD}], margin:[0,4,0,8] });
 const num = v => fmtN(v);
@@ -74,13 +80,13 @@ async function slipsDoc(p, slips, qrOf){
   const B=BR(), W=595.28/2, H=841.89/4, pad=14, iw=W-pad*2, content=[];
   slips.forEach((s,i)=>{ const d=s.data, col=i%2, row=Math.floor(i/2)%4, x=col*W+pad, y=row*H+pad-2;
     if(i&&i%8===0) content.push({text:'',pageBreak:'before'});
-    const kv=(a,v)=>({columns:[{text:a,color:C_LAB},{text:v,alignment:'right',bold:true}],fontSize:8.6,margin:[0,0,0,1.2]});
     const node={ stack:[
       {columns:[{...logoNode(22),width:24},{stack:[{text:B.company_short,bold:true,fontSize:8.5,color:C_DARK},{text:`สลิปเงินเดือน · ${periodText(p)}`,fontSize:7,color:C_LAB}],margin:[3,1,0,0]},{qr:qrOf(s),fit:40,width:40}]},
       {canvas:[{type:'line',x1:0,y1:0,x2:iw,y2:0,lineWidth:1,lineColor:C_DARK}],margin:[0,2,0,3]},
       {text:d.name,bold:true,fontSize:11},{text:`${d.emp_code||''}${d.position?' · '+d.position:''}`,fontSize:7.5,color:C_LAB,margin:[0,0,0,3]},
-      kv('อัตราค่าแรง',d.wage_type==='monthly'?`${num(d.rate)} /เดือน`:`${num(d.rate)} /วัน`), kv('วันทำงาน · OT',`${num(d.days)} วัน · ${num(d.ot_hours)} ชม.`),
-      kv('รวมก่อนหัก',num(d.gross)), kv('หักประกันสังคม',`−${num(d.sso)}`), kv('หักอื่น ๆ',`−${num(otherDed(d))}`),
+      {table:{widths:['*','auto'],body:[['อัตราค่าแรง',d.wage_type==='monthly'?`${num(d.rate)} /เดือน`:`${num(d.rate)} /วัน`],['วันทำงาน · OT',`${num(d.days)} วัน · ${num(d.ot_hours)} ชม.`],
+          ['รวมก่อนหัก',num(d.gross)],['หักประกันสังคม',`−${num(d.sso)}`],['หักอื่น ๆ',`−${num(otherDed(d))}`]].map(([a,v])=>[{text:a,color:C_LAB},{text:v,alignment:'right',bold:true}])},
+        layout:{hLineWidth:i=>i===0?0:.6,vLineWidth:()=>0,hLineColor:()=>'#CBD3D1',hLineStyle:()=>({dash:{length:1,space:1.4}}),paddingLeft:()=>0,paddingRight:()=>0,paddingTop:()=>1.1,paddingBottom:()=>1.1},fontSize:8.6,margin:[0,0,0,1]},
       {table:{widths:['*','auto'],body:[[{text:'รับสุทธิ',color:C_LAB,fontSize:9,margin:[4,3,0,0]},{text:num(d.net),bold:true,fontSize:14,color:C_DARK,margin:[0,0,4,0]}]]},layout:{fillColor:()=>C_BAND,hLineWidth:()=>0,vLineWidth:()=>0},margin:[0,2,0,3]},
       {columns:[{text:advText('slip_note'),fontSize:6.3,color:'#8A979C'},{text:'สแกน QR ดูรายละเอียด',fontSize:6.3,color:'#8A979C',alignment:'right',width:'auto'}]}
     ] };
@@ -195,23 +201,36 @@ async function crewSlipDoc(rep, site, docNo){
     signRow([rep.submitted_name||S.profile.display_name,`ผู้รายงาน · ส่งในระบบ ${t.toTimeString().slice(0,5)} น.`],['','ผู้ตรวจสอบ'])];
   return a5(`ใบสรุปคนงาน ${docNo}`, content, footNote(`สร้างโดย ${B.app}`,'ข้อมูล ณ เวลาที่ส่ง'));
 }
-/* หน้าดูตัวอย่าง + แชร์รูป (PNG คมชัดจาก PDF เวกเตอร์) + PDF */
+/* หน้าดูตัวอย่าง = ภาพจาก PDF ตัวจริง (ตรงกับไฟล์ที่ส่งออกทุกจุด) + บันทึกรูป/แชร์/PDF ครบทุกหน้า */
+const b64Blob = async b64 => (await fetch('data:image/png;base64,'+b64)).blob();
+const pngName = (name,i,n) => n>1?`${name}_หน้า${i+1}.png`:`${name}.png`;
+async function savePngs(pngs, name){ for(let i=0;i<pngs.length;i++) await saveOrShare(await b64Blob(pngs[i]), pngName(name,i,pngs.length)); }
 async function vectorPreview(dd, name, title, extraHTML='', onReady){
   const prog=overlay(`<div class="modal" role="dialog" aria-modal="true"><div class="row" style="gap:10px"><span class="spin" style="margin:0"></span><b>กำลังสร้างเอกสาร</b></div></div>`,true,false);
   try{
-    const blob=await pdfBlob(dd), png64=(await pdfToPngs(blob,3))[0], pngBlob=await (await fetch('data:image/png;base64,'+png64)).blob(), url=URL.createObjectURL(pngBlob), purl=URL.createObjectURL(blob);
+    const blob=await pdfBlob(dd), pngs=await pdfToPngs(blob,3), png64=pngs[0], blobs=await Promise.all(pngs.map(b64Blob)), urls=blobs.map(b=>URL.createObjectURL(b)), pngBlob=blobs[0], url=urls[0], purl=URL.createObjectURL(blob);
     prog.close();
-    const m=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>${esc(title)}<small>${esc(name)}</small></h1></header>
-      <div class="sheet-body"><img src="${url}" alt="${esc(title)}" style="width:100%;max-width:520px;border-radius:10px;box-shadow:var(--shadow);align-self:center">${extraHTML}</div>
-      <div class="sheet-foot" style="flex-wrap:wrap"><button class="btn" data-save>บันทึกรูป</button><button class="btn" data-pdf>PDF</button><button class="btn btn-p" data-share style="background:#06C755;border-color:#06C755;color:#fff">แชร์รูปเข้า LINE</button></div></div>`, false, false);
-    $('[data-x]',m.el).onclick=()=>{ URL.revokeObjectURL(url); URL.revokeObjectURL(purl); m.close(); };
-    $('[data-save]',m.el).onclick=()=>saveOrShare(pngBlob,name+'.png');
+    const m=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>${esc(title)}<small>${esc(name)}${urls.length>1?` · ${urls.length} หน้า`:''}</small></h1></header>
+      <div class="sheet-body">${urls.map((u,i)=>`<img src="${u}" alt="${esc(title)} หน้า ${i+1}" style="width:100%;max-width:520px;border-radius:10px;box-shadow:var(--shadow);align-self:center">`).join('')}${extraHTML}</div>
+      <div class="sheet-foot" style="flex-wrap:wrap"><button class="btn" data-save>บันทึกรูป${urls.length>1?` (${urls.length})`:''}</button><button class="btn" data-pdf>PDF</button><button class="btn btn-p" data-share style="background:#06C755;border-color:#06C755;color:#fff">แชร์รูปเข้า LINE</button></div></div>`, false, false);
+    $('[data-x]',m.el).onclick=()=>{ urls.forEach(u=>URL.revokeObjectURL(u)); URL.revokeObjectURL(purl); m.close(); };
+    $('[data-save]',m.el).onclick=()=>savePngs(pngs,name);
     $('[data-pdf]',m.el).onclick=async()=>{ const f=new File([blob],name+'.pdf',{type:'application/pdf'}); try{ if(navigator.canShare&&navigator.canShare({files:[f]})) await navigator.share({files:[f],title}); else dl(purl,name+'.pdf'); }catch(e){ if(e.name!=='AbortError') dl(purl,name+'.pdf'); } };
-    $('[data-share]',m.el).onclick=async()=>{ const f=new File([pngBlob],name+'.png',{type:'image/png'}); try{ if(navigator.canShare&&navigator.canShare({files:[f]})) await navigator.share({files:[f],title}); else { dl(url,name+'.png'); toast('อุปกรณ์นี้แชร์ไฟล์ไม่ได้ บันทึกรูปให้แล้ว'); } }catch(e){ if(e.name!=='AbortError') toast(errText(e),true); } };
-    onReady&&onReady({m,blob,png64});
+    $('[data-share]',m.el).onclick=async()=>{ const fs=blobs.map((b,i)=>new File([b],pngName(name,i,blobs.length),{type:'image/png'})); try{ if(navigator.canShare&&navigator.canShare({files:fs})) await navigator.share({files:fs,title}); else { urls.forEach((u,i)=>dl(u,pngName(name,i,urls.length))); toast('อุปกรณ์นี้แชร์ไฟล์ไม่ได้ บันทึกรูปให้แล้ว'); } }catch(e){ if(e.name!=='AbortError') toast(errText(e),true); } };
+    onReady&&onReady({m,blob,png64,pngs});
   }catch(e){ prog.close(); toast(errText(e),true); }
 }
-
+/* ตัวอย่างสด: สร้าง PDF จริงแล้วแสดงเป็นภาพทุกหน้า — ปรับค่าแล้ววาดใหม่ (หน่วงเล็กน้อย) */
+function livePdf(host, build, onDone){
+  let timer=null, running=false, again=false; const st={blob:null,pages:0};
+  async function run(){ if(running){ again=true; return; } running=true; host.classList.add('pv-busy');
+    try{ const dd=await build(); const blob=await pdfBlob(dd); const pngs=await pdfToPngs(blob,1.6);
+      host.innerHTML=pngs.map((b,i)=>`<img src="data:image/png;base64,${b}" alt="ตัวอย่างหน้า ${i+1}" class="arimg">`).join(''); st.blob=blob; st.pages=pngs.length; onDone&&onDone(st); }
+    catch(e){ host.innerHTML=`<div class="note n-bad">${esc(errText(e))}</div>`; st.blob=null; }
+    host.classList.remove('pv-busy'); running=false; if(again){ again=false; run(); } }
+  st.render=(now)=>{ clearTimeout(timer); if(now) run(); else timer=setTimeout(run,450); };
+  return st;
+}
 /* ---------- ใบสรุปคนงานประจำวัน (A4 แนวตั้ง จัดกลุ่มตามหน้างาน) ---------- */
 async function dailySummaryDoc(date, rows){
   await pdfReady(); await logoData();

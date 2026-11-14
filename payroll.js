@@ -188,11 +188,12 @@ async function paySummaryPreview(p, slips){
         <label class="row sm" style="gap:6px"><input type="checkbox" data-sign ${cfg.sign?'checked':''}>ช่องลงชื่อรับเงิน</label></div>
       <details><summary class="sm" style="cursor:pointer"><b>ความกว้างคอลัมน์ (มม. · ว่าง = อัตโนมัติ)</b></summary><div class="row" style="gap:8px;flex-wrap:wrap;margin-top:8px">${['#',...cols,...(cfg.sign?['_sign']:[])].map(k=>`<label class="field" style="width:118px"><span class="xs muted">${k==='#'?'ลำดับ':k==='_sign'?'ลงชื่อรับเงิน':PCOLS[k].t}</span><input class="in num" type="number" min="5" max="120" data-w="${k}" value="${k==='_sign'?cfg.sign_w:(cfg.widths[k]??'')}" placeholder="อัตโนมัติ" style="height:36px"></label>`).join('')}</div></details>
       ${admin?'<div class="row" style="gap:8px"><button class="btn btn-sm" data-def>คืนค่าเริ่มต้น</button><button class="btn btn-sm" data-savecfg>บันทึกหน้ากระดาษกับชุดฟอร์มนี้</button></div>':''}</div>
-      <div class="pg-wrap" id="pgw"></div></div>
-    <div class="sheet-foot" style="flex-wrap:wrap"><span class="sm muted grow" id="pgn"></span><button class="btn btn-p" data-pdf>ดาวน์โหลด PDF ใบสรุป</button></div></div>`,false,false);
-  const W=$('#pgw',ov.el);
-  const render=()=>{ renderSummary(W,p,slips,cfg,cols); $('#pgn',ov.el).textContent=`${$$('.a4',W).length} หน้า · ${slips.length} คน`; };
-  render();
+      <div class="note n-info">${IC.info}<span>ภาพตัวอย่างนี้สร้างจากไฟล์ PDF ตัวจริง — ไฟล์ PDF และรูปที่ส่งออกจะออกมาเหมือนที่เห็นทุกจุด</span></div>
+      <div class="pg-wrap" id="pgw"><div class="loading"><div class="spin"></div></div></div></div>
+    <div class="sheet-foot" style="flex-wrap:wrap"><span class="sm muted grow" id="pgn">กำลังสร้างตัวอย่าง...</span><button class="btn" data-png disabled>บันทึกรูป PNG</button><button class="btn btn-p" data-pdf disabled>ดาวน์โหลด PDF ใบสรุป</button></div></div>`,false,false);
+  const W=$('#pgw',ov.el), fn=`ใบสรุปเงินเดือน_${p.start_date}_${p.end_date}`;
+  const lp=livePdf(W,()=>summaryDoc(p,slips,cfg,cols),st=>{ $('#pgn',ov.el).textContent=`${st.pages} หน้า · ${slips.length} คน`; $('[data-png]',ov.el).disabled=$('[data-pdf]',ov.el).disabled=false; });
+  const render=()=>lp.render(); lp.render(true);
   $('[data-x]',ov.el).onclick=ov.close;
   $$('[data-m]',ov.el).forEach(i=>i.oninput=()=>{ cfg.margin[i.dataset.m]=Math.max(0,Math.min(40,+i.value||0)); render(); });
   $('[data-font]',ov.el).oninput=e=>{ cfg.font=+e.target.value; $('[data-fv]',ov.el).textContent=cfg.font; render(); };
@@ -200,7 +201,8 @@ async function paySummaryPreview(p, slips){
   $$('[data-w]',ov.el).forEach(i=>i.oninput=()=>{ const k=i.dataset.w, v=i.value===''?null:Math.max(5,Math.min(120,+i.value)); if(k==='_sign') cfg.sign_w=v||34; else if(v) cfg.widths[k]=v; else delete cfg.widths[k]; render(); });
   const df=$('[data-def]',ov.el); if(df) df.onclick=()=>{ ov.close(); S.settings.payroll_print_tmp=null; const keep=S.settings.payroll_print; S.settings.payroll_print=null; paySummaryPreview(p,slips); S.settings.payroll_print=keep; };
   const sc=$('[data-savecfg]',ov.el); if(sc) sc.onclick=async ev=>{ busy(ev.target,true); try{ const sets=JSON.parse(JSON.stringify(paySets())); const id=activeSetId(); sets[id].print=JSON.parse(JSON.stringify(cfg)); await saveSetting('payroll_columns',{...(S.settings.payroll_columns||{}),sets,active:id}); busy(ev.target,false); toast(`บันทึกหน้ากระดาษไว้กับชุด "${sets[id].name}" แล้ว`); }catch(e){ busy(ev.target,false); toast(e.message,true); } };
-  $('[data-pdf]',ov.el).onclick=async ev=>{ busy(ev.target,true,'กำลังสร้าง PDF...'); try{ const dd=await summaryDoc(p,slips,cfg,cols); await saveOrShare(await pdfBlob(dd), `ใบสรุปเงินเดือน_${p.start_date}_${p.end_date}.pdf`); busy(ev.target,false); toast('ดาวน์โหลด PDF (เวกเตอร์) แล้ว'); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
+  $('[data-pdf]',ov.el).onclick=async ev=>{ if(!lp.blob) return; busy(ev.target,true,'กำลังบันทึก...'); try{ await saveOrShare(lp.blob, fn+'.pdf'); busy(ev.target,false); toast('ดาวน์โหลด PDF (เวกเตอร์) แล้ว'); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
+  $('[data-png]',ov.el).onclick=async ev=>{ if(!lp.blob) return; busy(ev.target,true,'กำลังสร้างรูป...'); try{ await savePngs(await pdfToPngs(lp.blob,3),fn); }catch(e){ toast(errText(e),true); } busy(ev.target,false); };
 }
 function renderSummary(W,p,slips,cfg,cols){
     const m=cfg.margin, colsAll=['#',...cols,...(cfg.sign?['_sign']:[])];
@@ -223,25 +225,16 @@ function renderSummary(W,p,slips,cfg,cols){
 
 /* สลิปรายคน: 8 ใบ/A4 แนวตั้ง พร้อม QR */
 async function paySlipsPreview(p, slips){
-  try{ await loadScript(LIB.qr); }catch(e){ return toast(errText(e),true); }
-  const B=BR(), logo=B.logo, pages=[];
-  const qrSvg=t=>{ const q=qrcode(0,'M'); q.addData(t); q.make(); return q.createSvgTag({cellSize:2,margin:0,scalable:true}); };
   const base=`${location.origin}${location.pathname}#pay/s/`, qrOf=s=>s.data.__emp?.qr_token?`${location.origin}${location.pathname}#id/${s.data.__emp.qr_token}`:base+s.id;
-  for(let i=0;i<slips.length;i+=8){ const chunk=slips.slice(i,i+8);
-    pages.push(`<div class="a4 a4slips">${chunk.map(s=>{ const d=s.data; return `<div class="slip"><div class="sl-h">${logo?`<img src="${logo}" crossorigin="anonymous" alt="">`:`<img src="brand/kty-mark.svg" alt="" style="width:26px;height:28px">`}<div class="grow"><b>${esc(B.company_short)}</b><span>สลิปเงินเดือน · งวด ${periodLabel(p)}</span></div><div class="sl-qr">${qrSvg(qrOf(s))}</div></div>
-      <div class="sl-n"><b>${esc(d.name)}</b><span>${esc(d.emp_code||'')}${d.position?' · '+esc(d.position):''}</span></div>
-      <div class="sl-r"><span>อัตราค่าแรง</span><b>${d.wage_type==='monthly'?`${fmtN(d.rate)} /เดือน`:`${fmtN(d.rate)} /วัน`}</b></div>
-      <div class="sl-r"><span>วันทำงาน · OT</span><b>${fmtN(d.days)} วัน · ${fmtN(d.ot_hours)} ชม.</b></div>
-      <div class="sl-r"><span>รวมก่อนหัก</span><b>${fmtN(d.gross)}</b></div>
-      <div class="sl-r"><span>หักประกันสังคม</span><b>−${fmtN(d.sso)}</b></div>
-      <div class="sl-r"><span>หักอื่น ๆ</span><b>−${fmtN(otherDed(d))}</b></div>
-      <div class="sl-net"><span>รับสุทธิ</span><b>${fmtN(d.net)}</b></div>
-      <div class="sl-f"><span>${esc(advText('slip_note'))}</span><span>สแกน QR ดูรายละเอียด</span></div></div>`; }).join('')}</div>`); }
-  const ov=overlay(`<div class="sheet sheet-wide" role="dialog" aria-modal="true" aria-label="สลิปรายคน"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>สลิปรายคน<small>${slips.length} ใบ · ${pages.length} หน้า A4 (8 ใบ/หน้า ตัดตามเส้นประ)</small></h1></header>
-    <div class="sheet-body"><div class="note n-info">${IC.info}<span>QR บนสลิปเปิดหน้าการเงินของพนักงานในแอป (ต้องเข้าสู่ระบบ · พนักงานเห็นเฉพาะของตัวเอง ผู้บริหารเห็นทุกคน)</span></div><div class="pg-wrap">${pages.join('')||'<div class="card empty"><b>ยังไม่มีสลิป</b></div>'}</div></div>
-    <div class="sheet-foot"><button class="btn btn-p" data-pdf ${slips.length?'':'disabled'}>ดาวน์โหลด PDF สลิป</button></div></div>`,false,false);
+  const npg=Math.ceil(slips.length/8), fn=`สลิปเงินเดือน_${p.start_date}_${p.end_date}`;
+  const ov=overlay(`<div class="sheet sheet-wide" role="dialog" aria-modal="true" aria-label="สลิปรายคน"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>สลิปรายคน<small>${slips.length} ใบ · ${npg} หน้า A4 (8 ใบ/หน้า ตัดตามเส้นประ)</small></h1></header>
+    <div class="sheet-body"><div class="note n-info">${IC.info}<span>QR บนสลิปเปิดหน้าการเงินของพนักงานในแอป (ต้องเข้าสู่ระบบ · พนักงานเห็นเฉพาะของตัวเอง ผู้บริหารเห็นทุกคน) · ภาพตัวอย่างสร้างจาก PDF ตัวจริง ไฟล์ที่ส่งออกจะเหมือนที่เห็น</span></div><div class="pg-wrap" id="pgw">${slips.length?'<div class="loading"><div class="spin"></div></div>':'<div class="card empty"><b>ยังไม่มีสลิป</b></div>'}</div></div>
+    <div class="sheet-foot" style="flex-wrap:wrap"><button class="btn" data-png disabled>บันทึกรูป PNG</button><button class="btn btn-p" data-pdf disabled>ดาวน์โหลด PDF สลิป</button></div></div>`,false,false);
   $('[data-x]',ov.el).onclick=ov.close;
-  $('[data-pdf]',ov.el).onclick=async ev=>{ busy(ev.target,true,'กำลังสร้าง PDF...'); try{ const dd=await slipsDoc(p,slips,qrOf); await saveOrShare(await pdfBlob(dd), `สลิปเงินเดือน_${p.start_date}_${p.end_date}.pdf`); busy(ev.target,false); toast('ดาวน์โหลด PDF (เวกเตอร์) แล้ว'); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
+  const lp=livePdf($('#pgw',ov.el),()=>slipsDoc(p,slips,qrOf),()=>{ $('[data-png]',ov.el).disabled=$('[data-pdf]',ov.el).disabled=false; });
+  if(slips.length) lp.render(true);
+  $('[data-pdf]',ov.el).onclick=async ev=>{ if(!lp.blob) return; busy(ev.target,true,'กำลังบันทึก...'); try{ await saveOrShare(lp.blob, fn+'.pdf'); busy(ev.target,false); toast('ดาวน์โหลด PDF (เวกเตอร์) แล้ว'); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
+  $('[data-png]',ov.el).onclick=async ev=>{ if(!lp.blob) return; busy(ev.target,true,'กำลังสร้างรูป...'); try{ await savePngs(await pdfToPngs(lp.blob,3),fn); }catch(e){ toast(errText(e),true); } busy(ev.target,false); };
 }
 async function paySheetExport(p, slips, btn){
   if(!hasBridge()) return toast('ต้องติดตั้ง Bridge ก่อน',true);
