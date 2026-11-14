@@ -74,11 +74,20 @@ async function pagePay(a,b){
 }
 
 /* ---------------- งวดเงินเดือน ---------------- */
+let PAY_PT='all';
 async function payPeriod(periods){
   const C=$('#pyc'), p=periods.find(x=>x.id===payPid), i=periods.indexOf(p);
   let {data:slips}=await sb.from('pay_slips').select('*').eq('period_id',p.id);
   if(p.status==='draft'){ const r=await sb.rpc('calc_period',{p_period:p.id}); if(r.error) return C.innerHTML=`<div class="note n-bad">${esc(errText(r.error))}</div>`; ({data:slips}=await sb.from('pay_slips').select('*').eq('period_id',p.id)); }
   slips=(await liveIdentity(slips||[])).sort((a,b)=>(a.data.sort_order??1e9)-(b.data.sort_order??1e9)||String(a.data.emp_code).localeCompare(String(b.data.emp_code)));
+  /* จุดจ่ายเงิน: เปลี่ยนเฉพาะงวด > จุดรับเงินประจำของพนักงาน > บริษัท */
+  const {data:ppo,error:ppoErr}=await sb.from('pay_point_overrides').select('*').eq('period_id',p.id); const ovm={}; (ppo||[]).forEach(o=>ovm[o.employee_id]=o);
+  slips.forEach(s=>{ const o=ovm[s.employee_id]; s.ppDef=s.data.__emp?.pay_site_id?String(s.data.__emp.pay_site_id):'co'; s.pp=o?(o.site_id?String(o.site_id):'co'):s.ppDef; s.ppOv=!!o; });
+  const ppName=k=>{ if(k==='co') return 'บริษัท'; const x=S.sites.find(t=>String(t.id)===k); return x?`${x.code?x.code+' ':''}${x.contract_name||x.name}`:'ไซต์ '+k; };
+  const ppKeys=['co',...[...new Set(slips.map(s=>s.pp).filter(k=>k!=='co'))].sort((a,b)=>ppName(a).localeCompare(ppName(b),'th',{numeric:true}))];
+  if(PAY_PT!=='all'&&!ppKeys.includes(PAY_PT)) PAY_PT='all';
+  const allSlips=slips; slips=PAY_PT==='all'?allSlips:allSlips.filter(s=>s.pp===PAY_PT);
+  const place=PAY_PT==='all'?null:ppName(PAY_PT), groups=ppKeys.map(k=>({label:ppName(k),slips:allSlips.filter(s=>s.pp===k)})).filter(g=>g.slips.length);
   const cols=payCols(), sum=k=>slips.reduce((a,s)=>a+(+s.data[k]||0),0), closed=p.status==='closed';
   C.innerHTML=`<div class="card col" style="gap:8px"><div class="row" style="gap:8px;flex-wrap:wrap">
       <button class="ibtn" data-pp="${periods[i+1]?.id||''}" ${periods[i+1]?'':'disabled'} aria-label="งวดก่อน">${IC.back}</button>
@@ -86,6 +95,9 @@ async function payPeriod(periods){
       <button class="ibtn" data-pp="${periods[i-1]?.id||''}" ${periods[i-1]?'':'disabled'} aria-label="งวดถัดไป">${IC.chev}</button></div>
     <div class="row" style="gap:8px;flex-wrap:wrap"><select class="in" id="pset" style="height:38px;width:auto;min-width:170px" aria-label="ชุดฟอร์ม">${Object.entries(paySets()).map(([k,v])=>`<option value="${k}" ${k===activeSetId()?'selected':''}>ชุดฟอร์ม: ${esc(v.name)}</option>`).join('')}</select>${closed?'':'<button class="btn btn-sm" data-recalc>คำนวณใหม่จากการเช็คชื่อ</button>'}${isAdmin()?'<button class="btn btn-sm" data-cols>ตั้งค่าคอลัมน์</button>':''}<button class="btn btn-sm" data-prev>ใบสรุปเงินเดือน (PDF)</button><button class="btn btn-sm" data-slips>สลิปรายคน (PDF)</button><button class="btn btn-sm" data-cash>สรุปเบิกเงินสด (แบงก์/เหรียญ)</button><button class="btn btn-sm" data-sheet>ส่งออก Google Sheet</button>
       <span class="grow"></span>${closed?(isAdmin()?'<button class="btn btn-sm" data-reopen>เปิดงวดเพื่อแก้</button>':''):'<button class="btn btn-sm btn-p" data-close>ตรวจแล้ว ปิดงวด</button>'}</div></div>
+    <div class="card col" style="gap:8px"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><b class="sm">จุดจ่ายเงิน</b><div class="row" style="gap:6px;flex-wrap:wrap">${groups.length>1&&PAY_PT==='all'?'<button class="btn btn-sm" data-ppall>ใบสรุปทุกจุด (แยกหน้า)</button>':''}<button class="btn btn-sm" data-ppset>ตั้งจุดจ่ายรายคน</button></div></div>
+      <div class="pp-chips">${[['all','ทุกจุด',allSlips],...ppKeys.map(k=>[k,ppName(k),allSlips.filter(s=>s.pp===k)])].map(([k,t,L])=>`<button class="pp-chip ${PAY_PT===k?'on':''}" data-ppt="${k}"><b>${esc(t)}</b><span>${L.length} คน · ${baht(L.reduce((a,s)=>a+(+s.data.net||0),0))}</span></button>`).join('')}</div>
+      ${place?`<span class="xs muted">ตาราง ใบสรุป สลิป และสรุปเบิกเงินสด แสดงเฉพาะจุด "${esc(place)}"</span>`:''}</div>
     <div class="statg" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><div class="stat"><b class="num" style="font-size:22px">${baht(sum('net'))}</b><span class="sm muted">จ่ายสุทธิ ${slips.length} คน</span></div><div class="stat"><b class="num" style="font-size:22px">${baht(sum('gross'))}</b><span class="sm muted">รวมก่อนหัก</span></div><div class="stat"><b class="num" style="font-size:22px">${baht(sum('ot'))}</b><span class="sm muted">OT ${fmtN(sum('ot_hours'))} ชม.</span></div><div class="stat"><b class="num" style="font-size:22px;color:var(--bad)">${baht(sum('sso'))}</b><span class="sm muted">ประกันสังคม</span></div><div class="stat"><b class="num" style="font-size:22px;color:var(--bad)">${baht(sum('inst_sum')+sum('advance')+sum('deducts'))}</b><span class="sm muted">หักอื่น ๆ</span></div></div>
     <div class="card" style="padding:0;overflow-x:auto"><table class="tbl paytbl"><thead><tr><th>#</th>${cols.map(k=>`<th class="${PCOLS[k].n?'num':''}">${PCOLS[k].t}</th>`).join('')}</tr></thead><tbody>
       ${slips.map((s,ix)=>`<tr data-slip="${s.id}" style="cursor:pointer"><td class="muted">${ix+1}</td>${cols.map(k=>`<td class="${PCOLS[k].n?'num':''}" style="${PCOLS[k].neg&&+PCOLS[k].f(s.data).replace(/,/g,'')>0?'color:var(--bad)':''}">${k==='net'||k==='name'?`<b>${esc(PCOLS[k].f(s.data))}</b>`:esc(PCOLS[k].f(s.data))}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${cols.length+1}"><div class="empty"><b>ยังไม่มีพนักงานในงวดนี้</b></div></td></tr>`}
@@ -97,9 +109,12 @@ async function payPeriod(periods){
   const cl=$('[data-close]',C); if(cl) cl.onclick=async()=>{ if(!await confirmBox(`ปิดงวด ${periodLabel(p)}? ระบบจะคำนวณใหม่ครั้งสุดท้าย ตัดยอดผ่อน และพนักงานจะเห็นสลิปในแอป`,'ปิดงวด')) return; const r=await sb.rpc('close_period',{p_period:p.id}); if(r.error) return toast(errText(r.error),true); toast('ปิดงวดแล้ว'); pagePay(); };
   const ro=$('[data-reopen]',C); if(ro) ro.onclick=async()=>{ const why=await promptBox('เหตุผลที่เปิดงวด (บันทึกในประวัติ)',''); if(!why) return; const r=await sb.rpc('reopen_period',{p_period:p.id,p_reason:why}); if(r.error) return toast(errText(r.error),true); toast('เปิดงวดแล้ว'); pagePay(); };
   const co=$('[data-cols]',C); if(co) co.onclick=()=>payColsSheet(()=>pagePay());
-  $('[data-prev]',C).onclick=()=>paySummaryPreview(p,slips);
+  $('[data-prev]',C).onclick=()=>paySummaryPreview(p,slips,place);
+  $$('[data-ppt]',C).forEach(b=>b.onclick=()=>{ PAY_PT=b.dataset.ppt; payPeriod(periods); });
+  const pa=$('[data-ppall]',C); if(pa) pa.onclick=()=>paySummaryPreview(p,allSlips,null,groups);
+  $('[data-ppset]',C).onclick=()=>payPointSheet(p,allSlips,ppName,closed,ppoErr,()=>payPeriod(periods));
   $('[data-slips]',C).onclick=()=>paySlipsPreview(p,slips);
-  $('[data-cash]',C).onclick=()=>payCashPreview(p,slips);
+  $('[data-cash]',C).onclick=()=>payCashPreview(p,slips,place);
   $('[data-sheet]',C).onclick=ev=>paySheetExport(p,slips,ev.target);
   $$('[data-slip]',C).forEach(r=>r.onclick=()=>payDetail(p,slips.find(s=>s.id==r.dataset.slip),()=>pagePay()));
 }
@@ -184,10 +199,10 @@ async function pdfFromPages(els, orient, name){
   pdf.save(name);
 }
 /* ใบสรุปเงินเดือน: A4 แนวนอน ปรับขอบ ขนาดตัวอักษร ความกว้างคอลัมน์ และช่องลงชื่อรับเงิน */
-async function paySummaryPreview(p, slips){
+async function paySummaryPreview(p, slips, place=null, groups=null){
   try{ await loadScript(LIB.qr); }catch(_){}
   const cfg=pprint(), cols=payCols(), admin=isAdmin();
-  const ov=overlay(`<div class="sheet sheet-wide sheet-xl" role="dialog" aria-modal="true" aria-label="ใบสรุปเงินเดือน"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>ใบสรุปเงินเดือน<small>A4 แนวนอน · งวด ${periodLabel(p)}</small></h1></header>
+  const ov=overlay(`<div class="sheet sheet-wide sheet-xl" role="dialog" aria-modal="true" aria-label="ใบสรุปเงินเดือน"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>ใบสรุปเงินเดือน<small>A4 แนวนอน · งวด ${periodLabel(p)}${place?` · จ่ายที่ ${esc(place)}`:groups?' · ทุกจุด แยกหน้า':''}</small></h1></header>
     <div class="sheet-body pv-split"><div class="pv-ctl"><div class="prt-ctl card col" style="gap:10px">
       <div class="row" style="gap:10px;flex-wrap:wrap;align-items:flex-end"><b class="sm" style="width:100%">ระยะขอบกระดาษ (มม.)</b>${[['t','บน'],['r','ขวา'],['b','ล่าง'],['l','ซ้าย']].map(([k,t])=>`<label class="field" style="width:78px"><span class="xs muted">${t}</span><input class="in num" type="number" min="0" max="40" data-m="${k}" value="${cfg.margin[k]}" style="height:38px"></label>`).join('')}
         <label class="field" style="width:150px"><span class="xs muted">ขนาดตัวอักษร: <b data-fv>${cfg.font}</b> pt</span><input type="range" min="8" max="16" step="0.5" data-font value="${cfg.font}"></label>
@@ -201,8 +216,8 @@ async function paySummaryPreview(p, slips){
       <div class="note n-info">${IC.info}<span>ภาพตัวอย่างนี้สร้างจากไฟล์ PDF ตัวจริง — ไฟล์ PDF และรูปที่ส่งออกจะออกมาเหมือนที่เห็นทุกจุด</span></div>
       <div class="pg-wrap" id="pgw"><div class="loading"><div class="spin"></div></div></div></div></div>
     <div class="sheet-foot" style="flex-wrap:wrap"><span class="sm muted grow" id="pgn">กำลังสร้างตัวอย่าง...</span><button class="btn" data-png disabled>บันทึกรูป PNG</button><button class="btn btn-p" data-pdf disabled>ดาวน์โหลด PDF ใบสรุป</button></div></div>`,false,false);
-  const W=$('#pgw',ov.el), fn=`ใบสรุปเงินเดือน_${p.start_date}_${p.end_date}`;
-  const lp=livePdf(W,()=>summaryDoc(p,slips,cfg,cols),st=>{ $('#pgn',ov.el).textContent=`${st.pages} หน้า · ${slips.length} คน`; $('[data-png]',ov.el).disabled=$('[data-pdf]',ov.el).disabled=false; });
+  const W=$('#pgw',ov.el), fn=`ใบสรุปเงินเดือน_${p.start_date}_${p.end_date}${place?'_'+place.split(' ')[0]:groups?'_ทุกจุด':''}`;
+  const lp=livePdf(W,()=>summaryDoc(p,slips,cfg,cols,{place,groups}),st=>{ $('#pgn',ov.el).textContent=`${st.pages} หน้า · ${slips.length} คน`; $('[data-png]',ov.el).disabled=$('[data-pdf]',ov.el).disabled=false; });
   const render=()=>lp.render(); lp.render(true);
   $('[data-x]',ov.el).onclick=ov.close;
   $$('[data-m]',ov.el).forEach(i=>i.oninput=()=>{ cfg.margin[i.dataset.m]=Math.max(0,Math.min(40,+i.value||0)); render(); });
@@ -228,7 +243,7 @@ async function paySummaryPreview(p, slips){
   $('[data-wauto]',ov.el).onclick=()=>{ cols.forEach(k=>delete cfg.widths[k]); delete cfg.widths['#']; cfg.sign_w=34; drawW(); render(); };
   drawW();
   $$('[data-m]',ov.el).forEach(i=>i.addEventListener('input',meter));
-  const df=$('[data-def]',ov.el); if(df) df.onclick=()=>{ ov.close(); S.settings.payroll_print_tmp=null; const keep=S.settings.payroll_print; S.settings.payroll_print=null; paySummaryPreview(p,slips); S.settings.payroll_print=keep; };
+  const df=$('[data-def]',ov.el); if(df) df.onclick=()=>{ ov.close(); S.settings.payroll_print_tmp=null; const keep=S.settings.payroll_print; S.settings.payroll_print=null; paySummaryPreview(p,slips,place,groups); S.settings.payroll_print=keep; };
   const sc=$('[data-savecfg]',ov.el); if(sc) sc.onclick=async ev=>{ busy(ev.target,true); try{ const sets=JSON.parse(JSON.stringify(paySets())); const id=activeSetId(); sets[id].print=JSON.parse(JSON.stringify(cfg)); await saveSetting('payroll_columns',{...(S.settings.payroll_columns||{}),sets,active:id}); busy(ev.target,false); toast(`บันทึกหน้ากระดาษไว้กับชุด "${sets[id].name}" แล้ว`); }catch(e){ busy(ev.target,false); toast(e.message,true); } };
   $('[data-pdf]',ov.el).onclick=async ev=>{ if(!lp.blob) return; busy(ev.target,true,'กำลังบันทึก...'); try{ await saveOrShare(lp.blob, fn+'.pdf'); busy(ev.target,false); toast('ดาวน์โหลด PDF (เวกเตอร์) แล้ว'); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
   $('[data-png]',ov.el).onclick=async ev=>{ if(!lp.blob) return; busy(ev.target,true,'กำลังสร้างรูป...'); try{ await savePngs(await pdfToPngs(lp.blob,3),fn); }catch(e){ toast(errText(e),true); } busy(ev.target,false); };
@@ -266,10 +281,10 @@ async function paySlipsPreview(p, slips){
   $('[data-png]',ov.el).onclick=async ev=>{ if(!lp.blob) return; busy(ev.target,true,'กำลังสร้างรูป...'); try{ await savePngs(await pdfToPngs(lp.blob,3),fn); }catch(e){ toast(errText(e),true); } busy(ev.target,false); };
 }
 /* สรุปเบิกเงินสด: ติ๊กเลือกธนบัตร/เหรียญที่มี → คำนวณรายคนแล้วรวม (ค่าที่เลือกจำไว้ให้ผู้ใช้ทุกคน) */
-async function payCashPreview(p, slips){
+async function payCashPreview(p, slips, place=null){
   const ALL=CASH_DEN.map(d=>d[0]);
   let dens=(()=>{ const v=S.settings.cash_denoms; if(Array.isArray(v)&&v.length) return v.filter(x=>ALL.includes(x)); try{ const l=JSON.parse(localStorage.getItem('kty-cash-den')||'null'); if(Array.isArray(l)&&l.length) return l; }catch(_){} return [...ALL]; })();
-  const opt={per:true,perNewPage:true}, fn=`ใบเบิกเงินสด_${p.start_date}_${p.end_date}`;
+  const opt={per:true,perNewPage:true,place}, fn=`ใบเบิกเงินสด_${p.start_date}_${p.end_date}${place?'_'+place.split(' ')[0]:''}`;
   const ov=overlay(`<div class="sheet sheet-wide" role="dialog" aria-modal="true" aria-label="สรุปเบิกเงินสด"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>สรุปเบิกเงินสด<small>ธนบัตรและเหรียญที่ต้องเตรียม · งวด ${periodLabel(p)}</small></h1></header>
     <div class="sheet-body"><div class="card col" style="gap:10px">
       <b class="sm">ชนิดเงินที่นำมาคิด <span class="xs muted">(เอาติ๊กออกถ้าธนาคารไม่มีชั่วคราว)</span></b>
@@ -289,6 +304,22 @@ async function payCashPreview(p, slips){
   summ(); lp.render(true);
   $('[data-pdf]',ov.el).onclick=async ev=>{ if(!lp.blob) return; busy(ev.target,true,'กำลังบันทึก...'); try{ await saveOrShare(lp.blob, fn+'.pdf'); busy(ev.target,false); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
   $('[data-png]',ov.el).onclick=async ev=>{ if(!lp.blob) return; busy(ev.target,true,'กำลังสร้างรูป...'); try{ await savePngs(await pdfToPngs(lp.blob,3),fn); }catch(e){ toast(errText(e),true); } busy(ev.target,false); };
+}
+/* ตั้งจุดจ่ายรายคน (เฉพาะงวดนี้) · ค่าประจำแก้ที่ข้อมูลพนักงาน › จุดรับเงินเดือน */
+function payPointSheet(p, slips, ppName, closed, err, done){
+  if(err) return toast(/pay_point_overrides/.test(err.message||'')?'ต้องรันไฟล์ 28_pay_point.sql ก่อน':errText(err),true);
+  const opts=[['co','บริษัท'],...S.sites.filter(x=>x.status==='active'||slips.some(s=>s.pp===String(x.id))).map(x=>[String(x.id),ppName(String(x.id))])];
+  const ov=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="ตั้งจุดจ่าย"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>จุดจ่ายเงิน<small>งวด ${periodLabel(p)} · เปลี่ยนเฉพาะงวดนี้</small></h1></header>
+    <div class="sheet-body"><div class="note n-info">${IC.info}<span>ค่าประจำของแต่ละคนตั้งที่ ข้อมูลพนักงาน › จุดรับเงินเดือน · เปลี่ยนที่นี่มีผลเฉพาะงวดนี้</span></div>
+      <div class="card card-l">${slips.map(s=>`<div class="li" style="gap:10px;flex-wrap:wrap"><div class="grow" style="min-width:140px"><b class="sm">${esc(s.data.name)}</b><span class="xs muted">${esc(s.data.emp_code||'')} · สุทธิ ${baht(+s.data.net||0)}${s.ppOv?` · <span style="color:var(--acc,#0B6BCB);font-weight:700">เฉพาะงวดนี้ (ปกติ: ${esc(ppName(s.ppDef))})</span>`:''}</span></div>
+        <select class="in" data-ppe="${s.employee_id}" style="height:38px;width:auto;max-width:240px" ${closed?'disabled':''} aria-label="จุดจ่ายของ ${esc(s.data.name)}">${opts.map(([v,t])=>`<option value="${v}" ${s.pp===v?'selected':''}>${esc(t)}</option>`).join('')}</select></div>`).join('')}</div></div>
+    <div class="sheet-foot"><button class="btn btn-p" data-x2>เสร็จ</button></div></div>`,false,false);
+  let changed=false; const close=()=>{ ov.close(); if(changed) done(); };
+  $('[data-x]',ov.el).onclick=close; $('[data-x2]',ov.el).onclick=close;
+  $$('[data-ppe]',ov.el).forEach(sel=>sel.onchange=async()=>{ const s=slips.find(x=>x.employee_id===sel.dataset.ppe), v=sel.value; sel.disabled=true;
+    const r=v===s.ppDef?await sb.from('pay_point_overrides').delete().eq('period_id',p.id).eq('employee_id',s.employee_id)
+      :await sb.from('pay_point_overrides').upsert({period_id:p.id,employee_id:s.employee_id,site_id:v==='co'?null:+v,set_by_name:S.profile.display_name||null,set_at:new Date().toISOString()});
+    sel.disabled=false; if(r.error){ sel.value=s.pp; return toast(errText(r.error),true); } s.pp=v; s.ppOv=v!==s.ppDef; changed=true; toast(`${s.data.name}: จ่ายที่ ${ppName(v)}`); });
 }
 async function paySheetExport(p, slips, btn){
   if(!hasBridge()) return toast('ต้องติดตั้ง Bridge ก่อน',true);

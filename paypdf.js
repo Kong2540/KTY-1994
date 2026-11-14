@@ -62,7 +62,7 @@ const ruleLine = (w) => ({ canvas:[{type:'line',x1:0,y1:0,x2:w,y2:0,lineWidth:1.
 const num = v => fmtN(v);
 
 /* ---------- ใบสรุปเงินเดือน (A4 แนวนอน) ---------- */
-async function summaryDoc(p, slips, cfg, cols){
+async function summaryDoc(p, slips, cfg, cols, opt={}){
   await pdfReady(); await logoData();
   const B=BR(), m=cfg.margin, fs=cfg.font, pageW=841.89-(m.l+m.r)*PT;
   const keys=['#',...cols,...(cfg.sign?['_sign']:[])];
@@ -70,9 +70,16 @@ async function summaryDoc(p, slips, cfg, cols){
   const widths=keys.map(k=>{ const w=k==='_sign'?cfg.sign_w:k==='#'?(cfg.widths['#']||9):cfg.widths[k]; return w?w*PT:(k==='name'?'*':'auto'); });
   if(!widths.includes('*')&&widths.includes('auto')) widths[widths.indexOf('auto')]='*'; // กำหนดเองครบทุกคอลัมน์ = ใช้ตามที่กำหนด
   const head=keys.map(k=>({text:title(k),bold:true,color:C_DARK,fillColor:C_BAND,alignment:isNum(k)?'right':'left'}));
-  const rows=slips.map((s,i)=>keys.map(k=>k==='#'?{text:String(i+1),color:C_LAB}:k==='_sign'?{text:' '}:{text:String(PCOLS[k].f(s.data)),alignment:isNum(k)?'right':'left',bold:k==='net'}));
   const LK=keys.find(k=>k!=='#'&&k!=='_sign'&&!PCOLS[k].n)||'#';
-  const tot=keys.map(k=>({text:k===LK?'รวมทั้งสิ้น':(k!=='#'&&k!=='_sign'&&PCOLS[k].m?num(slips.reduce((a,s)=>a+(+String(PCOLS[k].f(s.data)).replace(/,/g,'')||0),0)):''),bold:true,alignment:k===LK?'left':'right',fillColor:C_BAND}));
+  const groups=opt.groups&&opt.groups.length?opt.groups:[{label:null,slips}];
+  const signRow=lbl=>({columns:advList('pay_sign').map(t=>({stack:[{text:'....................................................',alignment:'center',color:C_LAB},{text:/จ่าย/.test(t)&&lbl?`${t} (${lbl})`:t,alignment:'center',fontSize:fs-1,color:C_LAB}]})),margin:[0,28,0,0],unbreakable:true});
+  const tableOf=G=>{ const rows=G.map((s,i)=>keys.map(k=>k==='#'?{text:String(i+1),color:C_LAB}:k==='_sign'?{text:' '}:{text:String(PCOLS[k].f(s.data)),alignment:isNum(k)?'right':'left',bold:k==='net'}));
+    const tot=keys.map(k=>({text:k===LK?`รวมทั้งสิ้น${groups.length>1||opt.place?` ${G.length} คน`:''}`:(k!=='#'&&k!=='_sign'&&PCOLS[k].m?num(G.reduce((a,s)=>a+(+String(PCOLS[k].f(s.data)).replace(/,/g,'')||0),0)):''),bold:true,alignment:k===LK?'left':'right',fillColor:C_BAND}));
+    return {table:{headerRows:1,widths:[...widths],body:[JSON.parse(JSON.stringify(head)),...rows,tot],dontBreakRows:true},
+      layout:{hLineWidth:()=>.5,vLineWidth:()=>.5,hLineColor:()=>C_LINE,vLineColor:()=>C_LINE,paddingLeft:()=>4,paddingRight:()=>4,paddingTop:()=>cfg.sign?5:3,paddingBottom:()=>cfg.sign?5:3}}; };
+  const body=groups.flatMap((g,gi)=>[
+    ...(g.label&&groups.length>1?[{table:{widths:['*'],body:[[{text:[{text:'จ่ายที่: ',color:C_LAB},{text:g.label,bold:true},{text:`  ·  ${g.slips.length} คน`,color:C_LAB}],fontSize:fs+1,margin:[6,3,6,3]}]]},layout:{fillColor:()=>'#FFF4D6',hLineWidth:()=>0,vLineWidth:(i)=>i===0?3:0,vLineColor:()=>'#F2B705'},margin:[0,0,0,6],...(gi?{pageBreak:'before'}:{})}]:[]),
+    tableOf(g.slips), signRow(g.label||opt.place)]);
   const qr=`${location.origin}${location.pathname}#pay/p/${p.id}`;
   return { pageSize:'A4', pageOrientation:'landscape', _rh:2, pageMargins:[m.l*PT,m.t*PT,m.r*PT,m.b*PT+12],
     defaultStyle:{font:'Sarabun',fontSize:fs,color:'#1B262C',lineHeight:1.15},
@@ -80,12 +87,10 @@ async function summaryDoc(p, slips, cfg, cols){
     footer:(c,n)=>({columns:[{text:`${B.company_short} · ใบสรุปเงินเดือน ${periodText(p)}`,fontSize:7.5,color:'#9AA6AA'},{text:`หน้า ${c}/${n}`,alignment:'right',fontSize:7.5,color:'#9AA6AA'}],margin:[m.l*PT,0,m.r*PT,0]}),
     content:[
       {columns:[{...logoNode(38),width:42},{stack:[{text:B.company_th,bold:true,fontSize:13,color:C_DARK},{text:B.company_en,fontSize:7.5,color:C_LAB,characterSpacing:.6}],margin:[6,4,0,0],width:'*'},
-        {stack:[{text:'ใบสรุปเงินเดือน',bold:true,fontSize:17,color:C_DARK,alignment:'right'},{text:periodText(p),fontSize:10,color:C_LAB,alignment:'right'}],width:'auto',margin:[0,2,qr?8:0,0]},
+        {stack:[{text:'ใบสรุปเงินเดือน',bold:true,fontSize:17,color:C_DARK,alignment:'right'},{text:periodText(p),fontSize:10,color:C_LAB,alignment:'right'},...(opt.place?[{text:`จ่ายที่: ${opt.place}`,bold:true,fontSize:10,color:'#1B262C',background:'#F2B705',alignment:'right',margin:[0,2,0,0]}]:[])],width:'auto',margin:[0,2,qr?8:0,0]},
         ...(qr?[{stack:[{qr,fit:52,margin:[0,0,0,1]},{text:'สแกนดูย้อนหลัง',fontSize:6.5,color:C_LAB,alignment:'center'}],width:54}]:[])],columnGap:4},
       ruleLine(pageW),
-      {table:{headerRows:1,widths,body:[head,...rows,tot],dontBreakRows:true},
-        layout:{hLineWidth:()=>.5,vLineWidth:()=>.5,hLineColor:()=>C_LINE,vLineColor:()=>C_LINE,paddingLeft:()=>4,paddingRight:()=>4,paddingTop:()=>cfg.sign?5:3,paddingBottom:()=>cfg.sign?5:3}},
-      {columns:advList('pay_sign').map(t=>({stack:[{text:'....................................................',alignment:'center',color:C_LAB},{text:t,alignment:'center',fontSize:fs-1,color:C_LAB}]})),margin:[0,28,0,0],unbreakable:true}
+      ...body
     ] };
 }
 
@@ -147,7 +152,7 @@ async function cashDoc(p, slips, dens, opt={}){
     footer:(c,n)=>({columns:[{text:`${B.app} · คำนวณจากยอดสุทธิในระบบเงินเดือน (เศษสตางค์ปัดลง)`,fontSize:7,color:'#9AA6AA'},{text:`หน้า ${c}/${n}`,alignment:'right',fontSize:7,color:'#9AA6AA'}],margin:[M,14,M,0]}),
     content:[
       {columns:[{...logoNode(36),width:40},{stack:[{text:B.company_th,bold:true,fontSize:12.5,color:C_DARK},{text:B.company_en,fontSize:7,color:C_LAB,characterSpacing:.5}],margin:[6,4,0,0],width:'*'},
-        {stack:[{text:'ใบเบิกเงินสดจ่ายเงินเดือน',bold:true,fontSize:16,color:C_DARK,alignment:'right'},{text:periodText(p),fontSize:9.5,color:C_LAB,alignment:'right'}],width:'auto'}],columnGap:4},
+        {stack:[{text:'ใบเบิกเงินสดจ่ายเงินเดือน',bold:true,fontSize:16,color:C_DARK,alignment:'right'},{text:periodText(p),fontSize:9.5,color:C_LAB,alignment:'right'},...(opt.place?[{text:`จ่ายที่: ${opt.place}`,bold:true,fontSize:9.5,background:'#F2B705',alignment:'right',margin:[0,2,0,0]}]:[])],width:'auto'}],columnGap:4},
       ruleLine(iw),
       {columns:[{stack:[['วันที่จ่าย',thaiDate(p.pay_date)],['จำนวนพนักงาน',`${rows.length} คน`],['ยอดสุทธิในระบบ',`${fmtN(netAll)} บาท`]].map(([a,b])=>({columns:[{text:a,color:C_LAB,width:80},{text:b,bold:true}],margin:[0,0,0,3]}))},
         {table:{widths:[190],body:[[{stack:[{text:'ยอดเงินสดที่ต้องเบิก',fontSize:9,color:'#fff'},{text:`${N(paid)} บาท`,bold:true,fontSize:22,color:'#F2B705'}],margin:[10,6,10,6]}]]},layout:{fillColor:()=>C_DARK,hLineWidth:()=>0,vLineWidth:()=>0},width:190}],margin:[0,0,0,12]},
