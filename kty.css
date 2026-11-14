@@ -546,3 +546,15 @@ details.perm>summary::-webkit-details-marker{display:none}
 .wa-me b{background:#DC2626;color:#fff;border-radius:99px;font-size:11px;min-width:20px;height:20px;display:inline-grid;place-items:center;padding:0 6px}
 .wa-site{height:auto!important;min-height:18px;font-size:10.5px;margin-bottom:2px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-block!important;line-height:18px}
 #app .watypes{grid-template-columns:repeat(auto-fill,minmax(min(100%,140px),1fr))}
+/* ใบสรุปเงินเดือน: จอคอมแบ่งซ้าย (ตั้งค่า) – ขวา (ตัวอย่าง) เห็นผลทันที */
+@media (min-width:1000px){
+  .sheet.sheet-xl{max-width:min(1440px,96vw);height:94vh}
+  .sheet-body.pv-split{display:grid;grid-template-columns:minmax(360px,420px) minmax(0,1fr);gap:16px;overflow:hidden;padding:14px}
+  .pv-split>.pv-ctl,.pv-split>.pv-view{overflow-y:auto;min-height:0;display:flex;flex-direction:column;gap:12px;padding-right:4px}
+  .pv-split .pw-row{grid-template-columns:minmax(64px,104px) minmax(0,1fr) 58px 64px;gap:6px;padding:5px 8px}
+}
+@media (max-width:999.98px){ .pv-split>.pv-ctl,.pv-split>.pv-view{display:flex;flex-direction:column;gap:12px} }
+.pw-det>summary{cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;list-style:none}
+.pw-det>summary::-webkit-details-marker{display:none}
+.pw-det>summary::after{content:'▾';color:var(--ink2);margin-left:auto}
+.pw-det[open]>summary::after{content:'▴'}

@@ -182,18 +182,19 @@ async function pdfFromPages(els, orient, name){
 async function paySummaryPreview(p, slips){
   try{ await loadScript(LIB.qr); }catch(_){}
   const cfg=pprint(), cols=payCols(), admin=isAdmin();
-  const ov=overlay(`<div class="sheet sheet-wide" role="dialog" aria-modal="true" aria-label="ใบสรุปเงินเดือน"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>ใบสรุปเงินเดือน<small>A4 แนวนอน · งวด ${periodLabel(p)}</small></h1></header>
-    <div class="sheet-body"><div class="prt-ctl card col" style="gap:10px">
+  const ov=overlay(`<div class="sheet sheet-wide sheet-xl" role="dialog" aria-modal="true" aria-label="ใบสรุปเงินเดือน"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>ใบสรุปเงินเดือน<small>A4 แนวนอน · งวด ${periodLabel(p)}</small></h1></header>
+    <div class="sheet-body pv-split"><div class="pv-ctl"><div class="prt-ctl card col" style="gap:10px">
       <div class="row" style="gap:10px;flex-wrap:wrap;align-items:flex-end"><b class="sm" style="width:100%">ระยะขอบกระดาษ (มม.)</b>${[['t','บน'],['r','ขวา'],['b','ล่าง'],['l','ซ้าย']].map(([k,t])=>`<label class="field" style="width:78px"><span class="xs muted">${t}</span><input class="in num" type="number" min="0" max="40" data-m="${k}" value="${cfg.margin[k]}" style="height:38px"></label>`).join('')}
         <label class="field" style="width:150px"><span class="xs muted">ขนาดตัวอักษร: <b data-fv>${cfg.font}</b> pt</span><input type="range" min="8" max="16" step="0.5" data-font value="${cfg.font}"></label>
         <label class="row sm" style="gap:6px"><input type="checkbox" data-sign ${cfg.sign?'checked':''}>ช่องลงชื่อรับเงิน</label></div>
-      <div class="col" style="gap:6px"><div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:4px"><b class="sm">ความกว้างคอลัมน์ (มม.)</b><span class="xs muted">เลื่อน = กำหนดเอง · ปุ่ม "อัตโนมัติ" = ระบบจัดให้</span></div>
+      <details class="pw-det" ${innerWidth>=1000?'open':''}><summary><b class="sm">ความกว้างคอลัมน์ (มม.)</b><span class="xs muted" id="pws"></span></summary><div class="col" style="gap:6px;margin-top:8px"><span class="xs muted">เลื่อน = กำหนดเอง · ปุ่ม "อัตโนมัติ" = ระบบจัดให้</span>
         <div class="pw-list" id="pwl"></div>
         <div class="pw-meter" id="pwm"><i></i></div><span class="xs muted" id="pwt"></span>
-        <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn btn-sm" data-wfit>พอดีหน้ากระดาษ</button><button class="btn btn-sm" data-wauto>อัตโนมัติทั้งหมด</button></div></div>
+        <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn btn-sm" data-wfit>พอดีหน้ากระดาษ</button><button class="btn btn-sm" data-wauto>อัตโนมัติทั้งหมด</button></div></div></details>
       ${admin?'<div class="row" style="gap:8px"><button class="btn btn-sm" data-def>คืนค่าเริ่มต้น</button><button class="btn btn-sm" data-savecfg>บันทึกหน้ากระดาษกับชุดฟอร์มนี้</button></div>':''}</div>
+      </div><div class="pv-view">
       <div class="note n-info">${IC.info}<span>ภาพตัวอย่างนี้สร้างจากไฟล์ PDF ตัวจริง — ไฟล์ PDF และรูปที่ส่งออกจะออกมาเหมือนที่เห็นทุกจุด</span></div>
-      <div class="pg-wrap" id="pgw"><div class="loading"><div class="spin"></div></div></div></div>
+      <div class="pg-wrap" id="pgw"><div class="loading"><div class="spin"></div></div></div></div></div>
     <div class="sheet-foot" style="flex-wrap:wrap"><span class="sm muted grow" id="pgn">กำลังสร้างตัวอย่าง...</span><button class="btn" data-png disabled>บันทึกรูป PNG</button><button class="btn btn-p" data-pdf disabled>ดาวน์โหลด PDF ใบสรุป</button></div></div>`,false,false);
   const W=$('#pgw',ov.el), fn=`ใบสรุปเงินเดือน_${p.start_date}_${p.end_date}`;
   const lp=livePdf(W,()=>summaryDoc(p,slips,cfg,cols),st=>{ $('#pgn',ov.el).textContent=`${st.pages} หน้า · ${slips.length} คน`; $('[data-png]',ov.el).disabled=$('[data-pdf]',ov.el).disabled=false; });
@@ -211,14 +212,14 @@ async function paySummaryPreview(p, slips){
   const padMM=8/PT, pageMM=()=>297-cfg.margin.l-cfg.margin.r;
   const meter=()=>{ const ks=keysW(), sum=ks.reduce((a,k)=>a+effMM(k)+padMM,0), pg=pageMM(), fill=ks.some(k=>k!=='#'&&k!=='_sign'&&isAuto(k));
     const m=$('#pwm',ov.el); m.firstElementChild.style.width=Math.min(100,sum/pg*100)+'%'; m.classList.toggle('over',sum>pg+.5);
-    $('#pwt',ov.el).textContent=`รวม ${Math.round(sum)} มม. จากพื้นที่ ${Math.round(pg)} มม.`+(sum>pg+.5?` · เกิน ${Math.round(sum-pg)} มม. ระบบจะบีบให้พอดี`:fill?' · คอลัมน์อัตโนมัติจะขยายเต็มที่เหลือ':` · เหลือ ${Math.round(pg-sum)} มม.`); };
+    $('#pws',ov.el).textContent=`รวม ${Math.round(sum)}/${Math.round(pg)} มม.`; $('#pwt',ov.el).textContent=`รวม ${Math.round(sum)} มม. จากพื้นที่ ${Math.round(pg)} มม.`+(sum>pg+.5?` · เกิน ${Math.round(sum-pg)} มม. ระบบจะบีบให้พอดี`:fill?' · คอลัมน์อัตโนมัติจะขยายเต็มที่เหลือ':` · เหลือ ${Math.round(pg-sum)} มม.`); };
   const drawW=()=>{ $('#pwl',ov.el).innerHTML=keysW().map(k=>{ const au=isAuto(k), v=Math.round(effMM(k));
       return `<div class="pw-row"><b title="${esc(titleW(k))}">${esc(titleW(k))}</b><input type="range" min="5" max="120" step="1" value="${v}" data-w="${k}" aria-label="ความกว้าง ${esc(titleW(k))}"><span class="pw-mm ${au?'':'on'}">${au?'≈':''}${v} มม.</span>${k==='#'||k==='_sign'?'<span></span>':`<button class="pw-auto ${au?'on':''}" data-wa="${k}" aria-pressed="${au}">อัตโนมัติ</button>`}</div>`; }).join('');
     $$('[data-w]',ov.el).forEach(i=>{ i.oninput=()=>{ const k=i.dataset.w, v=+i.value; if(k==='_sign') cfg.sign_w=v; else cfg.widths[k]=v; const sp=i.nextElementSibling; sp.textContent=v+' มม.'; sp.classList.add('on'); const ab=i.parentElement.querySelector('.pw-auto'); if(ab) ab.classList.remove('on'); meter(); render(); }; });
     $$('[data-wa]',ov.el).forEach(b=>b.onclick=()=>{ const k=b.dataset.wa; if(cfg.widths[k]) delete cfg.widths[k]; else cfg.widths[k]=autoMM(k); drawW(); render(); });
     meter(); };
   $('[data-wfit]',ov.el).onclick=()=>{ const ks=keysW(), avail=pageMM()-ks.length*padMM, sum=ks.reduce((a,k)=>a+effMM(k),0), f=avail/sum;
-    ks.forEach(k=>{ const v=Math.max(5,Math.round(effMM(k)*f*10)/10); if(k==='_sign') cfg.sign_w=v; else cfg.widths[k]=v; }); drawW(); render(); };
+    ks.forEach(k=>{ const v=Math.max(k==='#'?7:8,Math.round(effMM(k)*f*10)/10); if(k==='_sign') cfg.sign_w=v; else cfg.widths[k]=v; }); drawW(); render(); };
   $('[data-wauto]',ov.el).onclick=()=>{ cols.forEach(k=>delete cfg.widths[k]); delete cfg.widths['#']; cfg.sign_w=34; drawW(); render(); };
   drawW();
   $$('[data-m]',ov.el).forEach(i=>i.addEventListener('input',meter));
