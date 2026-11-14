@@ -68,7 +68,7 @@ async function summaryDoc(p, slips, cfg, cols){
   const keys=['#',...cols,...(cfg.sign?['_sign']:[])];
   const isNum=k=>k!=='#'&&k!=='_sign'&&PCOLS[k].n, title=k=>k==='#'?'#':k==='_sign'?'ลงชื่อรับเงิน':PCOLS[k].t;
   const widths=keys.map(k=>{ const w=k==='_sign'?cfg.sign_w:k==='#'?(cfg.widths['#']||9):cfg.widths[k]; return w?w*PT:(k==='name'?'*':'auto'); });
-  if(!widths.includes('*')) widths[widths.indexOf('auto')>=0?widths.indexOf('auto'):1]='*';
+  if(!widths.includes('*')&&widths.includes('auto')) widths[widths.indexOf('auto')]='*'; // กำหนดเองครบทุกคอลัมน์ = ใช้ตามที่กำหนด
   const head=keys.map(k=>({text:title(k),bold:true,color:C_DARK,fillColor:C_BAND,alignment:isNum(k)?'right':'left'}));
   const rows=slips.map((s,i)=>keys.map(k=>k==='#'?{text:String(i+1),color:C_LAB}:k==='_sign'?{text:' '}:{text:String(PCOLS[k].f(s.data)),alignment:isNum(k)?'right':'left',bold:k==='net'}));
   const LK=keys.find(k=>k!=='#'&&k!=='_sign'&&!PCOLS[k].n)||'#';

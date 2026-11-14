@@ -519,3 +519,19 @@ details.perm>summary::-webkit-details-marker{display:none}
 @media (min-width:900px){.hsbar{bottom:24px}}
 .prgrid{display:grid;gap:12px}@media (min-width:1500px){.prgrid{grid-template-columns:1fr 1fr;align-items:start}}
 .prrow{display:flex;gap:8px;align-items:flex-end;padding:8px 0;border-top:1px solid var(--line);flex-wrap:wrap}.prrow>.grow{flex:1 1 200px}.prrow .field{gap:2px}
+
+/* แผงความกว้างคอลัมน์ใบสรุปเงินเดือน */
+.pw-list{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.pw-row{display:grid;grid-template-columns:minmax(70px,120px) minmax(0,1fr) 64px 70px;gap:8px;align-items:center;padding:6px 10px;border-top:1px solid var(--line);font-size:13px}
+.pw-row:first-child{border-top:0}
+.pw-row b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pw-row input[type=range]{width:100%;accent-color:var(--acc,#F2B705)}
+.pw-mm{font-variant-numeric:tabular-nums;font-size:12px;text-align:right;color:var(--ink2)}
+.pw-mm.on{color:var(--ink);font-weight:700}
+.pw-auto{height:26px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--ink2);font:600 11px inherit;cursor:pointer;padding:0 6px}
+.pw-auto.on{border-color:var(--ink);color:var(--ink);background:var(--bg2,rgba(0,0,0,.04))}
+.pw-meter{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.pw-meter i{display:block;height:100%;background:#16A34A;transition:width .15s}
+.pw-meter.over i{background:#DC2626}
+@media (max-width:480px){.pw-row{grid-template-columns:minmax(60px,90px) minmax(0,1fr) 56px 64px;gap:6px;padding:6px 8px}}
+.ds-opt:has(input:checked){border-color:var(--ink)!important;background:var(--bg2,rgba(242,183,5,.10))}

@@ -187,7 +187,10 @@ async function paySummaryPreview(p, slips){
       <div class="row" style="gap:10px;flex-wrap:wrap;align-items:flex-end"><b class="sm" style="width:100%">ระยะขอบกระดาษ (มม.)</b>${[['t','บน'],['r','ขวา'],['b','ล่าง'],['l','ซ้าย']].map(([k,t])=>`<label class="field" style="width:78px"><span class="xs muted">${t}</span><input class="in num" type="number" min="0" max="40" data-m="${k}" value="${cfg.margin[k]}" style="height:38px"></label>`).join('')}
         <label class="field" style="width:150px"><span class="xs muted">ขนาดตัวอักษร: <b data-fv>${cfg.font}</b> pt</span><input type="range" min="8" max="16" step="0.5" data-font value="${cfg.font}"></label>
         <label class="row sm" style="gap:6px"><input type="checkbox" data-sign ${cfg.sign?'checked':''}>ช่องลงชื่อรับเงิน</label></div>
-      <details><summary class="sm" style="cursor:pointer"><b>ความกว้างคอลัมน์ (มม. · ว่าง = อัตโนมัติ)</b></summary><div class="row" style="gap:8px;flex-wrap:wrap;margin-top:8px">${['#',...cols,...(cfg.sign?['_sign']:[])].map(k=>`<label class="field" style="width:118px"><span class="xs muted">${k==='#'?'ลำดับ':k==='_sign'?'ลงชื่อรับเงิน':PCOLS[k].t}</span><input class="in num" type="number" min="5" max="120" data-w="${k}" value="${k==='_sign'?cfg.sign_w:(cfg.widths[k]??'')}" placeholder="อัตโนมัติ" style="height:36px"></label>`).join('')}</div></details>
+      <div class="col" style="gap:6px"><div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:4px"><b class="sm">ความกว้างคอลัมน์ (มม.)</b><span class="xs muted">เลื่อน = กำหนดเอง · ปุ่ม "อัตโนมัติ" = ระบบจัดให้</span></div>
+        <div class="pw-list" id="pwl"></div>
+        <div class="pw-meter" id="pwm"><i></i></div><span class="xs muted" id="pwt"></span>
+        <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn btn-sm" data-wfit>พอดีหน้ากระดาษ</button><button class="btn btn-sm" data-wauto>อัตโนมัติทั้งหมด</button></div></div>
       ${admin?'<div class="row" style="gap:8px"><button class="btn btn-sm" data-def>คืนค่าเริ่มต้น</button><button class="btn btn-sm" data-savecfg>บันทึกหน้ากระดาษกับชุดฟอร์มนี้</button></div>':''}</div>
       <div class="note n-info">${IC.info}<span>ภาพตัวอย่างนี้สร้างจากไฟล์ PDF ตัวจริง — ไฟล์ PDF และรูปที่ส่งออกจะออกมาเหมือนที่เห็นทุกจุด</span></div>
       <div class="pg-wrap" id="pgw"><div class="loading"><div class="spin"></div></div></div></div>
@@ -198,8 +201,27 @@ async function paySummaryPreview(p, slips){
   $('[data-x]',ov.el).onclick=ov.close;
   $$('[data-m]',ov.el).forEach(i=>i.oninput=()=>{ cfg.margin[i.dataset.m]=Math.max(0,Math.min(40,+i.value||0)); render(); });
   $('[data-font]',ov.el).oninput=e=>{ cfg.font=+e.target.value; $('[data-fv]',ov.el).textContent=cfg.font; render(); };
-  $('[data-sign]',ov.el).onchange=e=>{ cfg.sign=e.target.checked; render(); };
-  $$('[data-w]',ov.el).forEach(i=>i.oninput=()=>{ const k=i.dataset.w, v=i.value===''?null:Math.max(5,Math.min(120,+i.value)); if(k==='_sign') cfg.sign_w=v||34; else if(v) cfg.widths[k]=v; else delete cfg.widths[k]; render(); });
+  $('[data-sign]',ov.el).onchange=e=>{ cfg.sign=e.target.checked; if(typeof drawW==='function') setTimeout(drawW); render(); };
+  /* แผงความกว้างคอลัมน์: แถบเลื่อน + มม. + อัตโนมัติ · แถบรวมเทียบหน้ากระดาษ · พอดีหน้า */
+  const keysW=()=>['#',...cols,...(cfg.sign?['_sign']:[])], titleW=k=>k==='#'?'ลำดับ':k==='_sign'?'ลงชื่อรับเงิน':PCOLS[k].t;
+  const autoMM=k=>{ if(k==='#') return 9; if(k==='_sign') return 34; const c=PCOLS[k]; const txt=[c.t,...slips.slice(0,80).map(s=>String(c.f(s.data)??''))];
+    const len=Math.max(...txt.map(t=>t.replace(/[ัิ-ฺ็-๎]/g,'').length)); return Math.max(8,Math.round(len*cfg.font*.5/PT+1)); };
+  const isAuto=k=>k!=='#'&&k!=='_sign'&&!cfg.widths[k];
+  const effMM=k=>k==='_sign'?cfg.sign_w:k==='#'?(cfg.widths['#']||9):(cfg.widths[k]||autoMM(k));
+  const padMM=8/PT, pageMM=()=>297-cfg.margin.l-cfg.margin.r;
+  const meter=()=>{ const ks=keysW(), sum=ks.reduce((a,k)=>a+effMM(k)+padMM,0), pg=pageMM(), fill=ks.some(k=>k!=='#'&&k!=='_sign'&&isAuto(k));
+    const m=$('#pwm',ov.el); m.firstElementChild.style.width=Math.min(100,sum/pg*100)+'%'; m.classList.toggle('over',sum>pg+.5);
+    $('#pwt',ov.el).textContent=`รวม ${Math.round(sum)} มม. จากพื้นที่ ${Math.round(pg)} มม.`+(sum>pg+.5?` · เกิน ${Math.round(sum-pg)} มม. ระบบจะบีบให้พอดี`:fill?' · คอลัมน์อัตโนมัติจะขยายเต็มที่เหลือ':` · เหลือ ${Math.round(pg-sum)} มม.`); };
+  const drawW=()=>{ $('#pwl',ov.el).innerHTML=keysW().map(k=>{ const au=isAuto(k), v=Math.round(effMM(k));
+      return `<div class="pw-row"><b title="${esc(titleW(k))}">${esc(titleW(k))}</b><input type="range" min="5" max="120" step="1" value="${v}" data-w="${k}" aria-label="ความกว้าง ${esc(titleW(k))}"><span class="pw-mm ${au?'':'on'}">${au?'≈':''}${v} มม.</span>${k==='#'||k==='_sign'?'<span></span>':`<button class="pw-auto ${au?'on':''}" data-wa="${k}" aria-pressed="${au}">อัตโนมัติ</button>`}</div>`; }).join('');
+    $$('[data-w]',ov.el).forEach(i=>{ i.oninput=()=>{ const k=i.dataset.w, v=+i.value; if(k==='_sign') cfg.sign_w=v; else cfg.widths[k]=v; const sp=i.nextElementSibling; sp.textContent=v+' มม.'; sp.classList.add('on'); const ab=i.parentElement.querySelector('.pw-auto'); if(ab) ab.classList.remove('on'); meter(); render(); }; });
+    $$('[data-wa]',ov.el).forEach(b=>b.onclick=()=>{ const k=b.dataset.wa; if(cfg.widths[k]) delete cfg.widths[k]; else cfg.widths[k]=autoMM(k); drawW(); render(); });
+    meter(); };
+  $('[data-wfit]',ov.el).onclick=()=>{ const ks=keysW(), avail=pageMM()-ks.length*padMM, sum=ks.reduce((a,k)=>a+effMM(k),0), f=avail/sum;
+    ks.forEach(k=>{ const v=Math.max(5,Math.round(effMM(k)*f*10)/10); if(k==='_sign') cfg.sign_w=v; else cfg.widths[k]=v; }); drawW(); render(); };
+  $('[data-wauto]',ov.el).onclick=()=>{ cols.forEach(k=>delete cfg.widths[k]); delete cfg.widths['#']; cfg.sign_w=34; drawW(); render(); };
+  drawW();
+  $$('[data-m]',ov.el).forEach(i=>i.addEventListener('input',meter));
   const df=$('[data-def]',ov.el); if(df) df.onclick=()=>{ ov.close(); S.settings.payroll_print_tmp=null; const keep=S.settings.payroll_print; S.settings.payroll_print=null; paySummaryPreview(p,slips); S.settings.payroll_print=keep; };
   const sc=$('[data-savecfg]',ov.el); if(sc) sc.onclick=async ev=>{ busy(ev.target,true); try{ const sets=JSON.parse(JSON.stringify(paySets())); const id=activeSetId(); sets[id].print=JSON.parse(JSON.stringify(cfg)); await saveSetting('payroll_columns',{...(S.settings.payroll_columns||{}),sets,active:id}); busy(ev.target,false); toast(`บันทึกหน้ากระดาษไว้กับชุด "${sets[id].name}" แล้ว`); }catch(e){ busy(ev.target,false); toast(e.message,true); } };
   $('[data-pdf]',ov.el).onclick=async ev=>{ if(!lp.blob) return; busy(ev.target,true,'กำลังบันทึก...'); try{ await saveOrShare(lp.blob, fn+'.pdf'); busy(ev.target,false); toast('ดาวน์โหลด PDF (เวกเตอร์) แล้ว'); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
@@ -333,21 +355,40 @@ async function payShop(){
   };
   draw();
 }
+/* ตัวเลือก "เริ่มหัก": งวดที่กำลังทำเงินเดือน (ยังไม่ปิด) · งวดตามวันที่วันนี้ · งวดถัดไป (ค่าเดิม) */
+const pBounds=d=>{ const x=new Date(d+'T00:00:00'), y=x.getFullYear(), m=x.getMonth(); if(x.getDate()<=15) return {s:localISO(new Date(y,m,1)),e:localISO(new Date(y,m,15))}; return {s:localISO(new Date(y,m,16)),e:localISO(new Date(y,m+1,0))}; };
+const pNext=b=>{ const e=new Date(b.e+'T00:00:00'); e.setDate(e.getDate()+1); return pBounds(localISO(e)); };
+async function deductStartOpts(){
+  const today=pBounds(localISO()), next=pNext(today);
+  const {data}=await sb.from('pay_periods').select('start_date,end_date,status').lte('start_date',today.s).order('start_date',{ascending:false}).limit(3);
+  const drafts=(data||[]).filter(p=>p.status==='draft').map(p=>({s:p.start_date,e:p.end_date})), closed=new Set((data||[]).filter(p=>p.status==='closed').map(p=>p.start_date));
+  const lab=b=>periodLabel({start_date:b.s,end_date:b.e}), out=[];
+  drafts.slice(0,1).forEach(b=>out.push({v:b.s,t:'งวดปัจจุบัน',sub:`${lab(b)} · กำลังทำเงินเดือน`}));
+  if(!out.some(o=>o.v===today.s)&&!closed.has(today.s)) out.push({v:today.s,t:out.length?'งวดตามวันที่วันนี้':'งวดปัจจุบัน',sub:lab(today)});
+  out.push({v:next.s,t:'งวดถัดไป',sub:`${lab(next)} · ค่าเดิม`,def:true});
+  return out;
+}
+const deductStartHTML=(opts,name)=>`<div class="col" style="gap:6px"><span class="xs muted" style="font-weight:700">เริ่มหัก</span>${opts.map(o=>`<label class="row ds-opt" style="gap:10px;align-items:flex-start;border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer"><input type="radio" name="${name}" value="${o.v}" ${o.def?'checked':''} style="margin-top:4px"><span class="col" style="gap:0"><b class="sm">${o.t}</b><span class="xs muted">${esc(o.sub)}</span></span></label>`).join('')}</div>`;
 async function payOrders(){
   const C=$('#pyc'); const {data}=await sb.from('emp_orders').select('*, employees(emp_code,first_name,last_name)').order('created_at',{ascending:false}).limit(60);
   const list=data||[];
   C.innerHTML=list.length?`<div class="card card-l">${list.map(o=>`<div class="li" style="align-items:flex-start"><div class="grow"><b>${esc(o.employees?`${o.employees.first_name} ${o.employees.last_name}`:'')}</b><span class="xs muted">${esc(o.items.map(x=>x.name+' ×'+x.qty).join(', '))} · ${baht(o.total)} · ผ่อน ${o.n_periods} งวด · สั่งโดย ${esc(o.requested_name||'')}</span></div>
     ${o.status==='pending'?`<div class="row" style="gap:6px"><button class="btn btn-sm btn-bad" data-no="${o.id}">ไม่อนุมัติ</button><button class="btn btn-sm btn-p" data-ok="${o.id}">อนุมัติ</button></div>`:`<span class="tag ${o.status==='approved'?'t-ok':'t-bad'}">${{approved:'อนุมัติแล้ว',rejected:'ไม่อนุมัติ',cancelled:'ยกเลิก'}[o.status]}</span>`}</div>`).join('')}</div>`:'<div class="card empty"><b>ยังไม่มีคำสั่งซื้อ</b></div>';
-  $$('[data-ok]',C).forEach(b=>b.onclick=async()=>{ const {error}=await sb.rpc('decide_emp_order',{p_id:+b.dataset.ok,p_ok:true,p_reason:null}); if(error) return toast(errText(error),true); toast('อนุมัติแล้ว ตัดสต็อกและตั้งยอดผ่อนแล้ว'); pagePay(); });
-  $$('[data-no]',C).forEach(b=>b.onclick=async()=>{ const r=await promptBox('เหตุผลที่ไม่อนุมัติ',''); if(r===null) return; const {error}=await sb.rpc('decide_emp_order',{p_id:+b.dataset.no,p_ok:false,p_reason:r}); if(error) return toast(errText(error),true); pagePay(); });
+  $$('[data-ok]',C).forEach(b=>b.onclick=async()=>{ const o=list.find(x=>x.id===+b.dataset.ok); const opts=await deductStartOpts();
+    const m=overlay(`<div class="modal" role="dialog" aria-modal="true" aria-label="อนุมัติคำสั่งซื้อ"><b>อนุมัติคำสั่งซื้อสินค้าบริษัท</b><div class="sm muted" style="margin:4px 0 10px">${esc(o.items.map(x=>x.name+' ×'+x.qty).join(', '))} · ${baht(o.total)} · ผ่อน ${o.n_periods} งวด</div>${deductStartHTML(opts,'dso')}<div class="row" style="gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn" data-c>ยกเลิก</button><button class="btn btn-p" data-y>อนุมัติ</button></div></div>`);
+    $('[data-c]',m.el).onclick=m.close;
+    $('[data-y]',m.el).onclick=async ev=>{ const st=$('input[name=dso]:checked',m.el)?.value||null; busy(ev.target,true); const {error}=await sb.rpc('decide_emp_order',{p_id:o.id,p_ok:true,p_reason:null,p_start:st}); busy(ev.target,false); if(error) return toast(errText(error),true); m.close(); toast('อนุมัติแล้ว ตัดสต็อกและตั้งยอดผ่อนแล้ว'); pagePay(); }; });
+  $$('[data-no]',C).forEach(b=>b.onclick=async()=>{ const r=await promptBox('เหตุผลที่ไม่อนุมัติ',''); if(r===null) return; const {error}=await sb.rpc('decide_emp_order',{p_id:+b.dataset.no,p_ok:false,p_reason:r,p_start:null}); if(error) return toast(errText(error),true); pagePay(); });
 }
 async function payInst(){
   const C=$('#pyc'); const [ins,em]=await Promise.all([ sb.from('installments').select('*, employees(emp_code,first_name,last_name)').order('created_at',{ascending:false}).limit(100), sb.from('employees').select('id,emp_code,first_name,last_name,status').neq('status','resigned').order('sort_order',{nullsFirst:false}) ]);
   const list=ins.data||[], emps=em.data||[], mx=Number(S.settings.payroll_rules?.max_installments||6);
   C.innerHTML=`<form class="card col" id="adv" style="gap:8px"><b class="sm">บันทึกเบิกเงินล่วงหน้า</b><select class="in" name="e" required><option value="">— เลือกพนักงาน —</option>${emps.map(e=>`<option value="${e.id}">${esc((e.emp_code?e.emp_code+' · ':'')+e.first_name+' '+e.last_name)}</option>`).join('')}</select>
-      <div class="g2"><input class="in num" name="a" type="number" inputmode="decimal" placeholder="จำนวนเงิน" required><select class="in" name="n">${Array.from({length:mx},(_,i)=>`<option value="${i+1}">${i?`ผ่อน ${i+1} งวด`:'หักงวดถัดไป'}</option>`).join('')}</select></div><input class="in" name="t" placeholder="หมายเหตุ เช่น เบิกค่ารักษาพยาบาล"><button class="btn btn-p btn-sm" style="align-self:flex-start">บันทึก</button></form>
+      <div class="g2"><input class="in num" name="a" type="number" inputmode="decimal" placeholder="จำนวนเงิน" required><select class="in" name="n">${Array.from({length:mx},(_,i)=>`<option value="${i+1}">${i?`ผ่อน ${i+1} งวด`:'หักงวดเดียว'}</option>`).join('')}</select></div><input class="in" name="t" placeholder="หมายเหตุ เช่น เบิกค่ารักษาพยาบาล"><div id="dsw"></div><button class="btn btn-p btn-sm" style="align-self:flex-start">บันทึก</button></form>
     <div class="card card-l">${list.map(i=>`<div class="li"><div class="grow"><b>${esc(i.employees?`${i.employees.first_name} ${i.employees.last_name}`:'')}</b><span class="xs muted">${i.kind==='advance'?'เบิกล่วงหน้า':'สินค้า'} · ${esc(i.title)} · ${baht(i.total)} / ${i.n_periods} งวด · เริ่ม ${thaiDate(i.start_date)}</span></div><b class="num sm">${baht(i.total-i.paid)}</b><span class="tag ${i.status==='active'?'t-acc':i.status==='done'?'t-ok':''}">${{active:'กำลังหัก',done:'ครบแล้ว',cancelled:'ยกเลิก'}[i.status]}</span>${i.status==='active'&&!+i.paid?`<button class="ibtn" data-cx="${i.id}" aria-label="ยกเลิก">${IC.close}</button>`:''}</div>`).join('')||'<div class="empty"><b>ยังไม่มีรายการผ่อน</b></div>'}</div>`;
-  $('#adv').onsubmit=async e=>{ e.preventDefault(); const f=e.target; const {error}=await sb.rpc('add_advance',{p_emp:f.e.value,p_amount:Number(f.a.value),p_n:Number(f.n.value),p_title:f.t.value.trim()||null}); if(error) return toast(errText(error),true); toast('บันทึกแล้ว เริ่มหักงวดถัดไป'); pagePay(); };
+  deductStartOpts().then(o=>{ const h=$('#dsw',C); if(h) h.innerHTML=deductStartHTML(o,'dsa'); }).catch(()=>{});
+  $('#adv').onsubmit=async e=>{ e.preventDefault(); const f=e.target; const r=$('input[name=dsa]:checked',f), st=r?.value||null, lb=r?r.closest('label').querySelector('b').textContent:'งวดถัดไป';
+    const {error}=await sb.rpc('add_advance',{p_emp:f.e.value,p_amount:Number(f.a.value),p_n:Number(f.n.value),p_title:f.t.value.trim()||null,p_start:st}); if(error) return toast(/p_start|function/.test(error.message)?'ต้องรันไฟล์ 25_deduct_start.sql ก่อน':errText(error),true); toast(`บันทึกแล้ว เริ่มหัก${lb}`); pagePay(); };
   $$('[data-cx]',C).forEach(b=>b.onclick=async()=>{ if(!await confirmBox('ยกเลิกรายการผ่อนนี้?','ยกเลิก',true)) return; const {error}=await sb.from('installments').update({status:'cancelled'}).eq('id',+b.dataset.cx); if(error) return toast(errText(error),true); pagePay(); });
 }
 
