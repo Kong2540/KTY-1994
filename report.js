@@ -68,7 +68,7 @@ async function monthReport(month){
     if(!widths.includes('*')) widths[0]='*';
     const legend=[...Object.entries(AR_CODE).map(([k,[t,col]])=>[{text:t,color:col,bold:true},` ${ATT[k]?.t||k}   `]),...Object.values(S.settings.holiday_types||[]).map(h=>[{text:h.abbr,color:h.color,bold:true},` ${h.name}   `]),[{text:'+',bold:true},' มี OT']].flat();
     const [y,mo]=mon.split('-').map(Number), rLabel=`${range==='3'?'ประจำเดือน':'งวดวันที่ '+parseISO(D.a).d+'–'+parseISO(D.b).d} ${TH_MON_S[mo-1]} ${y+543}`;
-    return { pageSize:'A4', pageOrientation:'landscape', pageMargins:[m.l*PT,m.t*PT,m.r*PT,m.b*PT+12], defaultStyle:{font:'Sarabun',fontSize:cfg.font,color:'#1B262C',lineHeight:1.1},
+    return { pageSize:'A4', pageOrientation:'landscape', _rh:2, pageMargins:[m.l*PT,m.t*PT,m.r*PT,m.b*PT+12], defaultStyle:{font:'Sarabun',fontSize:cfg.font,color:'#1B262C',lineHeight:1.1},
       styles:{th:{bold:true,color:C_DARK,fillColor:C_BAND}}, info:{title:`รายงานการมาทำงาน ${rLabel}`,author:B.company_th},
       footer:(c,n)=>({columns:[{text:`${B.app} · ข้อมูลจากการเช็คชื่อ${mgr&&money.length?'และระบบเงินเดือน':''}`,fontSize:6.5,color:'#9AA6AA'},{text:`หน้า ${c}/${n}`,alignment:'right',fontSize:6.5,color:'#9AA6AA'}],margin:[m.l*PT,0,m.r*PT,0]}),
       content:[
