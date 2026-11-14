@@ -163,7 +163,8 @@ function openWizard(e, startStep=0, onSaved){
       ${inp('social_security_no','เลขประกันสังคม',{num:true,mode:'numeric'})}
       <div><button type="button" class="chip ${F.social_security_no&&digits(F.social_security_no)===id&&id?'on':''}" data-sameid>${IC.check}ใช้เลขเดียวกับบัตรประชาชน</button></div>
       ${inp('sso_hospital','โรงพยาบาลตามสิทธิ์ประกันสังคม',{ph:'เช่น โรงพยาบาลสิงห์บุรี'})}
-      <div class="g2">${sel('sso_method','วิธีหักประกันสังคม',[['actual','ตามค่าจ้างจริง'],['cap','ตามเพดานค่าแรงต่อวัน'],['fixed','กรอกยอดเอง (บาท/งวด)'],['none','ไม่หักประกันสังคม']],{empty:'ตามค่าเริ่มต้นของบริษัท'})}${inp('sso_fixed','ยอดหักต่องวด (บาท) · ใช้เมื่อเลือกกรอกเอง',{num:true,mode:'decimal'})}</div>`; },
+      <div class="g2">${sel('sso_method','วิธีหักประกันสังคม',[['actual','ตามค่าจ้างจริง'],['cap','ตามเพดานค่าแรงต่อวัน'],['fixed','กรอกยอดเอง (บาท/งวด)'],['none','ไม่หักประกันสังคม']],{empty:'ตามค่าเริ่มต้นของบริษัท'})}${inp('sso_fixed','ยอดหักต่องวด (บาท) · ใช้เมื่อเลือกกรอกเอง',{num:true,mode:'decimal'})}</div>
+      <span class="hint">หักประกันสังคมเฉพาะพนักงานที่สิทธิ์การรักษาเป็น "ประกันสังคม" (ตั้งที่เมนูสิทธิ์การรักษา) · ยังไม่ระบุสิทธิ์ = ไม่หัก</span>`; },
     ()=>`<div class="sec">ที่อยู่ตามบัตรประชาชน</div>${addrBlock('addr')}
       <div class="card row" style="padding:14px"><div class="grow"><b>ที่อยู่ปัจจุบัน</b><div class="sm muted">เหมือนที่อยู่ตามบัตรประชาชน</div></div><button type="button" class="sw ${F.cur_same?'on':''}" data-cursame role="switch" aria-checked="${!!F.cur_same}" aria-label="ที่อยู่ปัจจุบันเหมือนที่อยู่ตามบัตร"></button></div>
       ${F.cur_same?'':`<div class="sec">ที่อยู่ปัจจุบัน</div>${addrBlock('cur')}`}`,
