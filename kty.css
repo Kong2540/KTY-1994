@@ -558,3 +558,6 @@ details.perm>summary::-webkit-details-marker{display:none}
 .pw-det>summary::-webkit-details-marker{display:none}
 .pw-det>summary::after{content:'▾';color:var(--ink2);margin-left:auto}
 .pw-det[open]>summary::after{content:'▴'}
+.rs-it{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer}
+.rs-it:has(input:checked){border-color:var(--bad,#DC2626);background:rgba(220,38,38,.08)}
+.rs-it input{accent-color:#DC2626;width:16px;height:16px}

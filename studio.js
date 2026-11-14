@@ -13,7 +13,8 @@ const STUDIO_SECS = [
   ['wa','✅','ประเภทการขออนุมัติ','ตรวจเหล็ก เทคอนกรีต รายการตรวจ ช่องลงนาม'],
   ['photos','📷','รูปถ่าย','จำนวนรูปขั้นต่ำ/สูงสุด ทุกงาน ทุกหัวข้อ'],
   ['selfedit','🪪','สิทธิ์แก้ข้อมูลส่วนตัว','ช่องไหนต้องอนุมัติ แก้ได้ทันที หรือห้ามแก้'],
-  ['adv','⚙️','ตั้งค่าขั้นสูง','สถานะ สี ตัวย่อเลขที่ ข้อความเอกสาร ไทล์หน้าหลัก']
+  ['adv','⚙️','ตั้งค่าขั้นสูง','สถานะ สี ตัวย่อเลขที่ ข้อความเอกสาร ไทล์หน้าหลัก'],
+  ['reset','🧹','ล้างข้อมูล / เริ่มต้นใหม่','ล้างข้อมูลทดลองหรือประวัติ สำรองลง Drive ก่อนทุกครั้ง']
 ];
 async function saveSetting(key, value){
   const {error}=await sb.from('app_settings').upsert({key,value,updated_at:new Date().toISOString()});
@@ -27,7 +28,7 @@ function pageStudio(sec){
     `<div class="studio ${isForm?'studio-wide':''}">${(wide&&!isForm)||!cur?`<nav class="studio-nav card card-l">${STUDIO_SECS.map(([k,e,t,d])=>`<a href="#studio/${k}" class="li ${show===k?'on':''}" style="text-decoration:none"><span class="se">${e}</span><div class="grow"><b>${t}</b><span class="xs muted">${d}</span></div>${IC.chev}</a>`).join('')}
       <a href="#manage" class="li" style="text-decoration:none"><span class="se">⚙️</span><div class="grow"><b>จัดการข้อมูลอื่น</b><span class="xs muted">ผู้ใช้ สิทธิ์รายระบบ ไซต์ ตำแหน่ง วัสดุ</span></div>${IC.chev}</a></nav>`:''}
       ${show?'<section class="studio-body col" id="sb" style="gap:14px"></section>':''}</div>`);
-  if(show) ({brand:stBrand,labels:stLabels,forms:stForms,lists:stLists,access:stAccess,rules:stRules,holidays:stHolidays,payroll:stPayroll,wa:stWa,adv:stAdv,photos:stPhotos,selfedit:stSelfEdit})[show]($('#sb'));
+  if(show) ({brand:stBrand,labels:stLabels,forms:stForms,lists:stLists,access:stAccess,rules:stRules,holidays:stHolidays,payroll:stPayroll,wa:stWa,adv:stAdv,photos:stPhotos,selfedit:stSelfEdit,reset:stReset})[show]($('#sb'));
 }
 
 /* ---------------- แบรนด์ ---------------- */
@@ -134,4 +135,53 @@ function stRules(host){
     <button class="btn btn-p btn-sm" data-save style="align-self:flex-start">บันทึก</button></div>`;
   const inp=$('#rm'); $$('[data-m]',host).forEach(b=>b.onclick=()=>{ inp.value=Math.max(0,Math.min(30,(+inp.value||0)+ +b.dataset.m)); });
   $('[data-save]',host).onclick=async ev=>{ busy(ev.target,true); try{ await saveSetting('daily_rules',{...r,min_photos:Math.max(0,Math.min(30,Math.round(+inp.value||0)))}); toast('บันทึกแล้ว'); stRules(host); }catch(e){ busy(ev.target,false); toast(e.message,true); } };
+}
+
+/* ---------- ล้างข้อมูล / เริ่มต้นใหม่ (แอดมิน) ---------- */
+const RESET_CATS=[
+ ['ประวัติและคำขอ',[['audit','ประวัติการแก้ไขข้อมูลพนักงาน (แท็บ "ประวัติ")','ทุกคน · ล้างรายคนได้ที่หน้าข้อมูลพนักงาน','audit_log','changed_at'],
+   ['req','ประวัติคำขอแก้ไขข้อมูลส่วนตัว','คำขอเปลี่ยนรูป/ข้อมูล ทั้งที่อนุมัติ ไม่อนุมัติ และค้าง','emp_change_requests','created_at'],
+   ['link','คำขอผูกบัญชีกับพนักงาน','','link_requests','created_at']]],
+ ['เช็คชื่อและดาว',[['att','การเช็คชื่อพนักงานรายวัน','สถานะ มา/สาย/ลา/ขาด และ OT','attendance','work_date'],
+   ['star','ประวัติดาว (เพิ่ม/หัก)','ทุกคนกลับเป็น 5 ดาว','star_events','created_at'],
+   ['crew','เช็คชื่อคนงานหน้าไซต์ (รอบเช้า)','','site_reports','report_date']]],
+ ['รายงานและงานหน้าไซต์',[['daily','รายงานประจำวัน','ไฟล์ PDF/Sheet ใน Drive ไม่ถูกลบ','daily_reports','report_date'],
+   ['iss','แจ้งปัญหา + ความเห็น','','issues','created_at'],
+   ['wa','ใบขออนุมัติงาน (เหล็ก/คอนกรีต ฯลฯ)','','work_approvals','created_at']]],
+ ['วัสดุและอุปกรณ์',[['docs','ใบเบิก ใบยืม ใบคืน ใบรับของ','','docs','created_at'],
+   ['ledger','ประวัติเคลื่อนไหวสต็อก','เก็บยอดคงเหลือไว้เป็นยอดยกมา','ledger','created_at']]],
+ ['เงินเดือน',[['pay','งวดเงินเดือน สลิป รายการเพิ่ม/หัก','รวมยอดประกันสังคมที่กรอกเอง','pay_periods','start_date'],
+   ['inst','รายการผ่อนสินค้า/เบิกล่วงหน้า + คำสั่งซื้อสินค้า','','installments','created_at']]],
+ ['อื่น ๆ',[['hol','วันหยุดบริษัทที่กำหนดไว้','','holidays','day']]]];
+async function stReset(host){
+  host.innerHTML=`<div class="card col" style="gap:12px">
+    <div class="note n-bad">${IC.info}<span><b>ข้อมูลที่ล้างแล้วกู้คืนในแอปไม่ได้</b> ระบบจะสำรองข้อมูลทั้งหมดลง Google Drive ให้ก่อนล้างทุกครั้ง</span></div>
+    <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><b class="sm">ช่วงข้อมูล</b><select class="in" id="rs_rg" style="width:auto;height:38px"><option value="all">ทั้งหมด</option><option value="before">ก่อนวันที่…</option></select><input class="in" type="date" id="rs_bd" value="${localISO()}" style="width:auto;height:38px" hidden></div>
+    <div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><b>เลือกข้อมูลที่จะล้าง</b><div class="row" style="gap:6px"><button class="btn btn-sm" data-rall>เริ่มต้นใหม่ทั้งระบบ</button><button class="btn btn-sm" data-rnone>ไม่เลือก</button></div></div>
+    ${RESET_CATS.map(([g,items])=>`<div class="col" style="gap:6px"><b class="sm muted">${g}</b>${items.map(([k,t,h,tb])=>`<label class="rs-it"><input type="checkbox" data-rk="${k}"><span class="col" style="gap:0;min-width:0"><b class="sm">${t}</b>${h?`<span class="xs muted">${h}</span>`:''}</span><span class="xs muted num" data-rn="${k}">…</span></label>`).join('')}</div>`).join('')}
+    <div class="note n-ok" style="font-size:13px">${IC.info}<span><b>ไม่ถูกล้างเสมอ:</b> ทะเบียนพนักงาน · บัญชีผู้ใช้และสิทธิ์ · ไซต์งาน · รายการวัสดุ/สินค้า · ตั้งค่าทั้งหมด · รูปและไฟล์ใน Google Drive · เลขที่เอกสารเริ่มนับใหม่ทุกปีอยู่แล้ว</span></div>
+    <div class="card" id="rs_sum" style="padding:10px 12px;background:var(--bg2,transparent)"></div>
+    <label class="field"><span class="sm">พิมพ์คำว่า <b>ล้างข้อมูล</b> เพื่อยืนยัน</span><input class="in" id="rs_cf" autocomplete="off" placeholder="ล้างข้อมูล"></label>
+    <button class="btn btn-bad" data-rgo disabled style="align-self:flex-start">สำรองแล้วล้างข้อมูลที่เลือก</button><div id="rs_res"></div></div>`;
+  const all=RESET_CATS.flatMap(g=>g[1]), cnt={};
+  const before=()=>$('#rs_rg',host).value==='before'?$('#rs_bd',host).value:null;
+  const count=async()=>{ const b=before(); await Promise.all(all.map(async([k,,,tb,col])=>{ let q=sb.from(tb).select('*',{count:'exact',head:true}); if(b) q=q.lt(col,/date|day/.test(col)?b:new Date(b+'T00:00:00+07:00').toISOString());
+      const {count:c,error}=await q; cnt[k]=error?null:c; const el=$(`[data-rn="${k}"]`,host); if(el) el.textContent=c==null?'-':`${c.toLocaleString()} รายการ`; })); sum(); };
+  const sum=()=>{ const on=$$('[data-rk]:checked',host).map(i=>i.dataset.rk), n=on.reduce((a,k)=>a+(cnt[k]||0),0), b=before();
+    $('#rs_sum',host).innerHTML=on.length?`จะล้าง <b>${on.length} หมวด</b> ประมาณ <b>${n.toLocaleString()} รายการ</b> (${b?'ก่อนวันที่ '+thaiDate(b):'ทั้งหมด'})`:'<span class="muted">ยังไม่ได้เลือกหมวด</span>';
+    $('[data-rgo]',host).disabled=!(on.length&&$('#rs_cf',host).value.trim()==='ล้างข้อมูล'); };
+  $$('[data-rk]',host).forEach(i=>i.onchange=sum); $('#rs_cf',host).oninput=sum;
+  $('[data-rall]',host).onclick=()=>{ $$('[data-rk]',host).forEach(i=>i.checked=true); sum(); };
+  $('[data-rnone]',host).onclick=()=>{ $$('[data-rk]',host).forEach(i=>i.checked=false); sum(); };
+  $('#rs_rg',host).onchange=()=>{ $('#rs_bd',host).hidden=$('#rs_rg',host).value==='all'; count(); }; $('#rs_bd',host).onchange=count;
+  $('[data-rgo]',host).onclick=async ev=>{ const cats=$$('[data-rk]:checked',host).map(i=>i.dataset.rk), b=before();
+    busy(ev.target,true,'กำลังสำรองข้อมูลลง Drive...'); let bk;
+    try{ bk=await bridge('backup'); }catch(e){ busy(ev.target,false); return toast('สำรองข้อมูลไม่สำเร็จ จึงยังไม่ล้าง: '+errText(e),true); }
+    busy(ev.target,true,'กำลังล้างข้อมูล...');
+    const {data,error}=await sb.rpc('reset_data',{p_cats:cats,p_before:b}); busy(ev.target,false);
+    if(error) return toast(/reset_data|function/.test(error.message)?'ต้องรันไฟล์ 27_data_reset.sql ก่อน':errText(error),true);
+    const tot=Object.values(data||{}).reduce((a,v)=>a+(+v||0),0);
+    $('#rs_res',host).innerHTML=`<div class="note n-ok">${IC.check||''}<span>สำรองแล้ว <b>${esc(bk?.name||'')}</b> และล้างข้อมูล ${tot.toLocaleString()} รายการเรียบร้อย</span></div>`;
+    $('#rs_cf',host).value=''; $$('[data-rk]',host).forEach(i=>i.checked=false); count(); };
+  count();
 }
