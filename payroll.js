@@ -139,7 +139,7 @@ function payBreak(d){
   if(+d.ot_hours) add(`OT ${fmtN(d.ot_hours)} ชม. × ${fmtN(d.ot_rate)}`,fmtN(d.ot));
   (d.items||[]).filter(x=>x.kind==='add').forEach(x=>add(`+ ${esc(x.label)}`,fmtN(x.amount)));
   add('<b>รวมรายได้ (ก่อนหัก)</b>',`<b>${fmtN(d.gross)}</b>`);
-  if(+d.sso) add('ประกันสังคม',`−${fmtN(d.sso)}`,'color:var(--bad)');
+  if(+d.sso) add(`ประกันสังคม${d.sso_manual?' <span class="tag t-warn" style="height:18px;font-size:10px">กรอกเอง</span>':d.sso_method==='cap'?` <span class="xs muted">(${fmtN(d.days)} แรง × ไม่เกิน ${fmtN(d.sso_auto_cap)})</span>`:''}`,`−${fmtN(d.sso)}`,'color:var(--bad)');
   (d.inst||[]).forEach(x=>add(`${x.kind==='advance'?'เบิกล่วงหน้า':'สินค้า'}: ${esc(x.title)} (งวด ${x.no}/${x.of})`,`−${fmtN(x.amount)}`,'color:var(--bad)'));
   (d.items||[]).filter(x=>x.kind==='deduct').forEach(x=>add(`− ${esc(x.label)}`,`−${fmtN(x.amount)}`,'color:var(--bad)'));
   add('<b>รับสุทธิ</b>',`<b style="font-size:18px">${fmtN(d.net)}</b>`);
@@ -150,6 +150,7 @@ function payDetail(p, s, done){
   const d=s.data, closed=p.status==='closed';
   const ov=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="รายละเอียดเงินเดือน"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>${esc(d.name)}<small>${esc(d.emp_code||'')} · งวด ${periodLabel(p)}</small></h1></header>
     <div class="sheet-body">${payBreak(d)}
+      ${closed||!d.sso_enabled?'':`<div class="card col" style="gap:8px"><div class="row" style="justify-content:space-between;gap:6px;flex-wrap:wrap"><b class="sm">ประกันสังคมงวดนี้</b><span class="xs muted">${d.sso_manual?'กรอกเอง':'ระบบคิด: '+({actual:'ตามค่าจ้างจริง',cap:'ตามเพดานค่าแรง',fixed:'ยอดคงที่ (ข้อมูลพนักงาน)',none:'ไม่หัก'}[d.sso_method]||'ตามค่าจ้างจริง')}</span></div><div class="row" style="gap:8px"><input class="in num" id="sso_ov" type="number" inputmode="decimal" min="0" placeholder="ว่าง = ใช้ยอดที่ระบบคิด" value="${d.sso_manual?d.sso:''}"><button class="btn btn-sm" data-ssov>บันทึก</button>${d.sso_manual?'<button class="btn btn-sm" data-ssoclr>ใช้ยอดระบบ</button>':''}</div><span class="xs muted">ยอดที่กรอกจะปัดขึ้นเป็นบาทเต็มตามกติกา และคงอยู่แม้คำนวณงวดใหม่</span></div>`}
       ${closed?'':`<div class="card col" style="gap:8px"><b class="sm">เพิ่มรายการงวดนี้</b><div class="seg"><button class="on" data-k="add">เพิ่มเงิน</button><button data-k="deduct">หักเงิน</button></div><input class="in" id="pi_l" placeholder="เช่น เบี้ยขยัน / ค่าเสียหาย"><div class="row" style="gap:8px"><input class="in num" id="pi_a" type="number" inputmode="decimal" placeholder="จำนวนเงิน" style="max-width:160px"><button class="btn btn-p" data-addi>เพิ่ม</button></div></div>
       ${(d.items||[]).filter(x=>x.source==='manual').length?`<div class="card card-l">${d.items.filter(x=>x.source==='manual').map(x=>`<div class="li"><span class="grow">${x.kind==='add'?'+':'−'} ${esc(x.label)}</span><b class="num">${fmtN(x.amount)}</b><button class="ibtn" data-deli="${x.id}" aria-label="ลบ">${IC.close}</button></div>`).join('')}</div>`:''}`}</div>
     <div class="sheet-foot"><a class="btn" href="#pay/s/${s.id}">หน้าสลิปเต็ม</a><button class="btn btn-p" data-x2>ปิด</button></div></div>`,false,false);
@@ -158,6 +159,10 @@ function payDetail(p, s, done){
   $('[data-x]',ov.el).onclick=close; $('[data-x2]',ov.el).onclick=close;
   $$('[data-k]',ov.el).forEach(b=>b.onclick=()=>{ kind=b.dataset.k; $$('[data-k]',ov.el).forEach(x=>x.classList.toggle('on',x===b)); });
   const recalc=async()=>{ const r=await sb.rpc('calc_period',{p_period:p.id}); if(r.error) throw r.error; const n=await sb.from('pay_slips').select('*').eq('period_id',p.id).eq('employee_id',s.employee_id).single(); ov.close(); payDetail(p,n.data,done); };
+  const setSso=async(ev,amt)=>{ busy(ev.target,true); const {error}=await sb.rpc('set_sso_override',{p_period:p.id,p_emp:s.employee_id,p_amount:amt}); if(error){ busy(ev.target,false); return toast(/set_sso_override|function/.test(error.message)?'ต้องรันไฟล์ 26_sso_cap.sql ก่อน':errText(error),true); }
+    const n=await sb.from('pay_slips').select('*').eq('period_id',p.id).eq('employee_id',s.employee_id).single(); ov.close(); payDetail(p,n.data,done); toast(amt===null?'กลับไปใช้ยอดที่ระบบคิดแล้ว':'บันทึกยอดประกันสังคมงวดนี้แล้ว'); };
+  const sv=$('[data-ssov]',ov.el); if(sv) sv.onclick=ev=>{ const v=$('#sso_ov',ov.el).value.trim(); if(v!==''&&!(Number(v)>=0)) return toast('ใส่ยอดเป็นตัวเลข',true); setSso(ev,v===''?null:Number(v)); };
+  const sc2=$('[data-ssoclr]',ov.el); if(sc2) sc2.onclick=ev=>setSso(ev,null);
   const ad=$('[data-addi]',ov.el); if(ad) ad.onclick=async ev=>{ const l=$('#pi_l',ov.el).value.trim(), a=Number($('#pi_a',ov.el).value); if(!l||!(a>0)) return toast('ใส่ชื่อรายการและจำนวนเงิน',true);
     busy(ev.target,true); const {error}=await sb.from('pay_items').insert({period_id:p.id,employee_id:s.employee_id,kind,label:l,amount:a}); if(error){ busy(ev.target,false); return toast(errText(error),true); }
     try{ await recalc(); toast('เพิ่มแล้ว คำนวณใหม่แล้ว'); }catch(e){ toast(errText(e),true); } };
@@ -395,17 +400,24 @@ async function payInst(){
 
 /* ---------------- ตั้งค่าระบบ: กติกาเงินเดือน + วันหยุดบริษัท ---------------- */
 function stPayroll(host){
-  const r={leave_paid:{sick:true,personal:false,vacation:true},late_full_day:true,monthly_divisor:30,sso_rate:0.05,sso_floor:1650,sso_ceiling:17500,max_installments:6,carry_negative:true,...(S.settings.payroll_rules||{})};
+  const r={leave_paid:{sick:true,personal:false,vacation:true},late_full_day:true,monthly_divisor:30,sso_rate:0.05,sso_floor:1650,sso_ceiling:17500,max_installments:6,carry_negative:true,sso_method:'actual',sso_cap_rate:350,sso_roundup:true,...(S.settings.payroll_rules||{})};
   const tg=(k,t,on)=>`<div class="li" style="padding:6px 0"><span class="grow">${t}</span><button class="sw ${on?'on':''}" data-t="${k}" role="switch" aria-label="${t}"></button></div>`;
   host.innerHTML=`<div class="card col" style="gap:10px"><b>การลาที่ได้ค่าจ้าง (พนักงานรายวัน)</b>${tg('sick','ลาป่วย',r.leave_paid.sick)}${tg('personal','ลากิจ',r.leave_paid.personal)}${tg('vacation','ลาพักร้อน',r.leave_paid.vacation)}${tg('late','มาสายนับเต็มวัน (ปิด = นับครึ่งวัน)',r.late_full_day)}${tg('carry','หักไม่หมด ยกยอดไปงวดถัดไป',r.carry_negative)}</div>
+    <div class="card col" style="gap:10px"><b>วิธีคิดเงินสมทบประกันสังคม (ค่าเริ่มต้นของบริษัท)</b>
+      ${[['actual','ตามค่าจ้างจริง','อัตรา% ของค่าจ้างรวมทั้งเดือน ภายในฐานต่ำสุด–เพดานฐาน'],['cap','ตามเพดานค่าแรงต่อวัน','วันที่มาทำงาน × ค่าแรง (ไม่เกินเพดาน) × อัตรา% · พนักงานรายเดือนใช้แบบค่าจ้างจริง เว้นแต่ตั้งรายคน']].map(([v,t,h])=>`<label class="row ds-opt" style="gap:10px;align-items:flex-start;border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer"><input type="radio" name="ssom" value="${v}" ${r.sso_method===v?'checked':''} style="margin-top:4px"><span class="col" style="gap:0"><b class="sm">${t}</b><span class="xs muted">${h}</span></span></label>`).join('')}
+      <div class="g2"><div class="field"><label>เพดานค่าแรงที่ใช้คิด (บาท/วัน)</label><input class="in num" data-n="sso_cap_rate" value="${r.sso_cap_rate}"></div><div class="field" style="justify-content:flex-end">${tg('roundup','ปัดเศษยอดหักขึ้นเป็นบาทเต็ม',r.sso_roundup!==false)}</div></div>
+      <span class="hint" data-ssoex></span></div>
     <div class="card col" style="gap:10px"><b>ตัวเลข</b><div class="g2"><div class="field"><label>ประกันสังคม (%)</label><input class="in num" data-n="sso_rate" value="${r.sso_rate*100}"></div><div class="field"><label>ฐานขั้นต่ำ (บาท/เดือน)</label><input class="in num" data-n="sso_floor" value="${r.sso_floor}"></div></div>
       <div class="g2"><div class="field"><label>เพดานฐาน (บาท/เดือน)</label><input class="in num" data-n="sso_ceiling" value="${r.sso_ceiling}"></div><div class="field"><label>รายเดือน หักวันละ เงินเดือน ÷</label><input class="in num" data-n="monthly_divisor" value="${r.monthly_divisor}"></div></div>
       <div class="field"><label>ผ่อนสินค้า/เบิกล่วงหน้าได้สูงสุด (งวด)</label><input class="in num" data-n="max_installments" value="${r.max_installments}" style="max-width:120px"></div>
       <span class="hint">ประกันสังคมหักสูงสุด ${fmtN(r.sso_ceiling*r.sso_rate)} บาท/เดือน (รวม 2 งวด)</span></div>
     <button class="btn btn-p" data-save style="align-self:flex-start">บันทึกกติกาเงินเดือน</button>`;
-  $$('[data-t]',host).forEach(b=>b.onclick=()=>b.classList.toggle('on'));
+  const ssoEx=()=>{ const c=Number($('[data-n="sso_cap_rate"]',host).value)||0, rt=Number($('[data-n="sso_rate"]',host).value)||0, raw=14.5*Math.min(480,c)*rt/100, up=$('[data-t="roundup"]',host).classList.contains('on');
+    $('[data-ssoex]',host).textContent=`ตัวอย่างแบบเพดาน: ค่าแรง 480 มา 14.5 แรง → 14.5 × ${fmtN(Math.min(480,c))} × ${rt}% = ${fmtN(raw)} → หัก ${up?Math.ceil(raw-1e-9):Math.round(raw)} บาท`; };
+  $$('[data-n]',host).forEach(i=>i.addEventListener('input',ssoEx));
+  $$('[data-t]',host).forEach(b=>b.onclick=()=>{ b.classList.toggle('on'); ssoEx(); }); ssoEx();
   $('[data-save]',host).onclick=async ev=>{ const on=k=>$(`[data-t="${k}"]`,host).classList.contains('on'), nv=k=>Number($(`[data-n="${k}"]`,host).value);
-    const v={...r,leave_paid:{sick:on('sick'),personal:on('personal'),vacation:on('vacation')},late_full_day:on('late'),carry_negative:on('carry'),sso_rate:nv('sso_rate')/100,sso_floor:nv('sso_floor'),sso_ceiling:nv('sso_ceiling'),monthly_divisor:nv('monthly_divisor')||30,max_installments:Math.max(1,Math.min(24,nv('max_installments')||6))};
+    const v={...r,leave_paid:{sick:on('sick'),personal:on('personal'),vacation:on('vacation')},late_full_day:on('late'),carry_negative:on('carry'),sso_rate:nv('sso_rate')/100,sso_floor:nv('sso_floor'),sso_ceiling:nv('sso_ceiling'),monthly_divisor:nv('monthly_divisor')||30,sso_method:($('input[name=ssom]:checked',host)||{}).value||'actual',sso_cap_rate:nv('sso_cap_rate')||350,sso_roundup:on('roundup'),max_installments:Math.max(1,Math.min(24,nv('max_installments')||6))};
     busy(ev.target,true); try{ await saveSetting('payroll_rules',v); toast('บันทึกแล้ว มีผลเมื่อกด "คำนวณใหม่" ในงวดที่ยังไม่ปิด'); stPayroll(host); }catch(e){ busy(ev.target,false); toast(e.message,true); } };
 }
 let holMonth=localISO().slice(0,7);

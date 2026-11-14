@@ -106,7 +106,7 @@ async function showHistory(id, box){
    ทะเบียนประวัติ 5 ขั้น (เพิ่ม/แก้ไข)
    ===================================================================== */
 const EMP_FIELDS=['title','first_name','last_name','first_name_en','last_name_en','nickname','gender','birth_date','nationality','marital_status','military_status','blood_type','blood_consent_at',
-  'national_id','id_issue_date','id_expiry_date','social_security_no','sso_hospital',
+  'national_id','id_issue_date','id_expiry_date','social_security_no','sso_hospital','sso_method','sso_fixed',
   'addr_no','addr_moo','addr_soi','addr_road','addr_subdistrict','addr_district','addr_province','addr_zip',
   'cur_same','cur_no','cur_moo','cur_soi','cur_road','cur_subdistrict','cur_district','cur_province','cur_zip',
   'phone','line_id','email','emergency_name','emergency_relation','emergency_phone','bank_name','bank_account_no','bank_account_name',
@@ -162,7 +162,8 @@ function openWizard(e, startStep=0, onSaved){
       <div class="sec">ประกันสังคม</div>
       ${inp('social_security_no','เลขประกันสังคม',{num:true,mode:'numeric'})}
       <div><button type="button" class="chip ${F.social_security_no&&digits(F.social_security_no)===id&&id?'on':''}" data-sameid>${IC.check}ใช้เลขเดียวกับบัตรประชาชน</button></div>
-      ${inp('sso_hospital','โรงพยาบาลตามสิทธิ์ประกันสังคม',{ph:'เช่น โรงพยาบาลสิงห์บุรี'})}`; },
+      ${inp('sso_hospital','โรงพยาบาลตามสิทธิ์ประกันสังคม',{ph:'เช่น โรงพยาบาลสิงห์บุรี'})}
+      <div class="g2">${sel('sso_method','วิธีหักประกันสังคม',[['actual','ตามค่าจ้างจริง'],['cap','ตามเพดานค่าแรงต่อวัน'],['fixed','กรอกยอดเอง (บาท/งวด)'],['none','ไม่หักประกันสังคม']],{empty:'ตามค่าเริ่มต้นของบริษัท'})}${inp('sso_fixed','ยอดหักต่องวด (บาท) · ใช้เมื่อเลือกกรอกเอง',{num:true,mode:'decimal'})}</div>`; },
     ()=>`<div class="sec">ที่อยู่ตามบัตรประชาชน</div>${addrBlock('addr')}
       <div class="card row" style="padding:14px"><div class="grow"><b>ที่อยู่ปัจจุบัน</b><div class="sm muted">เหมือนที่อยู่ตามบัตรประชาชน</div></div><button type="button" class="sw ${F.cur_same?'on':''}" data-cursame role="switch" aria-checked="${!!F.cur_same}" aria-label="ที่อยู่ปัจจุบันเหมือนที่อยู่ตามบัตร"></button></div>
       ${F.cur_same?'':`<div class="sec">ที่อยู่ปัจจุบัน</div>${addrBlock('cur')}`}`,
@@ -252,6 +253,7 @@ function openWizard(e, startStep=0, onSaved){
   async function save(btn){
     for(let s=0;s<5;s++){ const err=validate(s); if(err){ step=s; render(); return toast(err,true); } }
     const row={}; EMP_FIELDS.forEach(k=>{ let x=F[k]; if(typeof x==='string'){ x=x.trim(); if(x==='') x=null; } row[k]=x===undefined?null:x; });
+    ['sso_method','sso_fixed'].forEach(k=>{ if(F[k]===undefined) delete row[k]; }); // ยังไม่รัน 26_sso_cap.sql = ไม่ส่งช่องใหม่
     row.title=row.title||'นาย'; row.wage_rate=Number(F.wage_rate||0); row.ot_rate=Number(F.ot_rate||0); row.cur_same=!!F.cur_same;
     row.employment_type=row.employment_type||'permanent'; row.status=row.status||'active'; row.wage_type=row.wage_type||'daily';
     row.national_id=digits(F.national_id)||null;
