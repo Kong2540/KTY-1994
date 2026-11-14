@@ -241,12 +241,12 @@ async function paySlipsPreview(p, slips){
 async function payCashPreview(p, slips){
   const ALL=CASH_DEN.map(d=>d[0]);
   let dens=(()=>{ const v=S.settings.cash_denoms; if(Array.isArray(v)&&v.length) return v.filter(x=>ALL.includes(x)); try{ const l=JSON.parse(localStorage.getItem('kty-cash-den')||'null'); if(Array.isArray(l)&&l.length) return l; }catch(_){} return [...ALL]; })();
-  const opt={per:true,perNewPage:false}, fn=`ใบเบิกเงินสด_${p.start_date}_${p.end_date}`;
+  const opt={per:true,perNewPage:true}, fn=`ใบเบิกเงินสด_${p.start_date}_${p.end_date}`;
   const ov=overlay(`<div class="sheet sheet-wide" role="dialog" aria-modal="true" aria-label="สรุปเบิกเงินสด"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>สรุปเบิกเงินสด<small>ธนบัตรและเหรียญที่ต้องเตรียม · งวด ${periodLabel(p)}</small></h1></header>
     <div class="sheet-body"><div class="card col" style="gap:10px">
       <b class="sm">ชนิดเงินที่นำมาคิด <span class="xs muted">(เอาติ๊กออกถ้าธนาคารไม่มีชั่วคราว)</span></b>
       <div class="row" style="gap:8px;flex-wrap:wrap" id="cden">${CASH_DEN.map(([v,k])=>`<label class="chip ${dens.includes(v)?'on':''}" style="cursor:pointer;gap:6px"><input type="checkbox" data-den="${v}" ${dens.includes(v)?'checked':''}>${k==='เหรียญ'?'🪙':'💵'} ${v.toLocaleString('en-US')}</label>`).join('')}</div>
-      <div class="row" style="gap:14px;flex-wrap:wrap"><label class="row sm" style="gap:6px"><input type="checkbox" data-per checked>แสดงตารางใส่ซองรายคน</label><label class="row sm" style="gap:6px"><input type="checkbox" data-pnp>ตารางรายคนขึ้นหน้าใหม่</label><span class="xs muted">คิดแยกทีละคนให้ใส่ซองได้พอดี แล้วรวมเป็นยอดที่ต้องเบิก · เศษสตางค์ปัดลง</span></div>
+      <div class="row" style="gap:14px;flex-wrap:wrap"><label class="row sm" style="gap:6px"><input type="checkbox" data-per checked>แสดงหน้าสรุปรายคน (ใส่ซอง) แยกเป็นหน้า 2</label><span class="xs muted">คิดแยกทีละคนให้ใส่ซองได้พอดี แล้วรวมเป็นยอดที่ต้องเบิก · เศษสตางค์ปัดลง</span></div>
       <div id="csum" class="sm"></div></div>
       <div class="pg-wrap" id="pgw"><div class="loading"><div class="spin"></div></div></div></div>
     <div class="sheet-foot" style="flex-wrap:wrap"><span class="sm muted grow" id="pgn"></span><button class="btn" data-png disabled>บันทึกรูป PNG</button><button class="btn btn-p" data-pdf disabled>ดาวน์โหลด PDF</button></div></div>`,false,false);
@@ -258,7 +258,6 @@ async function payCashPreview(p, slips){
     if(isManager()) saveT=setTimeout(()=>saveSetting('cash_denoms',dens).catch(()=>{}),800); };
   $$('[data-den]',ov.el).forEach(i=>i.onchange=()=>{ const v=+i.dataset.den; dens=i.checked?[...new Set([...dens,v])]:dens.filter(x=>x!==v); i.parentElement.classList.toggle('on',i.checked); remember(); summ(); lp.render(); });
   $('[data-per]',ov.el).onchange=e=>{ opt.per=e.target.checked; lp.render(); };
-  $('[data-pnp]',ov.el).onchange=e=>{ opt.perNewPage=e.target.checked; lp.render(); };
   summ(); lp.render(true);
   $('[data-pdf]',ov.el).onclick=async ev=>{ if(!lp.blob) return; busy(ev.target,true,'กำลังบันทึก...'); try{ await saveOrShare(lp.blob, fn+'.pdf'); busy(ev.target,false); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
   $('[data-png]',ov.el).onclick=async ev=>{ if(!lp.blob) return; busy(ev.target,true,'กำลังสร้างรูป...'); try{ await savePngs(await pdfToPngs(lp.blob,3),fn); }catch(e){ toast(errText(e),true); } busy(ev.target,false); };

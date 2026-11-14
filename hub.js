@@ -1,7 +1,7 @@
 /* =====================================================================
    KTY Hub — โครงหน้า: แถบเมนูด้านข้าง / ลิ้นชักเมนูบนมือถือ / ตัวเลือกไซต์
    ===================================================================== */
-const HUB_VERSION = '3.5.7';
+const HUB_VERSION = '3.5.8';
 const MOD = {
   wa:       { t:'ขออนุมัติงาน',        hue:'#0E7C86', i:'<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>' },
   att:      { t:'เช็คชื่อ',            hue:'#2E9E5B', i:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>' },
@@ -231,7 +231,7 @@ async function pageHome(){
   $$('[data-site]').forEach(b=>b.onclick=()=>{ S.site=b.dataset.site; try{ localStorage.setItem('kty-site',S.site); }catch(_){} route(); });
   let tiles='';
   if(mgr){
-    tiles=[tileHTML('att','#att','เช็คชื่อ','att'), tileHTML('daily','#daily',null,'daily'), tileHTML('materials','#mat',null,'mat'), tileHTML('borrow','#ret',null,'brw'), tileHTML('issues','#iss',null,'iss'), tileHTML('people','#employees'), tileHTML('payroll','#pay'), tileHTML('sites','#manage/sites'), tileHTML('manage','#manage','จัดการ','users'), ...(isAdmin()?[tileHTML('studio','#studio')]:[])].filter(x=>x).join('');
+    tiles=[tileHTML('att','#att','เช็คชื่อ','att'), tileHTML('daily','#daily',null,'daily'), tileHTML('materials','#mat',null,'mat'), tileHTML('borrow','#ret',null,'brw'), tileHTML('issues','#iss',null,'iss'), tileHTML('wa','#wa','ขออนุมัติงาน','wa'), tileHTML('people','#employees'), tileHTML('payroll','#pay'), tileHTML('sites','#manage/sites'), tileHTML('manage','#manage','จัดการ','users'), ...(isAdmin()?[tileHTML('studio','#studio')]:[])].filter(x=>x).join('');
   } else {
     const t=[];
     if(p.can_check) t.push(tileHTML('att','#roll','เช็คชื่อหน้าไซต์งาน'));

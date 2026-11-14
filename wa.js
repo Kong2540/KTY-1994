@@ -12,7 +12,7 @@ const waTypes=()=>{ const t=S.settings.wa_types; return t&&t.length?t:WA_TYPES_D
 const waType=k=>waTypes().find(t=>t.key===k);
 const waElements=()=>{ const l=S.settings.daily_lists?.wa_elements; return l&&l.length?l:WA_ELEMENTS_DEF; };
 const waCanSign=(w,t)=>{ const s=t?.signers?.[w.step]; if(!s||!['submitted','in_review'].includes(w.status)) return false; return s.who==='checker'?(isManager()||hasMod('wa',['checker'])):s.who==='manager'?isManager():s.who==='requester'?w.requester===S.profile.id:false; };
-let WA_SITE=null, WA_TAB='list', WA_PRE=null;
+let WA_KEEP=false, WA_SITE=null, WA_TAB='list', WA_PRE=null, WA_F={site:'all',type:'all',st:'all',sort:'new'};
 
 /* ฟอร์มของแต่ละประเภท (แก้ได้ในตัวสร้างฟอร์ม) */
 function waSyncForms(){
@@ -30,7 +30,9 @@ function waSyncForms(){
 async function pageWa(a,b){
   waSyncForms();
   if(a==='new') return waForm(b);
-  if(a&&/^\d+$/.test(a)) return waDetailPage(+a);
+  if(a&&/^\d+$/.test(a)){ WA_KEEP=true; return waDetailPage(+a); } // กลับจากหน้ารายละเอียด = คงตัวกรองเดิม
+  if(location.hash.replace('#','')==='wa'&&!WA_KEEP) WA_F={site:'all',type:'all',st:'all',sort:'new'}; // เปิดใหม่ = ทุกไซต์ ล่าสุดก่อน
+  WA_KEEP=false;
   return waList();
 }
 
@@ -90,27 +92,54 @@ function signSheet(title, done, extraHTML='', onOpen){
 
 /* ---------- รายการ / ภาพรวมชิ้นส่วน ---------- */
 async function waList(){
-  const sites=S.sites.filter(s=>s.status==='active'); if(WA_SITE==null) WA_SITE=S.site?+S.site:(mySiteIds()[0]||sites[0]?.id||null);
-  const types=waTypes().filter(t=>t.active!==false);
+  const mgr=isManager(), mine=mySiteIds(), sites=S.sites.filter(s=>s.status==='active'&&(mgr||mine.includes(s.id)));
+  const types=waTypes().filter(t=>t.active!==false), F=WA_F;
+  if(F.site!=='all'&&!sites.some(s=>s.id===+F.site)) F.site='all';
   setPage(head('ขออนุมัติงาน','ตรวจเหล็ก · เทคอนกรีต · ประเภทอื่น')+`<div class="col" style="gap:12px">
     <div class="watypes">${types.map(t=>`<a href="#wa/new/${t.key}" class="card col" style="gap:4px;align-items:center;text-align:center;text-decoration:none;color:inherit;padding:14px"><span style="font-size:26px">${esc(t.icon||'📋')}</span><b class="sm">ขอ${esc(t.name)}</b>${(t.requires||[]).length?`<span class="xs muted">ต้องผ่าน${(t.requires||[]).map(r=>waType(r)?.name||r).join(', ')}ก่อน</span>`:''}</a>`).join('')}</div>
-    <div class="row" style="gap:8px;flex-wrap:wrap"><select class="in" id="wsite" style="height:40px;width:auto;flex:1;min-width:200px">${sites.map(s=>`<option value="${s.id}" ${s.id===WA_SITE?'selected':''}>${esc(s.name)}</option>`).join('')}</select><div class="seg" style="width:auto">${[['list','รายการ'],['track','ภาพรวมชิ้นส่วน']].map(([k,t])=>`<button class="${WA_TAB===k?'on':''}" data-wt="${k}">${t}</button>`).join('')}</div></div><div id="wab"><div class="loading"><div class="spin"></div></div></div></div>`);
-  $('#wsite').onchange=e=>{ WA_SITE=+e.target.value; waList(); };
+    <div class="seg" style="width:auto;align-self:flex-start">${[['list','รายการ'],['track','ภาพรวมชิ้นส่วน']].map(([k,t])=>`<button class="${WA_TAB===k?'on':''}" data-wt="${k}" style="white-space:nowrap;padding:0 14px">${t}</button>`).join('')}</div>
+    <div id="wab"><div class="loading"><div class="spin"></div></div></div></div>`);
   $$('[data-wt]').forEach(b=>b.onclick=()=>{ WA_TAB=b.dataset.wt; waList(); });
-  const {data,error}=await sb.from('work_approvals').select('id,wa_no,type_key,site_id,floor,element,element_code,status,result,step,requester,requester_name,created_at,request_at,approved_at').eq('site_id',WA_SITE).order('created_at',{ascending:false}).limit(400);
+  let q=sb.from('work_approvals').select('id,wa_no,type_key,site_id,floor,element,element_code,status,result,step,requester,requester_name,created_at,request_at,approved_at').order('created_at',{ascending:false}).limit(600);
+  if(WA_TAB==='track'&&F.site!=='all') q=q.eq('site_id',+F.site); else if(!mgr) q=q.in('site_id',mine.length?mine:[-1]);
+  const {data,error}=await q;
   const H=$('#wab');
   if(error){ H.outerHTML=/work_approvals/.test(error.message)?'<div class="card empty"><b>ยังไม่ได้อัปเดตฐานข้อมูล</b>รันไฟล์ 21_work_approvals.sql</div>':`<div class="note n-bad">${esc(errText(error))}</div>`; return; }
-  const L=data||[];
+  const ALL=(data||[]).filter(w=>mgr||mine.includes(w.site_id));
   if(WA_TAB==='track'){
+    const L=ALL.filter(w=>F.site!=='all'&&w.site_id===+F.site);
+    const pick=`<div class="row" style="gap:8px;margin-bottom:10px"><select class="in" id="wsite" style="height:40px;flex:1;min-width:200px" aria-label="หน้างาน"><option value="all">— เลือกหน้างาน —</option>${sites.map(s=>`<option value="${s.id}" ${String(s.id)===String(F.site)?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>`;
+    if(F.site==='all'){ H.outerHTML=`<div>${pick}<div class="card empty"><b>เลือกหน้างานก่อน</b>ภาพรวมชิ้นส่วนแสดงทีละหน้างาน</div></div>`; $('#wsite').onchange=e=>{ F.site=e.target.value; waList(); }; return; }
     const rows={}; L.filter(w=>w.status!=='cancelled').forEach(w=>{ const k=`${w.floor||''}|${(w.element_code||'').toUpperCase()}`; const r=rows[k]=rows[k]||{floor:w.floor,element:w.element,code:w.element_code,by:{}}; if(!r.by[w.type_key]||r.by[w.type_key].created_at<w.created_at) r.by[w.type_key]=w; });
     const R=Object.values(rows).sort((a,b)=>String(a.floor).localeCompare(String(b.floor),'th',{numeric:true})||String(a.code).localeCompare(String(b.code),'th',{numeric:true}));
     const cell=w=>{ if(!w) return '<span class="tag" style="height:22px;font-size:11px;color:var(--ink2)">ยังไม่ขอ</span>'; const [t,c]=w.status==='approved'&&w.result==='conditional'?['ผ่าน (มีเงื่อนไข)','t-acc']:WA_ST[w.status]; return `<a href="#wa/${w.id}" class="tag ${c}" style="height:22px;font-size:11px;text-decoration:none">${t}</a>`; };
-    H.outerHTML=`<div class="card" style="padding:0;overflow-x:auto"><table class="tbl"><thead><tr><th>ชั้น/โซน</th><th>ชิ้นส่วนโครงสร้าง</th>${types.map(t=>`<th style="text-align:center">${esc(t.icon||'')} ${esc(t.name)}</th>`).join('')}</tr></thead><tbody>
-      ${R.map(r=>`<tr><td>${esc(r.floor||'-')}</td><td><b>${esc(r.element||'')}</b> ${esc(r.code||'')}</td>${types.map(t=>`<td style="text-align:center">${cell(r.by[t.key])}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${types.length+2}"><div class="empty"><b>ยังไม่มีคำขอในไซต์นี้</b></div></td></tr>`}</tbody></table></div>`;
+    H.outerHTML=`<div>${pick}<div class="card" style="padding:0;overflow-x:auto"><table class="tbl"><thead><tr><th>ชั้น/โซน</th><th>ชิ้นส่วนโครงสร้าง</th>${types.map(t=>`<th style="text-align:center">${esc(t.icon||'')} ${esc(t.name)}</th>`).join('')}</tr></thead><tbody>
+      ${R.map(r=>`<tr><td>${esc(r.floor||'-')}</td><td><b>${esc(r.element||'')}</b> ${esc(r.code||'')}</td>${types.map(t=>`<td style="text-align:center">${cell(r.by[t.key])}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${types.length+2}"><div class="empty"><b>ยังไม่มีคำขอในไซต์นี้</b></div></td></tr>`}</tbody></table></div></div>`;
+    $('#wsite').onchange=e=>{ F.site=e.target.value; waList(); };
     return;
   }
-  H.outerHTML=`<div class="card card-l">${L.map(w=>{ const t=waType(w.type_key)||{}; const [st,sc]=w.status==='approved'&&w.result==='conditional'?['ผ่าน (มีเงื่อนไข)','t-acc']:WA_ST[w.status]; const me=waCanSign(w,t);
-    return `<a href="#wa/${w.id}" class="li" style="text-decoration:none;color:inherit"><span style="font-size:22px">${esc(t.icon||'📋')}</span><div class="grow"><b class="sm">${esc(t.name||w.type_key)} · ${esc(w.element||'')} ${esc(w.element_code||'')} ${esc(w.floor||'')}</b><span class="xs muted">${esc(w.wa_no||'')} · ${esc(w.requester_name||'')}${w.request_at?` · ${new Date(w.request_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}`:''}</span></div>${me?'<span class="tag t-warn" style="height:20px;font-size:10.5px">รอคุณลงนาม</span>':''}<span class="tag ${sc}" style="height:20px;font-size:10.5px">${st}</span></a>`; }).join('')||'<div class="empty"><b>ยังไม่มีคำขอ</b>กดปุ่มด้านบนเพื่อขออนุมัติ</div>'}</div>`;
+  /* รายการ: ทุกไซต์ ล่าสุดก่อน · กรองหน้างาน/ประเภท/สถานะ (ปุ่มแยก มีจำนวน) · เรียงได้ 4 แบบ */
+  const stKey=w=>w.status==='approved'&&w.result==='conditional'?'cond':w.status;
+  const isMe=w=>waCanSign(w,waType(w.type_key)||{});
+  const ok=(w,skip)=>(skip==='site'||F.site==='all'||w.site_id===+F.site)&&(skip==='type'||F.type==='all'||w.type_key===F.type)&&(skip==='st'||F.st==='all'||(F.st==='me'?isMe(w):stKey(w)===F.st));
+  const cnt=(key,v)=>ALL.filter(w=>ok(w,key)&&(v==='all'||(key==='site'?w.site_id===+v:key==='type'?w.type_key===v:v==='me'?isMe(w):stKey(w)===v))).length;
+  const chips=(key,label,opts)=>`<div class="col" style="gap:4px"><span class="xs muted" style="font-weight:600">${label}</span><div class="chips scroll" style="margin:0 -16px;padding:0 16px">${opts.map(([v,t])=>`<button class="chip ${String(F[key])===String(v)?'on':''}" data-f="${key}" data-v="${v}">${t} <span class="xs" style="opacity:.7;font-weight:700">${cnt(key,v)}</span></button>`).join('')}</div></div>`;
+  const siteName=id=>{ const s=S.sites.find(x=>x.id===id); return s?`${s.code?s.code+' ':''}${s.name}`:''; };
+  const sorter={new:(a,b)=>String(b.created_at).localeCompare(a.created_at),old:(a,b)=>String(a.created_at).localeCompare(b.created_at),
+    due:(a,b)=>String(a.request_at||'9').localeCompare(String(b.request_at||'9')),site:(a,b)=>siteName(a.site_id).localeCompare(siteName(b.site_id),'th',{numeric:true})||String(b.created_at).localeCompare(a.created_at)}[F.sort]||((a,b)=>0);
+  const L=ALL.filter(w=>ok(w)).sort(sorter), ST_OPT=[['all','ทั้งหมด'],['me','รอคุณลงนาม'],['submitted','รอตรวจ'],['in_review','รออนุมัติ'],['approved','อนุมัติแล้ว'],['cond','มีเงื่อนไข'],['rejected','ไม่ผ่าน'],['cancelled','ยกเลิก']];
+  const dt=x=>x?new Date(x).toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+' น.':'-';
+  H.outerHTML=`<div class="col" style="gap:10px">
+    ${sites.length>1?chips('site','หน้างาน',[['all','ทุกไซต์'],...sites.map(s=>[s.id,esc(s.code||s.name)])]):''}
+    ${types.length>1?chips('type','ประเภท',[['all','ทุกประเภท'],...types.map(t=>[t.key,`${esc(t.icon||'')} ${esc(t.name)}`])]):''}
+    ${chips('st','สถานะ',ST_OPT.filter(([v])=>v==='all'||cnt('st',v)>0||v==='me'))}
+    <div class="row" style="gap:8px;flex-wrap:wrap"><select class="in" id="wsort" style="height:38px;flex:1;min-width:200px" aria-label="เรียงลำดับ">${[['new','เรียง: ส่งล่าสุดก่อน'],['old','เรียง: ส่งเก่าสุดก่อน'],['due','เรียง: วันนัดตรวจ/เท ใกล้สุดก่อน'],['site','เรียง: ตามหน้างาน']].map(([v,t])=>`<option value="${v}" ${F.sort===v?'selected':''}>${t}</option>`).join('')}</select></div>
+    <div class="row sm muted"><span class="grow">${L.length} รายการ</span>${F.site!=='all'||F.type!=='all'||F.st!=='all'||F.sort!=='new'?'<button class="btn btn-sm" data-freset>ล้างตัวกรอง</button>':''}</div>
+    <div class="card card-l">${L.map(w=>{ const t=waType(w.type_key)||{}; const [st,sc]=w.status==='approved'&&w.result==='conditional'?['ผ่าน (มีเงื่อนไข)','t-acc']:(WA_ST[w.status]||[w.status,'']); const me=isMe(w);
+      return `<a href="#wa/${w.id}" class="li" style="text-decoration:none;color:inherit"><span style="font-size:22px">${esc(t.icon||'📋')}</span><div class="grow" style="min-width:0">${sites.length>1?`<span class="tag t-acc" style="height:18px;font-size:10.5px;margin-bottom:2px">${esc(siteName(w.site_id))}</span>`:''}<b class="sm" style="display:block">${esc(t.name||w.type_key)} · ${esc(w.element||'')} ${esc(w.element_code||'')} ${esc(w.floor||'')}</b><span class="xs muted">${esc(w.wa_no||'')} · ${esc(w.requester_name||'')}<br>ส่ง ${dt(w.created_at)}${w.request_at?` · นัด ${dt(w.request_at)}`:''}</span></div><div class="col" style="gap:4px;align-items:flex-end">${me?'<span class="tag t-warn" style="height:20px;font-size:10.5px">รอคุณลงนาม</span>':''}<span class="tag ${sc}" style="height:20px;font-size:10.5px">${st}</span></div></a>`; }).join('')||'<div class="empty"><b>ไม่มีรายการที่ตรงกับตัวกรอง</b></div>'}</div></div>`;
+  $$('[data-f]').forEach(b=>b.onclick=()=>{ F[b.dataset.f]=b.dataset.v; waList(); });
+  $('#wsort').onchange=e=>{ F.sort=e.target.value; waList(); };
+  const rs=$('[data-freset]'); if(rs) rs.onclick=()=>{ Object.assign(F,{site:'all',type:'all',st:'all',sort:'new'}); waList(); };
 }
 
 /* ---------- รายละเอียด / ลงนาม ---------- */
