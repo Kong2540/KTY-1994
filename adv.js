@@ -6,7 +6,7 @@ const ADV_DEF = {
   iss_urg:{normal:{t:'ปกติ',col:'#64748B'},urgent:{t:'ด่วน',col:'#D97706'},critical:{t:'ด่วนมาก/อันตราย',col:'#DC2626'}},
   iss_st:{new:'ใหม่',acknowledged:'รับเรื่อง',in_progress:'กำลังแก้ไข',resolved:'แก้แล้ว รอยืนยัน',closed:'ปิดเรื่อง'},
   prefix:{REQ:'REQ',BRW:'BRW',ISS:'ISS'},
-  text:{slip_note:'โปรดตรวจสอบจำนวนเงินให้เรียบร้อยก่อนออกจากบริษัทฯ',pay_sign:'ผู้จัดทำ, ผู้ตรวจสอบ, ผู้อนุมัติ',dws_sign:'ผู้เช็คชื่อ, ผู้ตรวจสอบ',rep_sign:'ผู้จัดทำ, ผู้ตรวจสอบ, ผู้อนุมัติ'},
+  text:{slip_note:'โปรดตรวจสอบจำนวนเงินให้เรียบร้อยก่อนออกจากบริษัทฯ',pay_sign:'ผู้จัดทำ, ผู้ตรวจสอบ, ผู้อนุมัติ',dws_sign:'ผู้เช็คชื่อ, ผู้ตรวจสอบ',rep_sign:'ผู้จัดทำ, ผู้ตรวจสอบ, ผู้อนุมัติ',cash_sign:'ผู้เบิกเงิน, ผู้จ่ายเงิน, ผู้อนุมัติ'},
   thr:{rate_ok:95,rate_warn:85,store_warn:80,store_bad:90},
   tiles:{}
 };
@@ -40,7 +40,7 @@ function stAdv(host){
     const urg=Object.entries(ADV_DEF.iss_urg).map(([k,d])=>{ const v={...d,...(A.iss_urg[k]||{})}; return `<div class="advrow"><input type="color" data-urg="${k}" data-f="col" value="${v.col}" aria-label="สี"><input class="in" data-urg="${k}" data-f="t" value="${esc(v.t)}"><span class="xs muted">${k}</span></div>`; }).join('');
     const ist=Object.entries(ADV_DEF.iss_st).map(([k,d])=>`<div class="advrow"><input class="in" data-ist="${k}" value="${esc(A.iss_st[k]||d)}"><span class="xs muted">${k}</span></div>`).join('');
     const pre=[['REQ','ใบเบิก วัสดุ/อุปกรณ์'],['BRW','ใบยืมอุปกรณ์ (เดิม)'],['ISS','ใบแจ้งปัญหา']].map(([k,t])=>`<label class="field"><span class="xs muted">${t}</span><input class="in" data-pre="${k}" value="${esc(A.prefix[k]||k)}" maxlength="6" style="text-transform:uppercase"></label>`).join('');
-    const txt=[['slip_note','ข้อความท้ายสลิปเงินเดือน'],['pay_sign','ช่องลงชื่อใบสรุปเงินเดือน (คั่นด้วย ,)'],['dws_sign','ช่องลงชื่อใบสรุปคนงานประจำวัน (คั่นด้วย ,)'],['rep_sign','ช่องลงชื่อรายงานการมาทำงาน (คั่นด้วย ,)']].map(([k,t])=>`<label class="field"><span class="xs muted">${t}</span><input class="in" data-txt="${k}" value="${esc(A.text[k]??ADV_DEF.text[k])}"></label>`).join('');
+    const txt=[['slip_note','ข้อความท้ายสลิปเงินเดือน'],['pay_sign','ช่องลงชื่อใบสรุปเงินเดือน (คั่นด้วย ,)'],['cash_sign','ช่องลงชื่อใบเบิกเงินสดจ่ายเงินเดือน (คั่นด้วย ,)'],['dws_sign','ช่องลงชื่อใบสรุปคนงานประจำวัน (คั่นด้วย ,)'],['rep_sign','ช่องลงชื่อรายงานการมาทำงาน (คั่นด้วย ,)']].map(([k,t])=>`<label class="field"><span class="xs muted">${t}</span><input class="in" data-txt="${k}" value="${esc(A.text[k]??ADV_DEF.text[k])}"></label>`).join('');
     const thr=[['rate_ok','อัตรามาทำงาน "ดี" ตั้งแต่ (%)'],['rate_warn','อัตรามาทำงาน "เฝ้าระวัง" ตั้งแต่ (%)'],['store_warn','เตือนพื้นที่ใกล้เต็ม เมื่อใช้ (%)'],['store_bad','เตือน "ใกล้เต็มมาก" เมื่อใช้ (%)']].map(([k,t])=>`<label class="field"><span class="xs muted">${t}</span><input class="in num" type="number" min="1" max="100" data-thr="${k}" value="${esc(A.thr[k]??ADV_DEF.thr[k])}"></label>`).join('');
     const TK=Object.keys(MOD).filter(k=>!['manage','studio','home'].includes(k)), tc=A.tiles[role]||{order:[],hidden:[]};
     const ordered=[...(tc.order||[]).filter(k=>TK.includes(k)),...TK.filter(k=>!(tc.order||[]).includes(k))];

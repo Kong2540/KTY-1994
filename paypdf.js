@@ -111,6 +111,54 @@ async function slipsDoc(p, slips, qrOf){
     info:{title:`สลิปเงินเดือน ${periodText(p)}`}, background:()=>({...cut,absolutePosition:{x:0,y:0}}), content };
 }
 
+/* ---------- ใบเบิกเงินสดจ่ายเงินเดือน (ธนบัตร/เหรียญที่ต้องเตรียม) ---------- */
+const CASH_DEN=[[1000,'ธนบัตร','ใบ'],[500,'ธนบัตร','ใบ'],[100,'ธนบัตร','ใบ'],[50,'ธนบัตร','ใบ'],[20,'ธนบัตร','ใบ'],[10,'เหรียญ','เหรียญ'],[5,'เหรียญ','เหรียญ'],[2,'เหรียญ','เหรียญ'],[1,'เหรียญ','เหรียญ']];
+/* แตกแบงก์รายคน: จ่ายได้มากที่สุดด้วยแบงก์/เหรียญที่เลือก แล้วใช้จำนวนใบน้อยที่สุด · เศษสตางค์ปัดลง */
+function cashBreak(amount, dens){
+  const a=Math.max(0,Math.floor(+amount||0)), ds=[...dens].sort((x,y)=>y-x), out={}; ds.forEach(d=>out[d]=0);
+  if(!a||!ds.length) return {cnt:out,paid:0,rest:a};
+  const big=ds[0], lim=Math.min(a, big*3+(a%big)); // ส่วนที่เกินจ่ายด้วยแบงก์ใหญ่สุดก่อน (แบงก์ไทยเป็นพหุคูณกัน) ที่เหลือคิดแบบละเอียด
+  let head=Math.max(0,Math.floor((a-lim)/big)); out[big]+=head; const r=a-head*big;
+  const best=new Int32Array(r+1).fill(1e9), from=new Int32Array(r+1).fill(-1); best[0]=0;
+  for(let v=1;v<=r;v++) for(const d of ds) if(d<=v&&best[v-d]+1<best[v]){ best[v]=best[v-d]+1; from[v]=d; }
+  let v=r; while(v>0&&best[v]>=1e9) v--; const paid=head*big+v;
+  while(v>0){ const d=from[v]; out[d]++; v-=d; }
+  return {cnt:out,paid,rest:a-paid};
+}
+async function cashDoc(p, slips, dens, opt={}){
+  await pdfReady(); await logoData();
+  const B=BR(), M=36, W=595.28, iw=W-M*2, sel=CASH_DEN.filter(d=>dens.includes(d[0])).map(d=>d[0]);
+  const rows=slips.map(s=>({s,net:+s.data.net||0,...cashBreak(s.data.net,sel)})).filter(r=>r.net>0);
+  const tot={}; sel.forEach(d=>tot[d]=rows.reduce((a,r)=>a+r.cnt[d],0));
+  const paid=rows.reduce((a,r)=>a+r.paid,0), rest=rows.reduce((a,r)=>a+r.rest,0), netAll=rows.reduce((a,r)=>a+r.net,0), satang=netAll-rows.reduce((a,r)=>a+Math.floor(r.net),0);
+  const N=v=>Number(v).toLocaleString('en-US'), bd={hLineWidth:(i,n)=>i===0||i===1||i===n.table.body.length?.7:.3,vLineWidth:()=>0,hLineColor:()=>C_LINE,paddingTop:()=>4,paddingBottom:()=>4,paddingLeft:()=>6,paddingRight:()=>6};
+  const H=(t,r)=>({text:t,bold:true,color:C_DARK,fillColor:C_BAND,alignment:r?'right':'left'});
+  const denRows=CASH_DEN.map(([v,k,u])=>{ const on=sel.includes(v);
+    return on?[{text:`${k} ${N(v)} บาท`,bold:true},{text:N(tot[v]),bold:true,alignment:'right',fontSize:12},{text:u,color:C_LAB},{text:fmtN(tot[v]*v),alignment:'right'}]
+      :[{text:`${k} ${N(v)} บาท`,color:'#9AA6AA',decoration:'lineThrough'},{text:'งดใช้',color:'#9AA6AA',alignment:'right'},{text:''},{text:'-',color:'#9AA6AA',alignment:'right'}]; });
+  const per=opt.per!==false&&rows.length?[{text:'รายละเอียดการใส่ซองรายคน',bold:true,fontSize:11,color:C_DARK,margin:[0,16,0,6],pageBreak:opt.perNewPage?'before':undefined},
+    {table:{headerRows:1,dontBreakRows:true,widths:[16,'*','auto',...sel.map(()=>'auto'),...(rest?['auto']:[])],
+      body:[[H('#'),H('ชื่อ-นามสกุล'),H('จ่ายจริง',1),...sel.map(v=>H(N(v),1)),...(rest?[H('เศษ',1)]:[])],
+        ...rows.map((r,i)=>[{text:String(i+1),color:C_LAB},{text:[r.s.data.name||'',r.s.data.__emp?.nickname?{text:` (${r.s.data.__emp.nickname})`,color:C_LAB}:''].filter(Boolean)},{text:N(r.paid),bold:true,alignment:'right'},
+          ...sel.map(v=>({text:r.cnt[v]?String(r.cnt[v]):'·',alignment:'right',color:r.cnt[v]?'#1B262C':'#C9D1D4'})),...(rest?[{text:r.rest?N(r.rest):'',alignment:'right',color:'#B42318'}]:[])]),
+        [{text:''},{text:'รวม',bold:true},{text:N(paid),bold:true,alignment:'right'},...sel.map(v=>({text:N(tot[v]),bold:true,alignment:'right'})),...(rest?[{text:N(rest),bold:true,alignment:'right',color:'#B42318'}]:[])]]},
+      layout:{...bd,fillColor:(r,n)=>r===n.table.body.length-1?C_BAND:null},fontSize:8.6}]:[];
+  return { pageSize:'A4', _rh:2, pageMargins:[M,32,M,44], defaultStyle:{font:'Sarabun',fontSize:9.5,color:'#1B262C',lineHeight:1.15}, info:{title:`ใบเบิกเงินสด ${periodText(p)}`,author:B.company_th},
+    footer:(c,n)=>({columns:[{text:`${B.app} · คำนวณจากยอดสุทธิในระบบเงินเดือน (เศษสตางค์ปัดลง)`,fontSize:7,color:'#9AA6AA'},{text:`หน้า ${c}/${n}`,alignment:'right',fontSize:7,color:'#9AA6AA'}],margin:[M,14,M,0]}),
+    content:[
+      {columns:[{...logoNode(36),width:40},{stack:[{text:B.company_th,bold:true,fontSize:12.5,color:C_DARK},{text:B.company_en,fontSize:7,color:C_LAB,characterSpacing:.5}],margin:[6,4,0,0],width:'*'},
+        {stack:[{text:'ใบเบิกเงินสดจ่ายเงินเดือน',bold:true,fontSize:16,color:C_DARK,alignment:'right'},{text:periodText(p),fontSize:9.5,color:C_LAB,alignment:'right'}],width:'auto'}],columnGap:4},
+      ruleLine(iw),
+      {columns:[{stack:[['วันที่จ่าย',thaiDate(p.pay_date)],['จำนวนพนักงาน',`${rows.length} คน`],['ยอดสุทธิในระบบ',`${fmtN(netAll)} บาท`]].map(([a,b])=>({columns:[{text:a,color:C_LAB,width:80},{text:b,bold:true}],margin:[0,0,0,3]}))},
+        {table:{widths:[190],body:[[{stack:[{text:'ยอดเงินสดที่ต้องเบิก',fontSize:9,color:'#fff'},{text:`${N(paid)} บาท`,bold:true,fontSize:22,color:'#F2B705'}],margin:[10,6,10,6]}]]},layout:{fillColor:()=>C_DARK,hLineWidth:()=>0,vLineWidth:()=>0},width:190}],margin:[0,0,0,12]},
+      {table:{headerRows:1,widths:['*',70,44,100],body:[[H('ชนิดเงิน'),H('จำนวน',1),H(''),H('เป็นเงิน (บาท)',1)],...denRows,
+        [{text:'รวมทั้งสิ้น',bold:true},{text:''},{text:''},{text:fmtN(paid),bold:true,alignment:'right',fontSize:11}]]},layout:{...bd,fillColor:(r,n)=>r===n.table.body.length-1?C_BAND:null}},
+      ...(rest||satang>0.004?[{stack:[...(rest?[{text:`เศษที่จ่ายด้วยชนิดเงินที่เลือกไม่ได้ รวม ${N(rest)} บาท (ดูช่อง "เศษ" ในตารางรายคน) — ต้องเตรียมเงินเพิ่มหรือเลือกชนิดเงินเพิ่ม`,color:'#B42318'}]:[]),
+          ...(satang>0.004?[{text:`เศษสตางค์ที่ปัดลงทั้งหมด ${fmtN(satang)} บาท`,color:C_LAB}]:[])],fontSize:8.5,margin:[0,6,0,0]}]:[]),
+      {columns:advList('cash_sign').map(t=>({stack:[{text:'..............................................',alignment:'center',color:'#9AA6AA'},{text:t,alignment:'center',fontSize:8.5,margin:[0,2,0,0]},{text:'วันที่ ......./......./.......',alignment:'center',fontSize:7.5,color:'#9AA6AA',margin:[0,2,0,0]}]})),margin:[0,26,0,0],unbreakable:true},
+      ...per ] };
+}
+
 /* ---------- สลิปแบบละเอียด (A4 แนวตั้ง จัดสมดุลเต็มหน้า) ---------- */
 async function detailDoc(p, s){
   await pdfReady(); await logoData();
