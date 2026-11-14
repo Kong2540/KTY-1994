@@ -349,12 +349,18 @@ async function issueDoc(i, imgs){
 }
 
 /* ---------- เอกสาร A4 แบบราชการ: ขออนุมัติงาน (QR เปิดโฟลเดอร์ Drive ของใบ) ---------- */
-async function waDoc(w, photos){
+/* ใบขออนุมัติงาน (ทุกประเภท) — บังคับ 1 หน้า A4: ลองขนาดปกติก่อน ถ้าเกินจะย่อระยะ/ตัวอักษร/รูป ทีละขั้นจนพอดีหน้าเดียว */
+const WA_FIT=[{s:1,pc:3,ar:.72},{s:.96,pc:4,ar:.72},{s:.92,pc:4,ar:.62},{s:.88,pc:5,ar:.66},{s:.84,pc:6,ar:.66},{s:.8,pc:7,ar:.66},{s:.76,pc:8,ar:.66},{s:.72,pc:10,ar:.66}];
+async function pageCount(dd){ let n=1; const f=dd.footer; dd.footer=(c,t)=>{ n=t; return typeof f==='function'?f(c,t):(f||null); }; await prepDoc(dd); await new Promise(r=>pdfMake.createPdf(dd).getBuffer(r)); return n; }
+async function fitOnePage(build, levels){ for(let i=0;i<levels;i++){ if(await pageCount(await build(i))<=1) return build(i); } return build(levels-1); }
+async function waDocFit(w, photos){ await pdfReady(); await logoData(); return fitOnePage(lv=>waDoc(w,photos,lv), WA_FIT.length); }
+async function waDoc(w, photos, lv=0){
   await pdfReady(); await logoData();
+  const F=WA_FIT[Math.min(lv,WA_FIT.length-1)], k=F.s, z=v=>+(v*k).toFixed(2);
   const t=(typeof waType==='function'&&waType(w.type_key))||{name:w.type_key,signers:[],doc_title:'แบบขออนุมัติ',doc_title_en:''};
-  const B=BR(), W=595.28, M=40, iw=W-M*2, site=S.sites.find(s=>s.id===w.site_id), dt=new Date(w.created_at);
+  const B=BR(), W=595.28, M=36, iw=W-M*2, site=S.sites.find(s=>s.id===w.site_id), dt=new Date(w.created_at);
   const thDate=d=>`${d.getDate()} ${TH_MONTHS[d.getMonth()]} ${d.getFullYear()+543}`;
-  const bd={hLineWidth:()=>.7,vLineWidth:()=>.7,hLineColor:()=>'#1B262C',vLineColor:()=>'#1B262C',paddingLeft:()=>5,paddingRight:()=>5,paddingTop:()=>3.5,paddingBottom:()=>3.5};
+  const bd={hLineWidth:()=>.7,vLineWidth:()=>.7,hLineColor:()=>'#1B262C',vLineColor:()=>'#1B262C',paddingLeft:()=>z(5),paddingRight:()=>z(5),paddingTop:()=>z(3),paddingBottom:()=>z(3)};
   const L=(t)=>({text:t,fillColor:'#F1F3F2'});
   const extra=(typeof formOf==='function'?formOf('wa_'+w.type_key):[]).filter(f=>!f.core&&f.type!=='photos'&&f.show_pdf!==0&&w.data&&cfText(f,w.data[f.key])).map(f=>[f.label,cfText(f,w.data[f.key])]);
   const info=[[L('โครงการ'),{text:site?`${site.name}${site.code?` (${site.code})`:''}`:'-',colSpan:3},{},{}],
@@ -362,34 +368,39 @@ async function waDoc(w, photos){
     [L('แบบอ้างอิง'),w.drawing_ref||'-',L('วันเวลา'),w.request_at?new Date(w.request_at).toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'})+' น.':'-']];
   for(let i=0;i<extra.length;i+=2){ const a=extra[i], b=extra[i+1]; info.push(b?[L(a[0]),a[1],L(b[0]),b[1]]:[L(a[0]),{text:a[1],colSpan:3},{},{}]); }
   const inspected=(w.checklist||[]).some(c=>c.result);
-  const tick=(col)=>({canvas:[{type:'polyline',lineWidth:1.6,lineColor:col,closePath:false,points:[{x:1,y:5},{x:4,y:8.5},{x:10,y:1}]}],width:11,alignment:'center'});
+  const tick=(col)=>({canvas:[{type:'polyline',lineWidth:1.5,lineColor:col,closePath:false,points:[{x:1,y:4.5},{x:4,y:8},{x:10,y:1}]}],width:11,alignment:'center'});
   const cbox=(on)=>({canvas:[{type:'rect',x:0,y:1,w:9,h:9,lineWidth:.8,lineColor:'#1B262C'},...(on?[{type:'polyline',lineWidth:1.5,lineColor:'#1B262C',points:[{x:1.5,y:5.5},{x:4,y:8},{x:8.5,y:2.5}]}]:[])],width:12});
   const ck=[[{text:'ที่',bold:true,fillColor:'#F1F3F2',alignment:'center'},{text:'รายการตรวจสอบ',bold:true,fillColor:'#F1F3F2'},{text:'ผ่าน',bold:true,fillColor:'#F1F3F2',alignment:'center'},{text:'ไม่ผ่าน',bold:true,fillColor:'#F1F3F2',alignment:'center'},{text:'หมายเหตุ',bold:true,fillColor:'#F1F3F2'}],
-    ...(w.checklist||[]).map((c,i)=>[{text:String(i+1),alignment:'center'},c.item,(inspected?c.result==='pass':c.self)?{columns:[{text:'',width:'*'},tick('#16A34A'),{text:'',width:'*'}]}:{text:''},c.result==='fail'?{columns:[{text:'',width:'*'},tick('#DC2626'),{text:'',width:'*'}]}:{text:''},{text:c.note||'',fontSize:8.5}])];
+    ...(w.checklist||[]).map((c,i)=>[{text:String(i+1),alignment:'center'},c.item,(inspected?c.result==='pass':c.self)?{columns:[{text:'',width:'*'},tick('#16A34A'),{text:'',width:'*'}]}:{text:''},c.result==='fail'?{columns:[{text:'',width:'*'},tick('#DC2626'),{text:'',width:'*'}]}:{text:''},{text:c.note||'',fontSize:z(8.5)}])];
   const opt=(on,label)=>[cbox(on),{text:label,width:'auto',noWrap:true,margin:[3,0,14,0]}];
   const res=[{columns:[{text:'ผลการตรวจสอบ',bold:true,width:'auto',noWrap:true,margin:[0,0,14,0]},...opt(w.result==='pass','ผ่าน'),...opt(w.result==='conditional','ผ่านแบบมีเงื่อนไข'),...opt(w.result==='fail','ไม่ผ่าน (แก้ไขแล้วขอตรวจใหม่)'),{text:'',width:'*'}],columnGap:0},
     ...(w.conditions?[{text:['เงื่อนไข/ข้อแก้ไข: ',{text:w.conditions,bold:true}],margin:[0,3,0,0]}]:[])];
-  const pw=(iw-12)/3, pics=(photos||[]).map((src,i)=>({stack:[{image:src,fit:[pw,pw*0.72],alignment:'center'},{text:`รูปที่ ${i+1}`,fontSize:7.5,color:'#555',alignment:'center',margin:[0,2,0,0]}]}));
-  const picRows=[]; for(let i=0;i<pics.length;i+=3){ const r=pics.slice(i,i+3); while(r.length<3) r.push({text:''}); picRows.push({columns:r,columnGap:6,margin:[0,0,0,6],unbreakable:true}); }
+  /* รูปทุกชุดรวมเป็นตารางเดียว จำนวนคอลัมน์ตามขั้นการย่อ */
+  const pc=F.pc, gap=5, pw=(iw-gap*(pc-1))/pc;
+  const cell=(src,cap)=>({stack:[{image:src,fit:[pw,pw*F.ar],alignment:'center'},{text:cap,fontSize:z(7.2),color:'#555',alignment:'center',margin:[0,1,0,0]}]});
+  const grid=(cells)=>{ const rows=[]; for(let i=0;i<cells.length;i+=pc){ const r=cells.slice(i,i+pc); while(r.length<pc) r.push({text:''}); rows.push({columns:r,columnGap:gap,margin:[0,0,0,z(4)],unbreakable:true}); } return rows; };
+  const picBlocks=[...((photos||[]).length?[{text:'ภาพประกอบ',bold:true,margin:[0,0,0,z(3)]},...grid(photos.map((src,i)=>cell(src,`รูปที่ ${i+1}`)))]:[]),
+    ...((photos&&photos.sets)||[]).filter(st=>st.imgs&&st.imgs.length).flatMap(st=>[{text:st.label,bold:true,margin:[0,z(2),0,z(3)]},...grid(st.imgs.map((src,i)=>cell(src,`${st.label} ${i+1}`)))])];
+  /* ช่องลงชื่อเรียงแถวเดียว (สูงสุด 4 ช่อง/แถว) */
   const sigCell=(s,i)=>{ const g=(w.signatures||[]).find(x=>x.idx===i);
-    return {stack:[g?.sig?{image:g.sig,fit:[120,38],alignment:'center'}:{text:' ',margin:[0,0,0,26]},
-      {text:`ลงชื่อ ........................................ ${s.label}`,alignment:'center'},{text:`(${g?.name||'........................................'})`,alignment:'center',margin:[0,2,0,0]},
-      ...(g?.position?[{text:g.position,alignment:'center',color:'#555',fontSize:8.5}]:[]),
-      {text:g?.at?`วันที่ ${new Date(g.at).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'})}`:'วันที่ ......./......./.......',alignment:'center',fontSize:8.5,color:'#555',margin:[0,2,0,0]}],margin:[0,0,0,10]}; };
-  const sg=(t.signers||[]).map(sigCell), sgRows=[]; for(let i=0;i<sg.length;i+=2) sgRows.push({columns:[sg[i],sg[i+1]||{text:''}],columnGap:20,unbreakable:true});
+    return {stack:[g?.sig?{image:g.sig,fit:[110,z(34)],alignment:'center'}:{text:' ',margin:[0,0,0,z(22)]},
+      {text:`ลงชื่อ .................................`,alignment:'center'},{text:`(${g?.name||'.................................'})`,alignment:'center',margin:[0,1,0,0]},
+      {text:[s.label,...(g?.position?[{text:' · '+g.position,color:'#555'}]:[])],alignment:'center',bold:true,fontSize:z(8.6)},
+      {text:g?.at?`วันที่ ${new Date(g.at).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'})}`:'วันที่ ......./......./.......',alignment:'center',fontSize:z(8),color:'#555',margin:[0,1,0,0]}]}; };
+  const sg=(t.signers||[]).map(sigCell), per=Math.min(4,Math.max(1,sg.length)), sgRows=[];
+  for(let i=0;i<sg.length;i+=per){ const r=sg.slice(i,i+per); while(r.length<per) r.push({text:''}); sgRows.push({columns:r,columnGap:10,margin:[0,0,0,z(6)],unbreakable:true}); }
   const qr=w.drive_folder?.url||`${location.origin}${location.pathname}#wa/${w.id}`;
-  return { pageSize:'A4', _rh:1, pageMargins:[M,36,M,40], defaultStyle:{font:'Sarabun',fontSize:10,color:'#111',lineHeight:1.15}, info:{title:`${t.doc_title} ${w.wa_no||''}`,author:B.company_th},
-    footer:(c,n)=>({columns:[{text:`เอกสารจากระบบ ${B.app} · สแกน QR เพื่อเปิดโฟลเดอร์เอกสารและไฟล์แนบ`,fontSize:7,color:'#777'},{text:`หน้า ${c}/${n}`,alignment:'right',fontSize:7,color:'#777'}],margin:[M,8,M,0]}),
+  return { pageSize:'A4', _rh:1, pageMargins:[M,30,M,34], defaultStyle:{font:'Sarabun',fontSize:z(10),color:'#111',lineHeight:1.12}, info:{title:`${t.doc_title} ${w.wa_no||''}`,author:B.company_th},
+    footer:(c,n)=>({columns:[{text:`เอกสารจากระบบ ${B.app} · สแกน QR มุมขวาบนเพื่อเปิด${w.drive_folder?.url?'โฟลเดอร์เอกสารและไฟล์แนบ':'ในแอป'}`,fontSize:7,color:'#777'},{text:n>1?`หน้า ${c}/${n}`:'',alignment:'right',fontSize:7,color:'#777'}],margin:[M,10,M,0]}),
     content:[
-      {columns:[{...logoNode(40),width:44},{stack:[{text:B.company_th,bold:true,fontSize:12.5},{text:B.company_en,fontSize:7.5,color:'#555',characterSpacing:.4}],margin:[6,4,0,0],width:'*'},
-        {stack:[{text:['เลขที่ ',{text:w.wa_no||'-',bold:true}],alignment:'right',fontSize:9.5},{text:`วันที่ ${thDate(dt)}`,alignment:'right',fontSize:9.5}],width:'auto',margin:[0,4,0,0]}],columnGap:4},
-      {stack:[{text:t.doc_title||t.name,bold:true,fontSize:16,alignment:'center'},{text:t.doc_title_en||'',fontSize:8.5,color:'#555',alignment:'center',characterSpacing:.5}],margin:[0,10,0,8]},
-      {table:{widths:[88,'*',66,'*'],body:info},layout:bd,margin:[0,0,0,8]},
-      {table:{headerRows:1,widths:[24,'*',40,40,110],body:ck},layout:bd,margin:[0,0,0,8]},
-      {table:{widths:['*'],body:[[{stack:res}]]},layout:bd,margin:[0,0,0,10]},
-      ...(picRows.length?[{text:'ภาพประกอบ',bold:true,margin:[0,0,0,4]},...picRows]:[]),
-      ...((photos&&photos.sets)||[]).flatMap(st=>{ const cells=st.imgs.map((src,i)=>({stack:[{image:src,fit:[pw,pw*0.72],alignment:'center'},{text:`${st.label} ${i+1}`,fontSize:7.5,color:'#555',alignment:'center',margin:[0,2,0,0]}]})); const rows=[]; for(let i=0;i<cells.length;i+=3){ const r=cells.slice(i,i+3); while(r.length<3) r.push({text:''}); rows.push({columns:r,columnGap:6,margin:[0,0,0,6],unbreakable:true}); } return [{text:st.label,bold:true,margin:[0,4,0,4]},...rows]; }),
-      {text:'',margin:[0,8,0,0]},...sgRows,
-      {columns:[{text:'',width:'*'},{stack:[{qr,fit:62,alignment:'right'},{text:w.drive_folder?.url?'โฟลเดอร์เอกสาร':'เปิดในแอป',fontSize:6.5,color:'#777',alignment:'right'}],width:80}],margin:[0,6,0,0],unbreakable:true}
+      {columns:[{...logoNode(38),width:42},{stack:[{text:B.company_th,bold:true,fontSize:12.5},{text:B.company_en,fontSize:7.5,color:'#555',characterSpacing:.4}],margin:[6,4,0,0],width:'*'},
+        {stack:[{text:['เลขที่ ',{text:w.wa_no||'-',bold:true}],alignment:'right',fontSize:9.5},{text:`วันที่ ${thDate(dt)}`,alignment:'right',fontSize:9.5}],width:'auto',margin:[0,5,6,0]},
+        {stack:[{qr,fit:44,alignment:'right'},{text:w.drive_folder?.url?'ไฟล์แนบ':'เปิดในแอป',fontSize:5.8,color:'#777',alignment:'center'}],width:48}],columnGap:4},
+      {stack:[{text:t.doc_title||t.name,bold:true,fontSize:z(16),alignment:'center'},{text:t.doc_title_en||'',fontSize:z(8.5),color:'#555',alignment:'center',characterSpacing:.5}],margin:[0,z(6),0,z(6)]},
+      {table:{widths:[86,'*',64,'*'],body:info},layout:bd,margin:[0,0,0,z(7)]},
+      {table:{headerRows:1,widths:[22,'*',36,38,104],body:ck},layout:bd,margin:[0,0,0,z(7)]},
+      {table:{widths:['*'],body:[[{stack:res}]]},layout:bd,margin:[0,0,0,z(8)]},
+      ...picBlocks,
+      {text:'',margin:[0,z(8),0,0]},...sgRows
     ] };
 }

@@ -164,12 +164,12 @@ async function waSyncDrive(id, newPhotos){
   if(!hasBridge()) return;
   const {data:w}=await sb.from('work_approvals').select('*').eq('id',id).single(); const f=await waEnsureFolder(w);
   for(let i=0;i<(newPhotos||[]).length;i++){ const x=newPhotos[i]; await bridge('wa_upload',{folder_id:f.id,name:x.name||`รูปที่ ${i+1}.jpg`,mime:'image/jpeg',data:await blobToB64(x.blob||x)}); }
-  const dd=await waDoc(w,await waPhotoData(w)); await bridge('wa_upload',{folder_id:f.id,name:`${w.wa_no}.pdf`,mime:'application/pdf',data:await pdfB64(dd)});
+  const dd=await waDocFit(w,await waPhotoData(w)); await bridge('wa_upload',{folder_id:f.id,name:`${w.wa_no}.pdf`,mime:'application/pdf',data:await pdfB64(dd)});
 }
 async function waPhotoData(w){
   const sets=formOf('wa_'+w.type_key).filter(f=>!f.core&&f.type==='photos'&&(w.data?.[f.key]||[]).length);
   const all=[...(w.photos||[]),...sets.flatMap(f=>w.data[f.key].map(p=>p.path))].filter(Boolean), urls=await waUrls(all);
-  const dataUrl=async p=>{ if(!urls[p]) return null; try{ const bl=await (await fetch(urls[p])).blob(); return await new Promise(r=>{ const fr=new FileReader(); fr.onload=()=>r(fr.result); fr.readAsDataURL(bl); }); }catch(_){ return null; } };
+  const dataUrl=async p=>{ if(!urls[p]) return null; try{ const bl=await (await fetch(urls[p])).blob(); const u=URL.createObjectURL(bl); try{ const im=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=u; }); const q=Math.min(1,1400/Math.max(im.naturalWidth,im.naturalHeight)), c=document.createElement('canvas'); c.width=Math.round(im.naturalWidth*q); c.height=Math.round(im.naturalHeight*q); c.getContext('2d').drawImage(im,0,0,c.width,c.height); return c.toDataURL('image/jpeg',.86); } finally{ URL.revokeObjectURL(u); } }catch(_){ return null; } }; // ย่อรูปเหลือ 1400px ให้สร้าง PDF เร็วขึ้น (ยังคมชัดพอพิมพ์)
   const main=[]; for(const p of (w.photos||[]).slice(0,30)){ const d=await dataUrl(p); if(d) main.push(d); }
   const out=main; out.sets=[]; for(const f of sets){ const imgs=[]; for(const p of w.data[f.key]){ const d=await dataUrl(p.path); if(d) imgs.push(d); } if(imgs.length) out.sets.push({label:f.label,imgs}); }
   return out;
@@ -177,7 +177,7 @@ async function waPhotoData(w){
 async function waShare(id){
   try{ const {data:w,error}=await sb.from('work_approvals').select('*').eq('id',id).single(); if(error) throw error;
     if(hasBridge()&&!w.drive_folder) try{ await waEnsureFolder(w); }catch(_){}
-    const dd=await waDoc(w,await waPhotoData(w)); vectorPreview(dd,w.wa_no||'wa',(waType(w.type_key)||{}).doc_title||'ใบขออนุมัติ','');
+    const dd=await waDocFit(w,await waPhotoData(w)); vectorPreview(dd,w.wa_no||'wa',(waType(w.type_key)||{}).doc_title||'ใบขออนุมัติ','');
   }catch(e){ toast(errText(e),true); }
 }
 
