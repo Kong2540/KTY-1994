@@ -574,3 +574,5 @@ details.perm>summary::-webkit-details-marker{display:none}
 .iss-cta-ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:#F2B705;color:#1B262C;flex:none}
 .iss-cta-ic svg{width:20px;height:20px}
 .iss-cta b{display:block;font-size:16px}
+.pp-row{display:grid;grid-template-columns:26px minmax(0,1fr) auto auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:6px 8px}
+.pp-sw{width:22px;height:22px;border-radius:6px;display:block}

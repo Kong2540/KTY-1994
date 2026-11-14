@@ -130,38 +130,59 @@ function cashBreak(amount, dens){
   while(v>0){ const d=from[v]; out[d]++; v-=d; }
   return {cnt:out,paid,rest:a-paid};
 }
+/* opt: {per, perNewPage, place} · opt.groups = [{label, slips, transfer}] → หน้าภาพรวม + หน้าแต่ละจุด + ใส่ซองรายคน + รายชื่อโอน */
 async function cashDoc(p, slips, dens, opt={}){
   await pdfReady(); await logoData();
   const B=BR(), M=36, W=595.28, iw=W-M*2, sel=CASH_DEN.filter(d=>dens.includes(d[0])).map(d=>d[0]);
-  const rows=slips.map(s=>({s,net:+s.data.net||0,...cashBreak(s.data.net,sel)})).filter(r=>r.net>0);
-  const tot={}; sel.forEach(d=>tot[d]=rows.reduce((a,r)=>a+r.cnt[d],0));
-  const paid=rows.reduce((a,r)=>a+r.paid,0), rest=rows.reduce((a,r)=>a+r.rest,0), netAll=rows.reduce((a,r)=>a+r.net,0), satang=netAll-rows.reduce((a,r)=>a+Math.floor(r.net),0);
   const N=v=>Number(v).toLocaleString('en-US'), bd={hLineWidth:(i,n)=>i===0||i===1||i===n.table.body.length?.7:.3,vLineWidth:()=>0,hLineColor:()=>C_LINE,paddingTop:()=>4,paddingBottom:()=>4,paddingLeft:()=>6,paddingRight:()=>6};
   const H=(t,r)=>({text:t,bold:true,color:C_DARK,fillColor:C_BAND,alignment:r?'right':'left'});
-  const denRows=CASH_DEN.map(([v,k,u])=>{ const on=sel.includes(v);
-    return on?[{text:`${k} ${N(v)} บาท`,bold:true},{text:N(tot[v]),bold:true,alignment:'right',fontSize:12},{text:u,color:C_LAB},{text:fmtN(tot[v]*v),alignment:'right'}]
-      :[{text:`${k} ${N(v)} บาท`,color:'#9AA6AA',decoration:'lineThrough'},{text:'งดใช้',color:'#9AA6AA',alignment:'right'},{text:''},{text:'-',color:'#9AA6AA',alignment:'right'}]; });
-  const per=opt.per!==false&&rows.length?[{text:'รายละเอียดการใส่ซองรายคน',bold:true,fontSize:11,color:C_DARK,margin:[0,16,0,6],pageBreak:opt.perNewPage?'before':undefined},
-    {table:{headerRows:1,dontBreakRows:true,widths:[16,'*','auto',...sel.map(()=>'auto'),...(rest?['auto']:[])],
-      body:[[H('#'),H('ชื่อ-นามสกุล'),H('จ่ายจริง',1),...sel.map(v=>H(N(v),1)),...(rest?[H('เศษ',1)]:[])],
-        ...rows.map((r,i)=>[{text:String(i+1),color:C_LAB},{text:[r.s.data.name||'',r.s.data.__emp?.nickname?{text:` (${r.s.data.__emp.nickname})`,color:C_LAB}:''].filter(Boolean)},{text:N(r.paid),bold:true,alignment:'right'},
-          ...sel.map(v=>({text:r.cnt[v]?String(r.cnt[v]):'·',alignment:'right',color:r.cnt[v]?'#1B262C':'#C9D1D4'})),...(rest?[{text:r.rest?N(r.rest):'',alignment:'right',color:'#B42318'}]:[])]),
-        [{text:''},{text:'รวม',bold:true},{text:N(paid),bold:true,alignment:'right'},...sel.map(v=>({text:N(tot[v]),bold:true,alignment:'right'})),...(rest?[{text:N(rest),bold:true,alignment:'right',color:'#B42318'}]:[])]]},
+  const calc=L=>{ const rows=L.map(s=>({s,net:+s.data.net||0,...cashBreak(s.data.net,sel)})).filter(r=>r.net>0), tot={}; sel.forEach(d=>tot[d]=rows.reduce((a,r)=>a+r.cnt[d],0));
+    const netAll=rows.reduce((a,r)=>a+r.net,0); return {rows,tot,netAll,paid:rows.reduce((a,r)=>a+r.paid,0),rest:rows.reduce((a,r)=>a+r.rest,0),satang:netAll-rows.reduce((a,r)=>a+Math.floor(r.net),0)}; };
+  const band=(t,sub,brk)=>({table:{widths:['*'],body:[[{text:[{text:'จ่ายที่: ',color:C_LAB},{text:t,bold:true},...(sub?[{text:`  ·  ${sub}`,color:C_LAB}]:[])],fontSize:10.5,margin:[6,3,6,3]}]]},layout:{fillColor:()=>'#FFF4D6',hLineWidth:()=>0,vLineWidth:i=>i===0?3:0,vLineColor:()=>'#F2B705'},margin:[0,0,0,10],...(brk?{pageBreak:'before'}:{})});
+  const signs=(list)=>({columns:list.map(t=>({stack:[{text:'..............................................',alignment:'center',color:'#9AA6AA'},{text:t,alignment:'center',fontSize:8.5,margin:[0,2,0,0]},{text:'วันที่ ......./......./.......',alignment:'center',fontSize:7.5,color:'#9AA6AA',margin:[0,2,0,0]}]})),margin:[0,26,0,0],unbreakable:true});
+  const bigBox=(lbl,amt,info)=>({columns:[{stack:info.map(([a,b])=>({columns:[{text:a,color:C_LAB,width:80},{text:b,bold:true}],margin:[0,0,0,3]}))},
+      {table:{widths:[190],body:[[{stack:[{text:lbl,fontSize:9,color:'#fff'},{text:`${N(amt)} บาท`,bold:true,fontSize:22,color:'#F2B705'}],margin:[10,6,10,6]}]]},layout:{fillColor:()=>C_DARK,hLineWidth:()=>0,vLineWidth:()=>0},width:190}],margin:[0,0,0,12]});
+  const denTable=c=>({table:{headerRows:1,widths:['*',70,44,100],body:[[H('ชนิดเงิน'),H('จำนวน',1),H(''),H('เป็นเงิน (บาท)',1)],
+      ...CASH_DEN.map(([v,k,u])=>sel.includes(v)?[{text:`${k} ${N(v)} บาท`,bold:true},{text:N(c.tot[v]),bold:true,alignment:'right',fontSize:12},{text:u,color:C_LAB},{text:fmtN(c.tot[v]*v),alignment:'right'}]
+        :[{text:`${k} ${N(v)} บาท`,color:'#9AA6AA',decoration:'lineThrough'},{text:'งดใช้',color:'#9AA6AA',alignment:'right'},{text:''},{text:'-',color:'#9AA6AA',alignment:'right'}]),
+      [{text:'รวมทั้งสิ้น',bold:true},{text:''},{text:''},{text:fmtN(c.paid),bold:true,alignment:'right',fontSize:11}]]},layout:{...bd,fillColor:(r,n)=>r===n.table.body.length-1?C_BAND:null}});
+  const restNote=c=>c.rest||c.satang>0.004?[{stack:[...(c.rest?[{text:`เศษที่จ่ายด้วยชนิดเงินที่เลือกไม่ได้ รวม ${N(c.rest)} บาท (ดูช่อง "เศษ" ในตารางรายคน) — ต้องเตรียมเงินเพิ่มหรือเลือกชนิดเงินเพิ่ม`,color:'#B42318'}]:[]),
+      ...(c.satang>0.004?[{text:`เศษสตางค์ที่ปัดลงทั้งหมด ${fmtN(c.satang)} บาท`,color:C_LAB}]:[])],fontSize:8.5,margin:[0,6,0,0]}]:[];
+  const perTable=c=>c.rows.length?[{table:{headerRows:1,dontBreakRows:true,widths:[16,'*','auto',...sel.map(()=>'auto'),...(c.rest?['auto']:[])],
+      body:[[H('#'),H('ชื่อ-นามสกุล'),H('จ่ายจริง',1),...sel.map(v=>H(N(v),1)),...(c.rest?[H('เศษ',1)]:[])],
+        ...c.rows.map((r,i)=>[{text:String(i+1),color:C_LAB},{text:[r.s.data.name||'',r.s.data.__emp?.nickname?{text:` (${r.s.data.__emp.nickname})`,color:C_LAB}:''].filter(Boolean)},{text:N(r.paid),bold:true,alignment:'right'},
+          ...sel.map(v=>({text:r.cnt[v]?String(r.cnt[v]):'·',alignment:'right',color:r.cnt[v]?'#1B262C':'#C9D1D4'})),...(c.rest?[{text:r.rest?N(r.rest):'',alignment:'right',color:'#B42318'}]:[])]),
+        [{text:''},{text:'รวม',bold:true},{text:N(c.paid),bold:true,alignment:'right'},...sel.map(v=>({text:N(c.tot[v]),bold:true,alignment:'right'})),...(c.rest?[{text:N(c.rest),bold:true,alignment:'right',color:'#B42318'}]:[])]]},
       layout:{...bd,fillColor:(r,n)=>r===n.table.body.length-1?C_BAND:null},fontSize:8.6}]:[];
+  const perTitle=(brk)=>({text:'รายละเอียดการใส่ซองรายคน',bold:true,fontSize:11,color:C_DARK,margin:[0,brk?0:16,0,6],...(brk?{pageBreak:'before'}:{})});
+  let body=[];
+  if(opt.groups&&opt.groups.length){
+    const cashG=opt.groups.filter(g=>!g.transfer&&g.slips.length), trG=opt.groups.filter(g=>g.transfer&&g.slips.length);
+    const allC=calc(cashG.flatMap(g=>g.slips)), gc=cashG.map(g=>({g,c:calc(g.slips)})), trL=trG.flatMap(g=>g.slips.map(s=>({s,pt:g.label}))).filter(x=>+x.s.data.net>0);
+    body.push(bigBox('ยอดเงินสดที่ต้องเบิก (ทุกจุด)',allC.paid,[['วันที่จ่าย',thaiDate(p.pay_date)],['จุดจ่ายเงินสด',`${gc.length} จุด · ${allC.rows.length} คน`],...(trL.length?[['โอนเข้าบัญชี',`${trL.length} คน · ${fmtN(trL.reduce((a,x)=>a+(+x.s.data.net||0),0))} บาท`]]:[])]),
+      {table:{headerRows:1,widths:['*',50,100],body:[[H('จุดจ่าย'),H('คน',1),H('เงินสด (บาท)',1)],...gc.map(({g,c})=>[{text:g.label},{text:String(c.rows.length),alignment:'right'},{text:fmtN(c.paid),alignment:'right',bold:true}]),
+        [{text:'รวมเงินสด',bold:true},{text:String(allC.rows.length),alignment:'right',bold:true},{text:fmtN(allC.paid),alignment:'right',bold:true}]]},layout:{...bd,fillColor:(r,n)=>r===n.table.body.length-1?C_BAND:null},margin:[0,0,0,10]},
+      denTable(allC),...restNote(allC),
+      ...(trL.length?[{text:`ไม่รวมในเงินสด: ${trG.map(g=>g.label).join(', ')} ${trL.length} คน ${fmtN(trL.reduce((a,x)=>a+(+x.s.data.net||0),0))} บาท (ดูหน้ารายชื่อโอน)`,fontSize:8.5,color:'#0B6BCB',margin:[0,6,0,0]}]:[]),
+      signs(advList('cash_sign')));
+    gc.forEach(({g,c})=>{ body.push(band(g.label,`${c.rows.length} คน`,true),bigBox('แบ่งเงินสดไปจุดนี้',c.paid,[['วันที่จ่าย',thaiDate(p.pay_date)],['จำนวนพนักงาน',`${c.rows.length} คน`]]),denTable(c),...restNote(c),signs(['ผู้จัดเงิน','ผู้รับเงินไปจ่าย']));
+      if(opt.per!==false&&c.rows.length) body.push(band(g.label,'ใส่ซองรายคน',true),...perTable(c)); });
+    if(trL.length){ const tot=trL.reduce((a,x)=>a+(+x.s.data.net||0),0);
+      body.push(band(trG.map(g=>g.label).join(', '),'รายชื่อโอนเงิน',true),{table:{headerRows:1,dontBreakRows:true,widths:[16,'*','auto','auto'],body:[[H('#'),H('ชื่อ-นามสกุล'),H('ธนาคาร / เลขบัญชี'),H('ยอดโอน (บาท)',1)],
+        ...trL.map((x,i)=>{ const e=x.s.data.__emp||{}; const bank=[e.bank_name,e.bank_account_no].filter(Boolean).join(' ')||x.s.data.bank||'-';
+          return [{text:String(i+1),color:C_LAB},{text:[x.s.data.name||'',e.bank_account_name&&e.bank_account_name!==x.s.data.name?{text:`\nชื่อบัญชี: ${e.bank_account_name}`,color:C_LAB,fontSize:8}:''].filter(Boolean)},{text:bank},{text:fmtN(+x.s.data.net||0),alignment:'right',bold:true}]; }),
+        [{text:''},{text:'รวม',bold:true},{text:''},{text:fmtN(tot),alignment:'right',bold:true}]]},layout:{...bd,fillColor:(r,n)=>r===n.table.body.length-1?C_BAND:null},fontSize:9},signs(['ผู้ทำรายการโอน','ผู้อนุมัติ'])); }
+  } else {
+    const c=calc(slips);
+    body.push(bigBox('ยอดเงินสดที่ต้องเบิก',c.paid,[['วันที่จ่าย',thaiDate(p.pay_date)],['จำนวนพนักงาน',`${c.rows.length} คน`],['ยอดสุทธิในระบบ',`${fmtN(c.netAll)} บาท`]]),denTable(c),...restNote(c),signs(advList('cash_sign')));
+    if(opt.per!==false&&c.rows.length) body.push(perTitle(opt.perNewPage),...perTable(c));
+  }
   return { pageSize:'A4', _rh:2, pageMargins:[M,32,M,44], defaultStyle:{font:'Sarabun',fontSize:9.5,color:'#1B262C',lineHeight:1.15}, info:{title:`ใบเบิกเงินสด ${periodText(p)}`,author:B.company_th},
     footer:(c,n)=>({columns:[{text:`${B.app} · คำนวณจากยอดสุทธิในระบบเงินเดือน (เศษสตางค์ปัดลง)`,fontSize:7,color:'#9AA6AA'},{text:`หน้า ${c}/${n}`,alignment:'right',fontSize:7,color:'#9AA6AA'}],margin:[M,14,M,0]}),
     content:[
       {columns:[{...logoNode(36),width:40},{stack:[{text:B.company_th,bold:true,fontSize:12.5,color:C_DARK},{text:B.company_en,fontSize:7,color:C_LAB,characterSpacing:.5}],margin:[6,4,0,0],width:'*'},
-        {stack:[{text:'ใบเบิกเงินสดจ่ายเงินเดือน',bold:true,fontSize:16,color:C_DARK,alignment:'right'},{text:periodText(p),fontSize:9.5,color:C_LAB,alignment:'right'},...(opt.place?[{text:`จ่ายที่: ${opt.place}`,bold:true,fontSize:9.5,background:'#F2B705',alignment:'right',margin:[0,2,0,0]}]:[])],width:'auto'}],columnGap:4},
-      ruleLine(iw),
-      {columns:[{stack:[['วันที่จ่าย',thaiDate(p.pay_date)],['จำนวนพนักงาน',`${rows.length} คน`],['ยอดสุทธิในระบบ',`${fmtN(netAll)} บาท`]].map(([a,b])=>({columns:[{text:a,color:C_LAB,width:80},{text:b,bold:true}],margin:[0,0,0,3]}))},
-        {table:{widths:[190],body:[[{stack:[{text:'ยอดเงินสดที่ต้องเบิก',fontSize:9,color:'#fff'},{text:`${N(paid)} บาท`,bold:true,fontSize:22,color:'#F2B705'}],margin:[10,6,10,6]}]]},layout:{fillColor:()=>C_DARK,hLineWidth:()=>0,vLineWidth:()=>0},width:190}],margin:[0,0,0,12]},
-      {table:{headerRows:1,widths:['*',70,44,100],body:[[H('ชนิดเงิน'),H('จำนวน',1),H(''),H('เป็นเงิน (บาท)',1)],...denRows,
-        [{text:'รวมทั้งสิ้น',bold:true},{text:''},{text:''},{text:fmtN(paid),bold:true,alignment:'right',fontSize:11}]]},layout:{...bd,fillColor:(r,n)=>r===n.table.body.length-1?C_BAND:null}},
-      ...(rest||satang>0.004?[{stack:[...(rest?[{text:`เศษที่จ่ายด้วยชนิดเงินที่เลือกไม่ได้ รวม ${N(rest)} บาท (ดูช่อง "เศษ" ในตารางรายคน) — ต้องเตรียมเงินเพิ่มหรือเลือกชนิดเงินเพิ่ม`,color:'#B42318'}]:[]),
-          ...(satang>0.004?[{text:`เศษสตางค์ที่ปัดลงทั้งหมด ${fmtN(satang)} บาท`,color:C_LAB}]:[])],fontSize:8.5,margin:[0,6,0,0]}]:[]),
-      {columns:advList('cash_sign').map(t=>({stack:[{text:'..............................................',alignment:'center',color:'#9AA6AA'},{text:t,alignment:'center',fontSize:8.5,margin:[0,2,0,0]},{text:'วันที่ ......./......./.......',alignment:'center',fontSize:7.5,color:'#9AA6AA',margin:[0,2,0,0]}]})),margin:[0,26,0,0],unbreakable:true},
-      ...per ] };
+        {stack:[{text:'ใบเบิกเงินสดจ่ายเงินเดือน',bold:true,fontSize:16,color:C_DARK,alignment:'right'},{text:periodText(p),fontSize:9.5,color:C_LAB,alignment:'right'},...(opt.place?[{text:`จ่ายที่: ${opt.place}`,bold:true,fontSize:9.5,background:'#F2B705',alignment:'right',margin:[0,2,0,0]}]:opt.groups?[{text:'ทุกจุดจ่าย',bold:true,fontSize:9.5,alignment:'right',margin:[0,2,0,0]}]:[])],width:'auto'}],columnGap:4},
+      ruleLine(iw), ...body ] };
 }
 
 /* ---------- สลิปแบบละเอียด (A4 แนวตั้ง จัดสมดุลเต็มหน้า) ---------- */

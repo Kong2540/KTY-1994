@@ -75,6 +75,13 @@ async function pagePay(a,b){
 
 /* ---------------- งวดเงินเดือน ---------------- */
 let PAY_PT='all';
+/* จุดจ่ายเงิน: 'co' = บริษัท · '<site_id>' = ไซต์งาน · 'c:<key>' = จุดที่แอดมินสร้าง (ตั้งค่า › กติกาเงินเดือน) */
+const payPointsCustom=()=>(S.settings.pay_points||[]).filter(x=>x&&x.key&&x.name);
+const payPointName=k=>{ if(k==='co') return 'บริษัท'; if(String(k).startsWith('c:')){ const c=payPointsCustom().find(x=>'c:'+x.key===k); return c?c.name:'จุดจ่ายที่ถูกลบ'; } const x=S.sites.find(t=>String(t.id)===String(k)); return x?`${x.code?x.code+' ':''}${x.contract_name||x.name}`:'ไซต์ '+k; };
+const payPointTransfer=k=>String(k).startsWith('c:')&&!!payPointsCustom().find(x=>'c:'+x.key===k)?.transfer;
+const ppValid=k=>k==='co'||(String(k).startsWith('c:')?payPointsCustom().some(x=>'c:'+x.key===k):S.sites.some(t=>String(t.id)===String(k)));
+const empPayPoint=e=>{ const v=e?.pay_point||(e?.pay_site_id?String(e.pay_site_id):'co'); return ppValid(v)?v:'co'; };
+const payPointOptions=(keep=[])=>[['co','บริษัท'],...S.sites.filter(x=>x.status==='active'||keep.includes(String(x.id))).map(x=>[String(x.id),'ไซต์ '+payPointName(String(x.id))]),...payPointsCustom().map(c=>['c:'+c.key,c.name+(c.transfer?' (โอน)':'')])];
 async function payPeriod(periods){
   const C=$('#pyc'), p=periods.find(x=>x.id===payPid), i=periods.indexOf(p);
   let {data:slips}=await sb.from('pay_slips').select('*').eq('period_id',p.id);
@@ -82,12 +89,12 @@ async function payPeriod(periods){
   slips=(await liveIdentity(slips||[])).sort((a,b)=>(a.data.sort_order??1e9)-(b.data.sort_order??1e9)||String(a.data.emp_code).localeCompare(String(b.data.emp_code)));
   /* จุดจ่ายเงิน: เปลี่ยนเฉพาะงวด > จุดรับเงินประจำของพนักงาน > บริษัท */
   const {data:ppo,error:ppoErr}=await sb.from('pay_point_overrides').select('*').eq('period_id',p.id); const ovm={}; (ppo||[]).forEach(o=>ovm[o.employee_id]=o);
-  slips.forEach(s=>{ const o=ovm[s.employee_id]; s.ppDef=s.data.__emp?.pay_site_id?String(s.data.__emp.pay_site_id):'co'; s.pp=o?(o.site_id?String(o.site_id):'co'):s.ppDef; s.ppOv=!!o; });
-  const ppName=k=>{ if(k==='co') return 'บริษัท'; const x=S.sites.find(t=>String(t.id)===k); return x?`${x.code?x.code+' ':''}${x.contract_name||x.name}`:'ไซต์ '+k; };
+  slips.forEach(s=>{ const o=ovm[s.employee_id]; s.ppDef=empPayPoint(s.data.__emp); s.pp=o?(o.point||(o.site_id?String(o.site_id):'co')):s.ppDef; if(!ppValid(s.pp)) s.pp='co'; s.ppOv=!!o; });
+  const ppName=payPointName;
   const ppKeys=['co',...[...new Set(slips.map(s=>s.pp).filter(k=>k!=='co'))].sort((a,b)=>ppName(a).localeCompare(ppName(b),'th',{numeric:true}))];
   if(PAY_PT!=='all'&&!ppKeys.includes(PAY_PT)) PAY_PT='all';
   const allSlips=slips; slips=PAY_PT==='all'?allSlips:allSlips.filter(s=>s.pp===PAY_PT);
-  const place=PAY_PT==='all'?null:ppName(PAY_PT), groups=ppKeys.map(k=>({label:ppName(k),slips:allSlips.filter(s=>s.pp===k)})).filter(g=>g.slips.length);
+  const place=PAY_PT==='all'?null:ppName(PAY_PT), groups=ppKeys.map(k=>({key:k,label:ppName(k),transfer:payPointTransfer(k),slips:allSlips.filter(s=>s.pp===k)})).filter(g=>g.slips.length);
   const cols=payCols(), sum=k=>slips.reduce((a,s)=>a+(+s.data[k]||0),0), closed=p.status==='closed';
   C.innerHTML=`<div class="card col" style="gap:8px"><div class="row" style="gap:8px;flex-wrap:wrap">
       <button class="ibtn" data-pp="${periods[i+1]?.id||''}" ${periods[i+1]?'':'disabled'} aria-label="งวดก่อน">${IC.back}</button>
@@ -96,7 +103,7 @@ async function payPeriod(periods){
     <div class="row" style="gap:8px;flex-wrap:wrap"><select class="in" id="pset" style="height:38px;width:auto;min-width:170px" aria-label="ชุดฟอร์ม">${Object.entries(paySets()).map(([k,v])=>`<option value="${k}" ${k===activeSetId()?'selected':''}>ชุดฟอร์ม: ${esc(v.name)}</option>`).join('')}</select>${closed?'':'<button class="btn btn-sm" data-recalc>คำนวณใหม่จากการเช็คชื่อ</button>'}${isAdmin()?'<button class="btn btn-sm" data-cols>ตั้งค่าคอลัมน์</button>':''}<button class="btn btn-sm" data-prev>ใบสรุปเงินเดือน (PDF)</button><button class="btn btn-sm" data-slips>สลิปรายคน (PDF)</button><button class="btn btn-sm" data-cash>สรุปเบิกเงินสด (แบงก์/เหรียญ)</button><button class="btn btn-sm" data-sheet>ส่งออก Google Sheet</button>
       <span class="grow"></span>${closed?(isAdmin()?'<button class="btn btn-sm" data-reopen>เปิดงวดเพื่อแก้</button>':''):'<button class="btn btn-sm btn-p" data-close>ตรวจแล้ว ปิดงวด</button>'}</div></div>
     <div class="card col" style="gap:8px"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><b class="sm">จุดจ่ายเงิน</b><div class="row" style="gap:6px;flex-wrap:wrap">${groups.length>1&&PAY_PT==='all'?'<button class="btn btn-sm" data-ppall>ใบสรุปทุกจุด (แยกหน้า)</button>':''}<button class="btn btn-sm" data-ppset>ตั้งจุดจ่ายรายคน</button></div></div>
-      <div class="pp-chips">${[['all','ทุกจุด',allSlips],...ppKeys.map(k=>[k,ppName(k),allSlips.filter(s=>s.pp===k)])].map(([k,t,L])=>`<button class="pp-chip ${PAY_PT===k?'on':''}" data-ppt="${k}"><b>${esc(t)}</b><span>${L.length} คน · ${baht(L.reduce((a,s)=>a+(+s.data.net||0),0))}</span></button>`).join('')}</div>
+      <div class="pp-chips">${[['all','ทุกจุด',allSlips],...ppKeys.map(k=>[k,ppName(k),allSlips.filter(s=>s.pp===k)])].map(([k,t,L])=>`<button class="pp-chip ${PAY_PT===k?'on':''}" data-ppt="${k}"><b>${k!=='all'&&payPointTransfer(k)?'🏦 ':''}${esc(t)}</b><span>${L.length} คน · ${baht(L.reduce((a,s)=>a+(+s.data.net||0),0))}</span></button>`).join('')}</div>
       ${place?`<span class="xs muted">ตาราง ใบสรุป สลิป และสรุปเบิกเงินสด แสดงเฉพาะจุด "${esc(place)}"</span>`:''}</div>
     <div class="statg" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><div class="stat"><b class="num" style="font-size:22px">${baht(sum('net'))}</b><span class="sm muted">จ่ายสุทธิ ${slips.length} คน</span></div><div class="stat"><b class="num" style="font-size:22px">${baht(sum('gross'))}</b><span class="sm muted">รวมก่อนหัก</span></div><div class="stat"><b class="num" style="font-size:22px">${baht(sum('ot'))}</b><span class="sm muted">OT ${fmtN(sum('ot_hours'))} ชม.</span></div><div class="stat"><b class="num" style="font-size:22px;color:var(--bad)">${baht(sum('sso'))}</b><span class="sm muted">ประกันสังคม</span></div><div class="stat"><b class="num" style="font-size:22px;color:var(--bad)">${baht(sum('inst_sum')+sum('advance')+sum('deducts'))}</b><span class="sm muted">หักอื่น ๆ</span></div></div>
     <div class="card" style="padding:0;overflow-x:auto"><table class="tbl paytbl"><thead><tr><th>#</th>${cols.map(k=>`<th class="${PCOLS[k].n?'num':''}">${PCOLS[k].t}</th>`).join('')}</tr></thead><tbody>
@@ -114,7 +121,7 @@ async function payPeriod(periods){
   const pa=$('[data-ppall]',C); if(pa) pa.onclick=()=>paySummaryPreview(p,allSlips,null,groups);
   $('[data-ppset]',C).onclick=()=>payPointSheet(p,allSlips,ppName,closed,ppoErr,()=>payPeriod(periods));
   $('[data-slips]',C).onclick=()=>paySlipsPreview(p,slips);
-  $('[data-cash]',C).onclick=()=>payCashPreview(p,slips,place);
+  $('[data-cash]',C).onclick=()=>payCashPreview(p,slips,place,PAY_PT==='all'&&groups.length>1?groups:null);
   $('[data-sheet]',C).onclick=ev=>paySheetExport(p,slips,ev.target);
   $$('[data-slip]',C).forEach(r=>r.onclick=()=>payDetail(p,slips.find(s=>s.id==r.dataset.slip),()=>pagePay()));
 }
@@ -281,20 +288,21 @@ async function paySlipsPreview(p, slips){
   $('[data-png]',ov.el).onclick=async ev=>{ if(!lp.blob) return; busy(ev.target,true,'กำลังสร้างรูป...'); try{ await savePngs(await pdfToPngs(lp.blob,3),fn); }catch(e){ toast(errText(e),true); } busy(ev.target,false); };
 }
 /* สรุปเบิกเงินสด: ติ๊กเลือกธนบัตร/เหรียญที่มี → คำนวณรายคนแล้วรวม (ค่าที่เลือกจำไว้ให้ผู้ใช้ทุกคน) */
-async function payCashPreview(p, slips, place=null){
+async function payCashPreview(p, slips, place=null, groups=null){
   const ALL=CASH_DEN.map(d=>d[0]);
   let dens=(()=>{ const v=S.settings.cash_denoms; if(Array.isArray(v)&&v.length) return v.filter(x=>ALL.includes(x)); try{ const l=JSON.parse(localStorage.getItem('kty-cash-den')||'null'); if(Array.isArray(l)&&l.length) return l; }catch(_){} return [...ALL]; })();
-  const opt={per:true,perNewPage:true,place}, fn=`ใบเบิกเงินสด_${p.start_date}_${p.end_date}${place?'_'+place.split(' ')[0]:''}`;
-  const ov=overlay(`<div class="sheet sheet-wide" role="dialog" aria-modal="true" aria-label="สรุปเบิกเงินสด"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>สรุปเบิกเงินสด<small>ธนบัตรและเหรียญที่ต้องเตรียม · งวด ${periodLabel(p)}</small></h1></header>
+  const opt={per:true,perNewPage:true,place,groups}, fn=`ใบเบิกเงินสด_${p.start_date}_${p.end_date}${place?'_'+place.split(' ')[0]:groups?'_ทุกจุด':''}`;
+  const ov=overlay(`<div class="sheet sheet-wide" role="dialog" aria-modal="true" aria-label="สรุปเบิกเงินสด"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>สรุปเบิกเงินสด<small>ธนบัตรและเหรียญที่ต้องเตรียม · งวด ${periodLabel(p)}${place?` · จ่ายที่ ${esc(place)}`:groups?' · ทุกจุด แยกหน้า':''}</small></h1></header>
     <div class="sheet-body"><div class="card col" style="gap:10px">
       <b class="sm">ชนิดเงินที่นำมาคิด <span class="xs muted">(เอาติ๊กออกถ้าธนาคารไม่มีชั่วคราว)</span></b>
       <div class="row" style="gap:8px;flex-wrap:wrap" id="cden">${CASH_DEN.map(([v,k])=>`<label class="chip ${dens.includes(v)?'on':''}" style="cursor:pointer;gap:6px"><input type="checkbox" data-den="${v}" ${dens.includes(v)?'checked':''}>${k==='เหรียญ'?'🪙':'💵'} ${v.toLocaleString('en-US')}</label>`).join('')}</div>
-      <div class="row" style="gap:14px;flex-wrap:wrap"><label class="row sm" style="gap:6px"><input type="checkbox" data-per checked>แสดงหน้าสรุปรายคน (ใส่ซอง) แยกเป็นหน้า 2</label><span class="xs muted">คิดแยกทีละคนให้ใส่ซองได้พอดี แล้วรวมเป็นยอดที่ต้องเบิก · เศษสตางค์ปัดลง</span></div>
+      <div class="row" style="gap:14px;flex-wrap:wrap"><label class="row sm" style="gap:6px"><input type="checkbox" data-per checked>${groups?'แสดงหน้าใส่ซองรายคนของแต่ละจุด':'แสดงหน้าสรุปรายคน (ใส่ซอง) แยกเป็นหน้า 2'}</label><span class="xs muted">คิดแยกทีละคนให้ใส่ซองได้พอดี แล้วรวมเป็นยอดที่ต้องเบิก · เศษสตางค์ปัดลง</span></div>
       <div id="csum" class="sm"></div></div>
       <div class="pg-wrap" id="pgw"><div class="loading"><div class="spin"></div></div></div></div>
     <div class="sheet-foot" style="flex-wrap:wrap"><span class="sm muted grow" id="pgn"></span><button class="btn" data-png disabled>บันทึกรูป PNG</button><button class="btn btn-p" data-pdf disabled>ดาวน์โหลด PDF</button></div></div>`,false,false);
   $('[data-x]',ov.el).onclick=ov.close;
-  const summ=()=>{ const sel=dens; let paid=0,rest=0; const t={}; slips.forEach(s=>{ const r=cashBreak(s.data.net,sel); paid+=r.paid; rest+=r.rest; sel.forEach(d=>t[d]=(t[d]||0)+r.cnt[d]); });
+  const cashSlips=groups?groups.filter(g=>!g.transfer).flatMap(g=>g.slips):slips;
+  const summ=()=>{ const sel=dens; let paid=0,rest=0; const t={}; cashSlips.forEach(s=>{ const r=cashBreak(s.data.net,sel); paid+=r.paid; rest+=r.rest; sel.forEach(d=>t[d]=(t[d]||0)+r.cnt[d]); });
     $('#csum',ov.el).innerHTML=`<div class="row" style="gap:6px 14px;flex-wrap:wrap">${CASH_DEN.filter(d=>sel.includes(d[0])).map(([v,k,u])=>`<span>${k} ${v.toLocaleString('en-US')} บาท <b>${t[v]||0}</b> ${u}</span>`).join('')}</div><div style="margin-top:6px">ต้องเบิกรวม <b style="font-size:17px">${paid.toLocaleString('en-US')}</b> บาท${rest?` · <span style="color:var(--bad)">จ่ายไม่ได้ ${rest.toLocaleString('en-US')} บาท (ไม่มีชนิดเงินที่เล็กพอ)</span>`:''}</div>`; };
   const lp=livePdf($('#pgw',ov.el),()=>cashDoc(p,slips,dens,opt),st=>{ $('#pgn',ov.el).textContent=`${st.pages} หน้า · ${slips.length} คน`; $('[data-png]',ov.el).disabled=$('[data-pdf]',ov.el).disabled=false; });
   let saveT=null; const remember=()=>{ try{ localStorage.setItem('kty-cash-den',JSON.stringify(dens)); }catch(_){} clearTimeout(saveT);
@@ -308,7 +316,7 @@ async function payCashPreview(p, slips, place=null){
 /* ตั้งจุดจ่ายรายคน (เฉพาะงวดนี้) · ค่าประจำแก้ที่ข้อมูลพนักงาน › จุดรับเงินเดือน */
 function payPointSheet(p, slips, ppName, closed, err, done){
   if(err) return toast(/pay_point_overrides/.test(err.message||'')?'ต้องรันไฟล์ 28_pay_point.sql ก่อน':errText(err),true);
-  const opts=[['co','บริษัท'],...S.sites.filter(x=>x.status==='active'||slips.some(s=>s.pp===String(x.id))).map(x=>[String(x.id),ppName(String(x.id))])];
+  const opts=payPointOptions(slips.map(s=>s.pp));
   const ov=overlay(`<div class="sheet" role="dialog" aria-modal="true" aria-label="ตั้งจุดจ่าย"><header class="appbar stripe"><button class="ibtn" data-x aria-label="ปิด">${IC.close}</button><h1>จุดจ่ายเงิน<small>งวด ${periodLabel(p)} · เปลี่ยนเฉพาะงวดนี้</small></h1></header>
     <div class="sheet-body"><div class="note n-info">${IC.info}<span>ค่าประจำของแต่ละคนตั้งที่ ข้อมูลพนักงาน › จุดรับเงินเดือน · เปลี่ยนที่นี่มีผลเฉพาะงวดนี้</span></div>
       <div class="card card-l">${slips.map(s=>`<div class="li" style="gap:10px;flex-wrap:wrap"><div class="grow" style="min-width:140px"><b class="sm">${esc(s.data.name)}</b><span class="xs muted">${esc(s.data.emp_code||'')} · สุทธิ ${baht(+s.data.net||0)}${s.ppOv?` · <span style="color:var(--acc,#0B6BCB);font-weight:700">เฉพาะงวดนี้ (ปกติ: ${esc(ppName(s.ppDef))})</span>`:''}</span></div>
@@ -318,7 +326,7 @@ function payPointSheet(p, slips, ppName, closed, err, done){
   $('[data-x]',ov.el).onclick=close; $('[data-x2]',ov.el).onclick=close;
   $$('[data-ppe]',ov.el).forEach(sel=>sel.onchange=async()=>{ const s=slips.find(x=>x.employee_id===sel.dataset.ppe), v=sel.value; sel.disabled=true;
     const r=v===s.ppDef?await sb.from('pay_point_overrides').delete().eq('period_id',p.id).eq('employee_id',s.employee_id)
-      :await sb.from('pay_point_overrides').upsert({period_id:p.id,employee_id:s.employee_id,site_id:v==='co'?null:+v,set_by_name:S.profile.display_name||null,set_at:new Date().toISOString()});
+      :await sb.from('pay_point_overrides').upsert({period_id:p.id,employee_id:s.employee_id,site_id:/^\d+$/.test(v)?+v:null,point:v,set_by_name:S.profile.display_name||null,set_at:new Date().toISOString()});
     sel.disabled=false; if(r.error){ sel.value=s.pp; return toast(errText(r.error),true); } s.pp=v; s.ppOv=v!==s.ppDef; changed=true; toast(`${s.data.name}: จ่ายที่ ${ppName(v)}`); });
 }
 async function paySheetExport(p, slips, btn){
@@ -442,7 +450,19 @@ function stPayroll(host){
       <div class="g2"><div class="field"><label>เพดานฐานค่าจ้าง (บาท/<b>เดือน</b>) · ตามกฎหมาย เช่น 17,500</label><input class="in num" data-n="sso_ceiling" value="${r.sso_ceiling}"></div><div class="field"><label>รายเดือน หักวันละ เงินเดือน ÷</label><input class="in num" data-n="monthly_divisor" value="${r.monthly_divisor}"></div></div>
       <div class="field"><label>ผ่อนสินค้า/เบิกล่วงหน้าได้สูงสุด (งวด)</label><input class="in num" data-n="max_installments" value="${r.max_installments}" style="max-width:120px"></div>
       <span class="hint">ประกันสังคมหักสูงสุด ${fmtN(r.sso_ceiling*r.sso_rate)} บาท/เดือน (รวม 2 งวด)</span></div>
-    <button class="btn btn-p" data-save style="align-self:flex-start">บันทึกกติกาเงินเดือน</button>`;
+    <button class="btn btn-p" data-save style="align-self:flex-start">บันทึกกติกาเงินเดือน</button>
+    <div class="card col" style="gap:10px" id="ppcard"><b>จุดจ่ายเงิน</b><span class="xs muted">บริษัทและไซต์งานที่เปิดอยู่เป็นจุดจ่ายให้อัตโนมัติ · เพิ่มจุดอื่นได้ที่นี่ · ติ๊ก "โอนเข้าบัญชี" = ไม่นับในใบเบิกเงินสด</span><div id="ppl" class="col" style="gap:8px"></div>
+      <div class="row" style="gap:8px"><button class="btn btn-sm" data-ppadd>+ เพิ่มจุดจ่าย</button><button class="btn btn-sm btn-p" data-ppsave>บันทึกจุดจ่าย</button></div></div>`;
+  let PPL=JSON.parse(JSON.stringify(S.settings.pay_points||[]));
+  const ppDraw=()=>{ $('#ppl',host).innerHTML=`<div class="pp-row"><span class="pp-sw" style="background:#1B262C"></span><b class="sm">บริษัท</b><span class="xs muted">ค่าเริ่มต้น</span><span></span></div><div class="pp-row"><span class="pp-sw" style="background:#0E7C86"></span><b class="sm">ไซต์งานทุกไซต์ (${S.sites.filter(x=>x.status==='active').length})</b><span class="xs muted">อัตโนมัติ</span><span></span></div>`+
+      PPL.map((c,i)=>`<div class="pp-row"><input type="color" value="${esc(c.color||'#C27C00')}" data-ppc="${i}" aria-label="สี" class="pp-sw" style="padding:0;border:0"><input class="in" data-ppn="${i}" value="${esc(c.name||'')}" placeholder="ชื่อจุดจ่าย เช่น สำนักงานสาขา" style="height:36px"><label class="row xs" style="gap:4px;white-space:nowrap"><input type="checkbox" data-ppt2="${i}" ${c.transfer?'checked':''}>โอนเข้าบัญชี</label><button class="ibtn" data-ppx="${i}" aria-label="ลบ">${IC.close}</button></div>`).join('');
+    $$('[data-ppn]',host).forEach(x=>x.oninput=()=>PPL[+x.dataset.ppn].name=x.value);
+    $$('[data-ppc]',host).forEach(x=>x.oninput=()=>PPL[+x.dataset.ppc].color=x.value);
+    $$('[data-ppt2]',host).forEach(x=>x.onchange=()=>PPL[+x.dataset.ppt2].transfer=x.checked);
+    $$('[data-ppx]',host).forEach(x=>x.onclick=async()=>{ if(!await confirmBox(`ลบจุดจ่าย "${PPL[+x.dataset.ppx].name}"? พนักงานที่ตั้งไว้จะกลับไปเป็น "บริษัท"`,'ลบ',true)) return; PPL.splice(+x.dataset.ppx,1); ppDraw(); }); };
+  ppDraw();
+  $('[data-ppadd]',host).onclick=()=>{ PPL.push({key:Math.random().toString(36).slice(2,8),name:'',color:'#C27C00',transfer:false}); ppDraw(); $$('[data-ppn]',host).pop()?.focus(); };
+  $('[data-ppsave]',host).onclick=async ev=>{ const v=PPL.map(c=>({...c,name:(c.name||'').trim()})).filter(c=>c.name); busy(ev.target,true); try{ await saveSetting('pay_points',v); PPL=JSON.parse(JSON.stringify(v)); ppDraw(); toast('บันทึกจุดจ่ายแล้ว'); }catch(e){ toast(/pay_points|ไม่มีสิทธิ์/.test(e.message)?'ต้องรันไฟล์ 29_pay_points_custom.sql และเป็นแอดมิน':e.message,true); } busy(ev.target,false); };
   const ssoEx=()=>{ const c=Number($('[data-n="sso_cap_rate"]',host).value)||0, rt=Number($('[data-n="sso_rate"]',host).value)||0, raw=14.5*Math.min(480,c)*rt/100, up=$('[data-t="roundup"]',host).classList.contains('on');
     $('[data-ssoex]',host).textContent=`ตัวอย่างแบบเพดาน: ค่าแรง 480 มา 14.5 แรง → 14.5 × ${fmtN(Math.min(480,c))} × ${rt}% = ${fmtN(raw)} → หัก ${up?Math.ceil(raw-1e-9):Math.round(raw)} บาท`; };
   $$('[data-n]',host).forEach(i=>i.addEventListener('input',ssoEx));
