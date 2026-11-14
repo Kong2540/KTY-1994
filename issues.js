@@ -36,8 +36,8 @@ function issueForm(){
   };
   const keep=()=>{ const t=$('#is_t'), d=$('#is_d'), s=$('#is_site'); if(t) F.title=t.value; if(d) F.detail=d.value; if(s) F.site_id=s.value; };
   const SIMPLE_KEYS=['detail','photos'];
-  const draw=()=>{ host.innerHTML=(simple?`<div class="note n-info">${IC.lock||IC.info}<span><b>ส่งถึงผู้บริหารโดยตรง</b> · ผู้อื่นไม่เห็น</span></div><div class="field"><label for="is_d">เรื่องที่ต้องการแจ้ง <span style="color:var(--bad)">*</span></label><textarea class="in" id="is_d" rows="9" placeholder="พิมพ์เล่าได้เต็มที่ เกิดอะไรขึ้น ที่ไหน เมื่อไร">${esc(F.detail)}</textarea></div>`+FIELDS.filter(f=>f.key==='photos').map(f=>B.photos(f)).join('')
-      :FIELDS.filter(f=>!(simple&&!SIMPLE_KEYS.includes(f.key))).map(f=>B[f.key]?B[f.key](f):cfHTML(f,F.extra[f.key])).join(''))+`<span class="xs muted">ผู้บริหารได้รับแจ้งเตือนในแอปทันที · ส่งแล้วแชร์ใบแจ้งปัญหาเข้า LINE ได้</span>`;
+  const draw=()=>{ host.innerHTML=(simple?`<div class="note n-info">${IC.lock||IC.info}<span><b>เห็นเฉพาะผู้บริหารและผู้ที่แอดมินกำหนด</b> · เพื่อนร่วมงานและหัวหน้างานไม่เห็นเรื่องนี้</span></div><div class="field"><label for="is_d">เรื่องที่ต้องการแจ้ง <span style="color:var(--bad)">*</span></label><textarea class="in" id="is_d" rows="9" placeholder="พิมพ์เล่าได้เต็มที่ เกิดอะไรขึ้น ที่ไหน เมื่อไร">${esc(F.detail)}</textarea></div>`+FIELDS.filter(f=>f.key==='photos').map(f=>B.photos(f)).join('')
+      :FIELDS.filter(f=>!(simple&&!SIMPLE_KEYS.includes(f.key))).map(f=>B[f.key]?B[f.key](f):cfHTML(f,F.extra[f.key])).join(''))+(simple?'':`<span class="xs muted">ผู้บริหารได้รับแจ้งเตือนในแอปทันที · ส่งแล้วแชร์ใบแจ้งปัญหาเข้า LINE ได้</span>`);
     $$('[data-cat]',host).forEach(b=>b.onclick=()=>{ keep(); F.category=b.dataset.cat; draw(); });
     $$('[data-site]',host).forEach(b=>b.onclick=()=>{ keep(); F.site_id=+F.site_id===+b.dataset.site?'':+b.dataset.site; draw(); });
     $$('[data-urg]',host).forEach(b=>b.onclick=()=>{ keep(); F.urgency=b.dataset.urg; draw(); });
@@ -45,7 +45,7 @@ function issueForm(){
     const ph=$('[data-ph]',host); if(ph) ph.onchange=async()=>{ keep(); for(const f of [...ph.files].slice(0,pMax-F.photos.length)){ const bl=await resizeImage(f,1600); F.photos.push({blob:bl,url:URL.createObjectURL(bl)}); } draw(); };
     cfBind(host,F.extra,()=>{ keep(); draw(); },FX); };
   draw();
-  $('#isbar').innerHTML=`<span class="sm muted grow">แจ้งในนาม ${esc(S.profile.display_name)}</span><button class="btn btn-p" id="isgo">ส่งถึงผู้บริหาร</button>`;
+  $('#isbar').innerHTML=`<span class="sm muted grow">${simple?'ส่งเข้าระบบ ไม่ส่งเข้า LINE':`แจ้งในนาม ${esc(S.profile.display_name)}`}</span><button class="btn btn-p" id="isgo">ส่งถึงผู้บริหาร</button>`;
   $('#isgo').onclick=async ev=>{ keep(); cfCollectSignatures(F.extra);
     const fd=k=>FIELDS.find(x=>x.key===k);
     if(simple){ if(!F.detail.trim()) return toast('พิมพ์เรื่องที่ต้องการแจ้ง',true);
@@ -63,7 +63,7 @@ function issueForm(){
       const paths=[]; for(let i=0;i<F.photos.length;i++){ const path=`${data.id}/${Date.now()}_${i+1}.jpg`; const {error:e2}=await sb.storage.from('issue-photos').upload(path,F.photos[i].blob,{contentType:'image/jpeg'}); if(!e2) paths.push(path); }
       if(paths.length) await sb.rpc('set_issue_photos',{p_id:data.id,p_photos:paths});
       if(!simple&&FIELDS.some(f=>!f.core&&f.type==='photos'&&(F.extra[f.key]||[]).length)){ await cfUploadPhotoSets(FIELDS,F.extra,async(bl,f,i)=>{ const path=`${data.id}/${f.key}_${Date.now()}_${i+1}.jpg`; const {error:e3}=await sb.storage.from('issue-photos').upload(path,bl,{contentType:'image/jpeg'}); return e3?null:{path}; }); await sb.rpc('issue_merge_extra',{p_id:data.id,p:cfStrip(F.extra)}); }
-      toast(`ส่งเรื่อง ${data.issue_no} ถึงผู้บริหารแล้ว`); location.hash='#iss/'+data.id; setTimeout(()=>issueShare(data.id),500);
+      toast(`ส่งเรื่อง ${data.issue_no} ถึงผู้บริหารแล้ว`); location.hash='#iss/'+data.id; if(!simple) setTimeout(()=>issueShare(data.id),500);
     }catch(e){ busy(ev.target,false); toast(/create_issue/.test(e.message||'')?'ยังไม่ได้รันไฟล์ 20_issues.sql':errText(e),true); }
   };
 }
@@ -117,7 +117,7 @@ async function issueDetail(host, id, reload){
   const tsOf={new:i.created_at,acknowledged:i.acknowledged_at,resolved:i.resolved_at,closed:i.closed_at};
   let users=[]; if(mgr){ const {data}=await sb.from('profiles').select('id,display_name,role').eq('is_active',true).neq('role','pending').order('display_name'); users=data||[]; }
   host.innerHTML=`<div class="col" style="gap:12px"><div class="row" style="gap:8px;flex-wrap:wrap"><b class="grow" style="font-size:18px">${esc(i.title)}</b><span class="tag" style="background:${uc};color:#fff">${ut}</span><span class="tag ${ISS_ST[i.status][1]}">${ISS_ST[i.status][0]}</span></div>
-    <span class="xs muted">${esc(i.issue_no||'')} · ${esc(i.category)}${site?` · ${esc(site.name)}`:''} · แจ้งโดย ${esc(i.reporter_name||'')}${i.reporter_position?` (${esc(i.reporter_position)})`:''} · ${new Date(i.created_at).toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'})}${i.reopened?` · เปิดซ้ำ ${i.reopened} ครั้ง`:''}</span>
+    <span class="xs muted">${esc(i.issue_no||'')} · ${esc(i.category)}${site?` · ${esc(site.name)}`:''}${!isManager()&&S.profile.role!=='foreman'?'':` · แจ้งโดย ${esc(i.reporter_name||'')}${i.reporter_position?` (${esc(i.reporter_position)})`:''}`} · ${new Date(i.created_at).toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'})}${i.reopened?` · เปิดซ้ำ ${i.reopened} ครั้ง`:''}</span>
     ${i.detail?`<div class="sm" style="white-space:pre-wrap">${esc(i.detail)}</div>`:''}
     ${F.length?`<div class="card" style="padding:4px 14px;box-shadow:none">${F.map(f=>`<div class="kv"><span>${esc(f.label)}</span><span>${esc(cfText(f,i.extra[f.key]))}</span></div>`).join('')}</div>`:''}
     ${formOf('issue').filter(f=>!f.core&&f.type==='photos'&&(i.extra?.[f.key]||[]).length).map(f=>`<b class="xs">${esc(f.label)}</b><div class="pgrid">${i.extra[f.key].map(p=>urls[p.path]?`<a class="pthumb" href="${urls[p.path]}" target="_blank" rel="noopener"><img src="${urls[p.path]}" alt=""></a>`:'').join('')}</div>`).join('')}
@@ -133,7 +133,7 @@ async function issueDetail(host, id, reload){
     <b class="sm">การพูดคุย (${cms.filter(c=>c.kind==='comment').length})</b>
     <div class="col" style="gap:8px">${cms.map(c=>c.kind==='comment'?`<div class="iscm ${c.author===S.profile.id?'me':''}"><b class="xs">${esc(c.author_name||'')} · ${new Date(c.created_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}</b>${c.body?`<div class="sm" style="white-space:pre-wrap">${esc(c.body)}</div>`:''}${(c.photos||[]).length?`<div class="pgrid" style="margin-top:4px">${c.photos.map(p=>urls[p]?`<a class="pthumb" href="${urls[p]}" target="_blank" rel="noopener"><img src="${urls[p]}" alt=""></a>`:'').join('')}</div>`:''}</div>`:`<div class="xs muted" style="text-align:center">— ${esc(c.body||'')} · ${esc(c.author_name||'')} ${new Date(c.created_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})} —</div>`).join('')||'<span class="xs muted">ยังไม่มีข้อความ</span>'}</div>
     ${i.status!=='closed'?`<div class="row" style="gap:6px"><input class="in grow" id="icm" placeholder="${mgr?'ตอบกลับ / สั่งการ…':'พิมพ์ข้อความ…'}"><label class="btn btn-sm" title="แนบรูป">📷<input type="file" accept="image/*" multiple hidden id="icp"></label><button class="btn btn-sm btn-p" id="ics">ส่ง</button></div><span class="xs muted" id="icpn"></span>`:''}
-    <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn btn-sm" data-share>ใบแจ้งปัญหา (แชร์ LINE / PDF)</button></div></div>`;
+    <div class="row" style="gap:8px;flex-wrap:wrap">${!isManager()&&S.profile.role!=='foreman'?'':'<button class="btn btn-sm" data-share>ใบแจ้งปัญหา (แชร์ LINE / PDF)</button>'}</div></div>`;
   hydratePhotos?.(host);
   const save=async(st)=>{ const {error}=await sb.rpc('set_issue',{p_id:id,p_status:st||$('#ims',host)?.value||i.status,p_assignee:mgr?($('#ima',host)?.value||null):i.assignee,p_due:mgr?($('#imd',host)?.value||null):i.due_date,p_note:null}); if(error) return toast(errText(error),true); toast('บันทึกแล้ว'); reload(); };
   const sv=$('[data-save]',host); if(sv) sv.onclick=()=>save();
@@ -143,7 +143,7 @@ async function issueDetail(host, id, reload){
   const ics=$('#ics',host); if(ics) ics.onclick=async ev=>{ const body=$('#icm',host).value.trim(); if(!body&&!cph.length) return; busy(ev.target,true);
     try{ const paths=[]; for(let k=0;k<cph.length;k++){ const p=`${id}/c${Date.now()}_${k}.jpg`; const {error}=await sb.storage.from('issue-photos').upload(p,cph[k],{contentType:'image/jpeg'}); if(!error) paths.push(p); }
       const {error}=await sb.rpc('add_issue_comment',{p_id:id,p_body:body,p_photos:paths}); if(error) throw error; reload(); }catch(e){ busy(ev.target,false); toast(errText(e),true); } };
-  $('[data-share]',host).onclick=()=>issueShare(id);
+  const shb=$('[data-share]',host); if(shb) shb.onclick=()=>issueShare(id);
 }
 async function issueShare(id){
   try{ const {data:i,error}=await sb.from('issues').select('*').eq('id',id).single(); if(error) throw error;
