@@ -20,19 +20,26 @@ function issueForm(){
   const pMin=photoMin(formOf('issue'),'photos',0), pMax=photoMax(formOf('issue'),'photos',6);
   const F={category:pre.category||'',urgency:pre.urgency||'normal',site_id:pre.site_id||(S.site?+S.site:''),title:pre.title||'',detail:pre.detail||'',extra:{},photos:[],source_daily:pre.source_daily||null}, FX={};
   setPage(head('แจ้งปัญหา','ส่งตรงถึงผู้บริหาร',{back:'#iss'})+'<div id="isf" class="col" style="gap:14px;max-width:720px"></div><div class="savebar" id="isbar"></div>');
-  const host=$('#isf'), sites=S.sites.filter(s=>s.status==='active');
+  const mgr=isManager(), simple=!mgr&&S.profile.role!=='foreman';   // พนักงาน: พิมพ์ข้อความ + รูปเท่านั้น
+  const host=$('#isf'), sites=S.sites.filter(s=>s.status==='active'&&(mgr||mySiteIds().includes(s.id)));
+  if(!mgr&&!simple){ if(F.site_id&&!sites.some(s=>s.id===+F.site_id)) F.site_id=''; if(!F.site_id&&sites.length===1) F.site_id=sites[0].id; }
+  const projName=s=>s.contract_name||s.name, siteSub=s=>[s.code,s.location].filter(Boolean).join(' · ');
   const req=f=>f.required?' <span style="color:var(--bad)">*</span>':'', hlp=f=>f.help?`<span class="hint">${esc(f.help)}</span>`:'';
   const B={
     category:f=>`<div class="field"><label>${esc(f.label)}${req(f)}</label><div class="chips">${issCats().map(c=>`<button type="button" class="chip ${F.category===c?'on':''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}</div>${hlp(f)}</div>`,
     urgency:f=>`<div class="field"><label>${esc(f.label)}${req(f)}</label><div class="seg">${Object.entries(ISS_URG).map(([k,[t,c]])=>`<button type="button" class="${F.urgency===k?'on':''}" data-urg="${k}" style="${k!=='normal'?`color:${c}`:''}">${t}</button>`).join('')}</div>${hlp(f)}</div>`,
-    site_id:f=>`<div class="field"><label for="is_site">${esc(f.label)}${req(f)}</label><select class="in" id="is_site"><option value="">— ไม่ระบุ —</option>${sites.map(s=>`<option value="${s.id}" ${+F.site_id===s.id?'selected':''}>${esc(s.name)}${s.code?` (${esc(s.code)})`:''}</option>`).join('')}</select>${hlp(f)}</div>`,
+    site_id:f=>mgr?`<div class="field"><label for="is_site">${esc(f.label)}${req(f)}</label><select class="in" id="is_site"><option value="">— ไม่ระบุ —</option>${sites.map(s=>`<option value="${s.id}" ${+F.site_id===s.id?'selected':''}>${esc(projName(s))}${siteSub(s)?` · ${esc(siteSub(s))}`:''}</option>`).join('')}</select>${hlp(f)}</div>`
+      :`<div class="field"><label>โครงการ / ไซต์งาน${req(f)}</label>${sites.length?`<div class="iss-sites">${sites.map(s=>`<button type="button" class="iss-site ${+F.site_id===s.id?'on':''}" data-site="${s.id}"><b>${esc(projName(s))}</b>${siteSub(s)?`<span class="xs muted">${esc(siteSub(s))}</span>`:''}</button>`).join('')}</div><span class="hint">แสดงเฉพาะไซต์ที่คุณดูแล (${sites.length} ไซต์)</span>`:'<span class="hint">ยังไม่ได้รับสิทธิ์ดูแลไซต์ใด · ส่งได้โดยไม่ระบุไซต์</span>'}${hlp(f)}</div>`,
     title:f=>`<div class="field"><label for="is_t">${esc(f.label)}${req(f)}</label><input class="in" id="is_t" maxlength="140" value="${esc(F.title)}" placeholder="สรุปปัญหาสั้น ๆ">${hlp(f)}</div>`,
     detail:f=>`<div class="field"><label for="is_d">${esc(f.label)}${req(f)}</label><textarea class="in" id="is_d" rows="5" placeholder="เกิดอะไรขึ้น ที่ไหน กระทบงานอย่างไร">${esc(F.detail)}</textarea>${hlp(f)}</div>`,
     photos:f=>`<div class="field"><label>${esc(f.label)}${pMin?' <span style="color:var(--bad)">*</span>':''} <span class="muted" style="${F.photos.length<pMin?'color:var(--bad)':''}">${F.photos.length}${pMin?` / ขั้นต่ำ ${pMin}`:` / ${pMax}`}</span></label><div class="pgrid">${F.photos.map((p,i)=>`<div class="pthumb"><img src="${p.url}" alt=""><button type="button" data-delp="${i}" aria-label="ลบรูป">×</button></div>`).join('')}${F.photos.length<pMax?`<label class="pthumb padd">${IC.camera}<span class="xs">เพิ่มรูป</span><input type="file" accept="image/*" multiple hidden data-ph></label>`:''}</div>${hlp(f)}</div>`
   };
   const keep=()=>{ const t=$('#is_t'), d=$('#is_d'), s=$('#is_site'); if(t) F.title=t.value; if(d) F.detail=d.value; if(s) F.site_id=s.value; };
-  const draw=()=>{ host.innerHTML=FIELDS.map(f=>B[f.key]?B[f.key](f):cfHTML(f,F.extra[f.key])).join('')+`<span class="xs muted">ผู้บริหารได้รับแจ้งเตือนในแอปทันที · ส่งแล้วแชร์ใบแจ้งปัญหาเข้า LINE ได้</span>`;
+  const SIMPLE_KEYS=['detail','photos'];
+  const draw=()=>{ host.innerHTML=(simple?`<div class="note n-info">${IC.lock||IC.info}<span><b>ส่งถึงผู้บริหารโดยตรง</b> · ผู้อื่นไม่เห็น</span></div><div class="field"><label for="is_d">เรื่องที่ต้องการแจ้ง <span style="color:var(--bad)">*</span></label><textarea class="in" id="is_d" rows="9" placeholder="พิมพ์เล่าได้เต็มที่ เกิดอะไรขึ้น ที่ไหน เมื่อไร">${esc(F.detail)}</textarea></div>`+FIELDS.filter(f=>f.key==='photos').map(f=>B.photos(f)).join('')
+      :FIELDS.filter(f=>!(simple&&!SIMPLE_KEYS.includes(f.key))).map(f=>B[f.key]?B[f.key](f):cfHTML(f,F.extra[f.key])).join(''))+`<span class="xs muted">ผู้บริหารได้รับแจ้งเตือนในแอปทันที · ส่งแล้วแชร์ใบแจ้งปัญหาเข้า LINE ได้</span>`;
     $$('[data-cat]',host).forEach(b=>b.onclick=()=>{ keep(); F.category=b.dataset.cat; draw(); });
+    $$('[data-site]',host).forEach(b=>b.onclick=()=>{ keep(); F.site_id=+F.site_id===+b.dataset.site?'':+b.dataset.site; draw(); });
     $$('[data-urg]',host).forEach(b=>b.onclick=()=>{ keep(); F.urgency=b.dataset.urg; draw(); });
     $$('[data-delp]',host).forEach(b=>b.onclick=()=>{ keep(); F.photos.splice(+b.dataset.delp,1); draw(); });
     const ph=$('[data-ph]',host); if(ph) ph.onchange=async()=>{ keep(); for(const f of [...ph.files].slice(0,pMax-F.photos.length)){ const bl=await resizeImage(f,1600); F.photos.push({blob:bl,url:URL.createObjectURL(bl)}); } draw(); };
@@ -41,19 +48,21 @@ function issueForm(){
   $('#isbar').innerHTML=`<span class="sm muted grow">แจ้งในนาม ${esc(S.profile.display_name)}</span><button class="btn btn-p" id="isgo">ส่งถึงผู้บริหาร</button>`;
   $('#isgo').onclick=async ev=>{ keep(); cfCollectSignatures(F.extra);
     const fd=k=>FIELDS.find(x=>x.key===k);
-    if(fd('category')?.required!==0&&!F.category) return toast('เลือกหมวด',true);
+    if(simple){ if(!F.detail.trim()) return toast('พิมพ์เรื่องที่ต้องการแจ้ง',true);
+      const first=F.detail.trim().split('\n')[0].trim(); F.title=first.length>80?first.slice(0,78)+'…':first; F.category='จากพนักงาน'; F.urgency='normal'; F.site_id=''; }
+    if(!simple&&fd('category')?.required!==0&&!F.category) return toast('เลือกหมวด',true);
     if(!F.title.trim()) return toast('กรอกหัวข้อ',true);
     if(fd('detail')?.required&&!F.detail.trim()) return toast('กรอกรายละเอียด',true);
     if(fd('site_id')?.required&&!F.site_id) return toast('เลือกไซต์',true);
     if(F.photos.length<pMin) return toast(`ต้องแนบรูปอย่างน้อย ${pMin} รูป`,true);
-    const cv=cfValidate(FIELDS,F.extra); if(cv) return toast(cv,true);
+    const cv=simple?null:cfValidate(FIELDS,F.extra); if(cv) return toast(cv,true);
     busy(ev.target,true,'กำลังส่ง...');
     try{
-      const {data,error}=await sb.rpc('create_issue',{p:{category:F.category||'อื่น ๆ',urgency:F.urgency,site_id:F.site_id||null,title:F.title.trim(),detail:F.detail.trim(),extra:cfStrip(F.extra),source_daily:F.source_daily}});
+      const {data,error}=await sb.rpc('create_issue',{p:{category:F.category||'อื่น ๆ',urgency:F.urgency,site_id:F.site_id||null,title:F.title.trim(),detail:F.detail.trim(),extra:simple?{}:cfStrip(F.extra),source_daily:F.source_daily}});
       if(error) throw error;
       const paths=[]; for(let i=0;i<F.photos.length;i++){ const path=`${data.id}/${Date.now()}_${i+1}.jpg`; const {error:e2}=await sb.storage.from('issue-photos').upload(path,F.photos[i].blob,{contentType:'image/jpeg'}); if(!e2) paths.push(path); }
       if(paths.length) await sb.rpc('set_issue_photos',{p_id:data.id,p_photos:paths});
-      if(FIELDS.some(f=>!f.core&&f.type==='photos'&&(F.extra[f.key]||[]).length)){ await cfUploadPhotoSets(FIELDS,F.extra,async(bl,f,i)=>{ const path=`${data.id}/${f.key}_${Date.now()}_${i+1}.jpg`; const {error:e3}=await sb.storage.from('issue-photos').upload(path,bl,{contentType:'image/jpeg'}); return e3?null:{path}; }); await sb.rpc('issue_merge_extra',{p_id:data.id,p:cfStrip(F.extra)}); }
+      if(!simple&&FIELDS.some(f=>!f.core&&f.type==='photos'&&(F.extra[f.key]||[]).length)){ await cfUploadPhotoSets(FIELDS,F.extra,async(bl,f,i)=>{ const path=`${data.id}/${f.key}_${Date.now()}_${i+1}.jpg`; const {error:e3}=await sb.storage.from('issue-photos').upload(path,bl,{contentType:'image/jpeg'}); return e3?null:{path}; }); await sb.rpc('issue_merge_extra',{p_id:data.id,p:cfStrip(F.extra)}); }
       toast(`ส่งเรื่อง ${data.issue_no} ถึงผู้บริหารแล้ว`); location.hash='#iss/'+data.id; setTimeout(()=>issueShare(data.id),500);
     }catch(e){ busy(ev.target,false); toast(/create_issue/.test(e.message||'')?'ยังไม่ได้รันไฟล์ 20_issues.sql':errText(e),true); }
   };
@@ -79,7 +88,7 @@ async function issueList(){
         <div style="text-align:right;flex:none"><span class="tag" style="height:20px;font-size:10.5px;background:${uc};color:#fff">${ut}</span><div class="xs" style="margin-top:3px"><span class="tag ${sc}" style="height:18px;font-size:10px">${st}</span></div>${over?'<div class="xs" style="color:var(--bad)">เกินกำหนด</div>':i.assignee_name?`<div class="xs muted">${esc(i.assignee_name)}</div>`:''}</div></a>`; };
     host.innerHTML=`${mgr?`<div class="statg" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">${[['ด่วนมาก ยังไม่รับ',open.filter(i=>i.urgency==='critical'&&i.status==='new').length,'var(--bad)'],['เปิดอยู่ทั้งหมด',open.length,'var(--ink)'],['เกินกำหนด',open.filter(i=>i.due_date&&i.due_date<today&&i.status!=='resolved').length,'var(--warn)'],['ปิดแล้วเดือนนี้',closedM.length,'var(--ok)'],['เวลาแก้เฉลี่ย',closedM.length?avg.toFixed(1)+' วัน':'-','var(--ink)']].map(([t,v,c])=>`<div class="stat"><b class="num" style="font-size:22px;color:${c}">${v}</b><span class="sm muted">${t}</span></div>`).join('')}</div>`:''}
       <div class="chips">${[['open',`เปิดอยู่ ${open.length}`],['closed','ปิดแล้ว'],['all','ทั้งหมด']].map(([k,t])=>`<button class="chip ${ISS_F.st===k?'on':''}" data-fs="${k}">${t}</button>`).join('')}${mgr?`<button class="chip ${ISS_F.mine?'on':''}" data-fm>ของฉัน</button>`:''}
-        <select class="in" id="fcat" style="height:36px;width:auto"><option value="">ทุกหมวด</option>${issCats().map(c=>`<option ${ISS_F.cat===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
+        <select class="in" id="fcat" style="height:36px;width:auto"><option value="">ทุกหมวด</option>${[...new Set([...issCats(),...all.map(i=>i.category).filter(Boolean)])].map(c=>`<option ${ISS_F.cat===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
         <select class="in" id="fsite" style="height:36px;width:auto"><option value="">ทุกไซต์</option>${S.sites.map(s=>`<option value="${s.id}" ${ISS_F.site===String(s.id)?'selected':''}>${esc(s.code||s.name)}</option>`).join('')}</select></div>
       <div class="${wide?'issplit':''}"><div class="card card-l" style="padding:4px 8px">${L.map(row).join('')||'<div class="empty"><b>ไม่มีเรื่อง</b>กด "+ แจ้งปัญหา" เพื่อแจ้งเรื่องใหม่</div>'}</div>${wide?'<div id="isdet" class="card">'+(ISS_SEL?'<div class="loading"><div class="spin"></div></div>':'<div class="empty"><b>เลือกเรื่องทางซ้าย</b></div>')+'</div>':''}</div>`;
     $$('[data-fs]',host).forEach(b=>b.onclick=()=>{ ISS_F.st=b.dataset.fs; draw(); });
