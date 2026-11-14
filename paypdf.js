@@ -210,8 +210,17 @@ function docHead(title, en, iw){
 const infoGrid = (rows, qr) => ({ columns:[{stack:rows.map(([a,b])=>({columns:[{text:a,color:C_LAB,width:62},{text:b||'-',bold:true}],fontSize:8.8,margin:[0,0,0,3]}))}, ...(qr?[{stack:[{qr,fit:62,alignment:'center'},{text:`สแกนเปิดใน ${BR().app}`,fontSize:6,color:C_LAB,alignment:'center',margin:[0,2,0,0]}],width:70}]:[])], margin:[0,0,0,6] });
 const lineTable = (head, rows, widths) => ({ table:{headerRows:1, widths, body:[head.map((h,i)=>({text:h,bold:true,fontSize:8,color:C_DARK,alignment:i&&i>=head.length-2?'right':'left'})), ...rows]},
   layout:{fillColor:r=>r===0?C_BAND:null, hLineWidth:(i,n)=>i===0||i===1||i===n.table.body.length?.6:.3, vLineWidth:()=>0, hLineColor:()=>C_LINE, paddingTop:()=>3.5, paddingBottom:()=>3.5, paddingLeft:()=>5, paddingRight:()=>5}, fontSize:8.6 });
-const stepsBar = (names, cur, iw) => ({ table:{dontBreakRows:true,widths:names.map(()=>'*'), body:[names.map((t,i)=>({stack:[(i<cur?{canvas:[{type:'polyline',lineWidth:1.4,lineColor:'#FFFFFF',points:[{x:0,y:4.5},{x:3,y:7.5},{x:8.5,y:1}]}],alignment:'center',margin:[0,1.5,0,1.5]}:{text:String(i+1),bold:true,fontSize:8,color:i===cur?C_GOLD:'#9AA6AA',alignment:'center'}),{text:t,fontSize:6.8,color:i<cur?'#FFFFFF':i===cur?'#1B262C':C_LAB,alignment:'center',margin:[0,1,0,0]}],fillColor:i<cur?C_DARK:null}))]},
-  layout:{hLineWidth:()=>.5,vLineWidth:()=>.5,hLineColor:()=>C_LINE,vLineColor:()=>C_LINE,paddingTop:()=>4,paddingBottom:()=>4}, margin:[0,8,0,0] });
+/* แถบขั้นตอนแบบวงกลมเชื่อมเส้น: ผ่านแล้ว = วงกลมทึบ+เครื่องหมายถูก · ขั้นปัจจุบัน = วงแหวนสีทอง · ขั้นถัดไป = วงกลมเส้นเทา */
+const stepsBar = (names, cur, iw) => { const n=names.length, cw=iw/n, r=9, cx=cw/2, cy=r+4, GREY='#C9D1D4';
+  const cells=names.map((t,i)=>{ const done=i<cur, now=i===cur, seg=(x1,x2,on)=>({type:'line',x1,y1:cy,x2,y2:cy,lineWidth:on?2:1,lineColor:on?C_DARK:GREY,...(on?{}:{dash:{length:2.5,space:2}})});
+    const cv=[...(i>0?[seg(0,cx-r-2,i<=cur)]:[]),...(i<n-1?[seg(cx+r+2,cw,i+1<=cur)]:[]),
+      {type:'ellipse',x:cx,y:cy,r1:r+3,r2:r+3,color:now?'#FFF4D6':'#FFFFFF'},
+      {type:'ellipse',x:cx,y:cy,r1:r,r2:r,color:done?C_DARK:now?'#FFFFFF':'#FFFFFF',lineWidth:done?0:now?1.8:1,lineColor:done?C_DARK:now?C_GOLD:GREY},
+      ...(done?[{type:'polyline',lineWidth:1.6,lineColor:'#FFFFFF',points:[{x:cx-4,y:cy+.2},{x:cx-1.2,y:cy+3},{x:cx+4.2,y:cy-3.2}]}]:[])];
+    return {stack:[{canvas:cv,width:cw},{text:done?' ':String(i+1),bold:true,fontSize:8.5,color:now?C_GOLD:'#9AA6AA',alignment:'center',margin:[0,-(r+8),0,0]},
+      {text:t,fontSize:7.2,bold:done||now,color:done?C_DARK:now?'#1B262C':C_LAB,alignment:'center',margin:[0,r+1,0,0]},
+      ...(now?[{text:'ขั้นปัจจุบัน',fontSize:6,color:'#B07F00',alignment:'center'}]:[])],width:cw}; });
+  return {columns:cells,columnGap:0,margin:[0,10,0,0]}; };
 const signRow = (a,b) => ({ columns:[a,b].map(([name,role])=>({stack:[{canvas:[{type:'line',x1:0,y1:0,x2:150,y2:0,lineWidth:.5,lineColor:C_LINE}]},{text:name||' ',bold:true,fontSize:8.5,margin:[0,3,0,0]},{text:role,fontSize:7,color:C_LAB}],alignment:'center'})), columnGap:20, margin:[0,14,0,0] });
 const footNote = (left,right) => ({ columns:[{text:left,fontSize:6.2,color:'#8A979C'},{text:right,fontSize:6.2,color:'#8A979C',alignment:'right',width:'auto'}] });
 const a5 = (title, content, footer) => ({ pageSize:'A5', pageMargins:[A5M,A5M,A5M,A5M+12], defaultStyle:{font:'Sarabun',fontSize:9,color:'#1B262C',lineHeight:1.14}, info:{title}, content,
