@@ -210,12 +210,12 @@ function docHead(title, en, iw){
 const infoGrid = (rows, qr) => ({ columns:[{stack:rows.map(([a,b])=>({columns:[{text:a,color:C_LAB,width:62},{text:b||'-',bold:true}],fontSize:8.8,margin:[0,0,0,3]}))}, ...(qr?[{stack:[{qr,fit:62,alignment:'center'},{text:`สแกนเปิดใน ${BR().app}`,fontSize:6,color:C_LAB,alignment:'center',margin:[0,2,0,0]}],width:70}]:[])], margin:[0,0,0,6] });
 const lineTable = (head, rows, widths) => ({ table:{headerRows:1, widths, body:[head.map((h,i)=>({text:h,bold:true,fontSize:8,color:C_DARK,alignment:i&&i>=head.length-2?'right':'left'})), ...rows]},
   layout:{fillColor:r=>r===0?C_BAND:null, hLineWidth:(i,n)=>i===0||i===1||i===n.table.body.length?.6:.3, vLineWidth:()=>0, hLineColor:()=>C_LINE, paddingTop:()=>3.5, paddingBottom:()=>3.5, paddingLeft:()=>5, paddingRight:()=>5}, fontSize:8.6 });
-const stepsBar = (names, cur, iw) => ({ table:{widths:names.map(()=>'*'), body:[names.map((t,i)=>({stack:[(i<cur?{canvas:[{type:'polyline',lineWidth:1.4,lineColor:'#FFFFFF',points:[{x:0,y:4.5},{x:3,y:7.5},{x:8.5,y:1}]}],alignment:'center',margin:[0,1.5,0,1.5]}:{text:String(i+1),bold:true,fontSize:8,color:i===cur?C_GOLD:'#9AA6AA',alignment:'center'}),{text:t,fontSize:6.8,color:i<cur?'#FFFFFF':i===cur?'#1B262C':C_LAB,alignment:'center',margin:[0,1,0,0]}],fillColor:i<cur?C_DARK:null}))]},
+const stepsBar = (names, cur, iw) => ({ table:{dontBreakRows:true,widths:names.map(()=>'*'), body:[names.map((t,i)=>({stack:[(i<cur?{canvas:[{type:'polyline',lineWidth:1.4,lineColor:'#FFFFFF',points:[{x:0,y:4.5},{x:3,y:7.5},{x:8.5,y:1}]}],alignment:'center',margin:[0,1.5,0,1.5]}:{text:String(i+1),bold:true,fontSize:8,color:i===cur?C_GOLD:'#9AA6AA',alignment:'center'}),{text:t,fontSize:6.8,color:i<cur?'#FFFFFF':i===cur?'#1B262C':C_LAB,alignment:'center',margin:[0,1,0,0]}],fillColor:i<cur?C_DARK:null}))]},
   layout:{hLineWidth:()=>.5,vLineWidth:()=>.5,hLineColor:()=>C_LINE,vLineColor:()=>C_LINE,paddingTop:()=>4,paddingBottom:()=>4}, margin:[0,8,0,0] });
 const signRow = (a,b) => ({ columns:[a,b].map(([name,role])=>({stack:[{canvas:[{type:'line',x1:0,y1:0,x2:150,y2:0,lineWidth:.5,lineColor:C_LINE}]},{text:name||' ',bold:true,fontSize:8.5,margin:[0,3,0,0]},{text:role,fontSize:7,color:C_LAB}],alignment:'center'})), columnGap:20, margin:[0,14,0,0] });
 const footNote = (left,right) => ({ columns:[{text:left,fontSize:6.2,color:'#8A979C'},{text:right,fontSize:6.2,color:'#8A979C',alignment:'right',width:'auto'}] });
 const a5 = (title, content, footer) => ({ pageSize:'A5', pageMargins:[A5M,A5M,A5M,A5M+12], defaultStyle:{font:'Sarabun',fontSize:9,color:'#1B262C',lineHeight:1.14}, info:{title}, content,
-  footer:footer?((cp,pc)=>({...footer,margin:[A5M,0,A5M,0]})):undefined });
+  footer:footer?(()=>{ const fj=JSON.stringify(footer); return (cp,pc)=>({...JSON.parse(fj),margin:[A5M,0,A5M,0]}); })():undefined }); // สร้างท้ายกระดาษใหม่ทุกหน้า (ใช้ object ซ้ำทำให้ตำแหน่งเพี้ยนตั้งแต่หน้า 2)
 
 async function docSlipDoc(doc, lines, site){
   await pdfReady(); await logoData();
@@ -233,9 +233,9 @@ async function docSlipDoc(doc, lines, site){
     {text:`รวม ${lines.length} รายการ`,fontSize:7.6,color:C_LAB,alignment:'right',margin:[0,3,0,0]},
     ...(brw||mixed?[{text:'ผู้ยืมรับผิดชอบดูแลอุปกรณ์จนกว่าจะคืน หากชำรุดหรือสูญหายต้องแจ้งทันที',fontSize:7.4,color:C_LAB,margin:[0,6,0,0]}]:[]),
     ...(doc.note?[{text:doc.note,fontSize:7.6,color:C_LAB,margin:[0,4,0,0]}]:[]),
-    stepsBar(brw?['ขอยืม','อนุมัติ','รับของ','คืนแล้ว']:mixed?['ขอเบิก','อนุมัติ','จ่ายของ','รับของ','คืนอุปกรณ์']:['ขอเบิก','อนุมัติ','จ่ายของ','รับของ'], stepI, iw),
-    signRow([doc.requester_name,`${brw?'ผู้ขอยืม':'ผู้ขอเบิก'} · ส่งในระบบ ${t.toTimeString().slice(0,5)} น.`],[doc.approver_name||(doc.status==='rejected'?'ไม่อนุมัติ':'รออนุมัติ'),`ผู้อนุมัติ${doc.approved_at?' · '+new Date(doc.approved_at).toTimeString().slice(0,5)+' น.':''}`])];
-  return a5(`${title} ${doc.doc_no}`, content, footNote(`สร้างโดย ${B.app}`,'ไม่แสดงราคา · เอกสารอ้างอิงในระบบ'));
+    {unbreakable:true,stack:[stepsBar(brw?['ขอยืม','อนุมัติ','รับของ','คืนแล้ว']:mixed?['ขอเบิก','อนุมัติ','จ่ายของ','รับของ','คืนอุปกรณ์']:['ขอเบิก','อนุมัติ','จ่ายของ','รับของ'], stepI, iw),
+    signRow([doc.requester_name,`${brw?'ผู้ขอยืม':'ผู้ขอเบิก'} · ส่งในระบบ ${t.toTimeString().slice(0,5)} น.`],[doc.approver_name||(doc.status==='rejected'?'ไม่อนุมัติ':'รออนุมัติ'),`ผู้อนุมัติ${doc.approved_at?' · '+new Date(doc.approved_at).toTimeString().slice(0,5)+' น.':''}`])]}]; // แถบขั้นตอน+ลายเซ็นไม่แยกหน้า
+  return {...a5(`${title} ${doc.doc_no}`, content, footNote(`สร้างโดย ${B.app}`,'ไม่แสดงราคา · เอกสารอ้างอิงในระบบ')), _rh:4 }; // หัวกระดาษ + เลขที่ + ข้อมูลโครงการ/QR ซ้ำทุกหน้า
 }
 async function returnSlipDoc(doc, ret, site){
   await pdfReady(); await logoData();
@@ -249,7 +249,7 @@ async function returnSlipDoc(doc, ret, site){
     ...(ret.note?[{text:`หมายเหตุ: ${ret.note}`,fontSize:7.8,color:C_LAB,margin:[0,6,0,0]}]:[]),
     {columns:[{stack:[...(ret.signature?[{image:ret.signature,fit:[150,46],alignment:'center'}]:[{text:' ',margin:[0,20,0,0]}]),{canvas:[{type:'line',x1:0,y1:0,x2:150,y2:0,lineWidth:.5,lineColor:C_LINE}]},{text:ret.returned_name||'',bold:true,fontSize:8.5,margin:[0,3,0,0]},{text:'ผู้คืน (ลงชื่อในระบบ)',fontSize:7,color:C_LAB}],alignment:'center'},
       {stack:[{text:' ',margin:[0,46,0,0]},{canvas:[{type:'line',x1:0,y1:0,x2:150,y2:0,lineWidth:.5,lineColor:C_LINE}]},{text:' ',fontSize:8.5,margin:[0,3,0,0]},{text:'ผู้รับคืน (สโตร์)',fontSize:7,color:C_LAB}],alignment:'center'}],columnGap:20,margin:[0,14,0,0]}];
-  return a5(`ใบคืน ${doc.doc_no}`, content, footNote(`สร้างโดย ${B.app}`,'อุปกรณ์ชำรุดย้ายไปคลังส่งซ่อม'));
+  return {...a5(`ใบคืน ${doc.doc_no}`, content, footNote(`สร้างโดย ${B.app}`,'อุปกรณ์ชำรุดย้ายไปคลังส่งซ่อม')), _rh:4 }; // หัวกระดาษ + เลขที่ + ข้อมูลโครงการ/QR ซ้ำทุกหน้า
 }
 async function crewSlipDoc(rep, site, docNo){
   await pdfReady(); await logoData();
