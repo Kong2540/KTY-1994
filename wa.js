@@ -123,21 +123,25 @@ async function waList(){
   const isMe=w=>waCanSign(w,waType(w.type_key)||{});
   const ok=(w,skip)=>(skip==='site'||F.site==='all'||w.site_id===+F.site)&&(skip==='type'||F.type==='all'||w.type_key===F.type)&&(skip==='st'||F.st==='all'||(F.st==='me'?isMe(w):stKey(w)===F.st));
   const cnt=(key,v)=>ALL.filter(w=>ok(w,key)&&(v==='all'||(key==='site'?w.site_id===+v:key==='type'?w.type_key===v:v==='me'?isMe(w):stKey(w)===v))).length;
-  const chips=(key,label,opts)=>`<div class="col" style="gap:4px"><span class="xs muted" style="font-weight:600">${label}</span><div class="chips scroll" style="margin:0 -16px;padding:0 16px">${opts.map(([v,t])=>`<button class="chip ${String(F[key])===String(v)?'on':''}" data-f="${key}" data-v="${v}">${t} <span class="xs" style="opacity:.7;font-weight:700">${cnt(key,v)}</span></button>`).join('')}</div></div>`;
+  const selF=(key,label,opts)=>`<label class="wa-fs"><span>${label}</span><select class="in" data-f="${key}" aria-label="${label}">${opts.map(([v,t])=>`<option value="${v}" ${String(F[key])===String(v)?'selected':''}>${t} (${cnt(key,v)})</option>`).join('')}</select></label>`;
   const siteName=id=>{ const s=S.sites.find(x=>x.id===id); return s?`${s.code?s.code+' ':''}${s.name}`:''; };
   const sorter={new:(a,b)=>String(b.created_at).localeCompare(a.created_at),old:(a,b)=>String(a.created_at).localeCompare(b.created_at),
     due:(a,b)=>String(a.request_at||'9').localeCompare(String(b.request_at||'9')),site:(a,b)=>siteName(a.site_id).localeCompare(siteName(b.site_id),'th',{numeric:true})||String(b.created_at).localeCompare(a.created_at)}[F.sort]||((a,b)=>0);
   const L=ALL.filter(w=>ok(w)).sort(sorter), ST_OPT=[['all','ทั้งหมด'],['me','รอคุณลงนาม'],['submitted','รอตรวจ'],['in_review','รออนุมัติ'],['approved','อนุมัติแล้ว'],['cond','มีเงื่อนไข'],['rejected','ไม่ผ่าน'],['cancelled','ยกเลิก']];
   const dt=x=>x?new Date(x).toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+' น.':'-';
   H.outerHTML=`<div class="col" style="gap:10px">
-    ${sites.length>1?chips('site','หน้างาน',[['all','ทุกไซต์'],...sites.map(s=>[s.id,esc(s.code||s.name)])]):''}
-    ${types.length>1?chips('type','ประเภท',[['all','ทุกประเภท'],...types.map(t=>[t.key,`${esc(t.icon||'')} ${esc(t.name)}`])]):''}
-    ${chips('st','สถานะ',ST_OPT.filter(([v])=>v==='all'||cnt('st',v)>0||v==='me'))}
-    <div class="row" style="gap:8px;flex-wrap:wrap"><select class="in" id="wsort" style="height:38px;flex:1;min-width:200px" aria-label="เรียงลำดับ">${[['new','เรียง: ส่งล่าสุดก่อน'],['old','เรียง: ส่งเก่าสุดก่อน'],['due','เรียง: วันนัดตรวจ/เท ใกล้สุดก่อน'],['site','เรียง: ตามหน้างาน']].map(([v,t])=>`<option value="${v}" ${F.sort===v?'selected':''}>${t}</option>`).join('')}</select></div>
+    <div class="wa-fg">
+      ${selF('site','หน้างาน',[['all','ทุกไซต์'],...sites.map(s=>[s.id,esc(s.code||s.name)])])}
+      ${selF('type','ประเภท',[['all','ทุกประเภท'],...types.map(t=>[t.key,esc(t.name)])])}
+      ${selF('st','สถานะ',ST_OPT.filter(([v])=>v==='all'||v==='me'||cnt('st',v)>0||F.st===v).map(([v,t])=>[v,v==='all'?'ทุกสถานะ':t]))}
+      <label class="wa-fs"><span>เรียงลำดับ</span><select class="in" id="wsort" aria-label="เรียงลำดับ">${[['new','ส่งล่าสุดก่อน'],['old','ส่งเก่าสุดก่อน'],['due','วันนัดใกล้สุดก่อน'],['site','ตามหน้างาน']].map(([v,t])=>`<option value="${v}" ${F.sort===v?'selected':''}>${t}</option>`).join('')}</select></label>
+    </div>
+    <button class="wa-me ${F.st==='me'?'on':''}" data-fme>${F.st==='me'?'กำลังดูเฉพาะที่รอคุณลงนาม · แตะเพื่อดูทั้งหมด':`รอคุณลงนาม <b>${cnt('st','me')}</b>`}</button>
     <div class="row sm muted"><span class="grow">${L.length} รายการ</span>${F.site!=='all'||F.type!=='all'||F.st!=='all'||F.sort!=='new'?'<button class="btn btn-sm" data-freset>ล้างตัวกรอง</button>':''}</div>
     <div class="card card-l">${L.map(w=>{ const t=waType(w.type_key)||{}; const [st,sc]=w.status==='approved'&&w.result==='conditional'?['ผ่าน (มีเงื่อนไข)','t-acc']:(WA_ST[w.status]||[w.status,'']); const me=isMe(w);
-      return `<a href="#wa/${w.id}" class="li" style="text-decoration:none;color:inherit"><span style="font-size:22px">${esc(t.icon||'📋')}</span><div class="grow" style="min-width:0">${sites.length>1?`<span class="tag t-acc" style="height:18px;font-size:10.5px;margin-bottom:2px">${esc(siteName(w.site_id))}</span>`:''}<b class="sm" style="display:block">${esc(t.name||w.type_key)} · ${esc(w.element||'')} ${esc(w.element_code||'')} ${esc(w.floor||'')}</b><span class="xs muted">${esc(w.wa_no||'')} · ${esc(w.requester_name||'')}<br>ส่ง ${dt(w.created_at)}${w.request_at?` · นัด ${dt(w.request_at)}`:''}</span></div><div class="col" style="gap:4px;align-items:flex-end">${me?'<span class="tag t-warn" style="height:20px;font-size:10.5px">รอคุณลงนาม</span>':''}<span class="tag ${sc}" style="height:20px;font-size:10.5px">${st}</span></div></a>`; }).join('')||'<div class="empty"><b>ไม่มีรายการที่ตรงกับตัวกรอง</b></div>'}</div></div>`;
-  $$('[data-f]').forEach(b=>b.onclick=()=>{ F[b.dataset.f]=b.dataset.v; waList(); });
+      return `<a href="#wa/${w.id}" class="li" style="text-decoration:none;color:inherit"><span style="font-size:22px">${esc(t.icon||'📋')}</span><div class="grow" style="min-width:0">${sites.length>1?`<span class="tag t-acc wa-site">${esc(siteName(w.site_id))}</span>`:''}<b class="sm" style="display:block">${esc(t.name||w.type_key)} · ${esc(w.element||'')} ${esc(w.element_code||'')} ${esc(w.floor||'')}</b><span class="xs muted">${esc(w.wa_no||'')} · ${esc(w.requester_name||'')}<br>ส่ง ${dt(w.created_at)}${w.request_at?` · นัด ${dt(w.request_at)}`:''}</span></div><div class="col" style="gap:4px;align-items:flex-end">${me?'<span class="tag t-warn" style="height:20px;font-size:10.5px">รอคุณลงนาม</span>':''}<span class="tag ${sc}" style="height:20px;font-size:10.5px">${st}</span></div></a>`; }).join('')||'<div class="empty"><b>ไม่มีรายการที่ตรงกับตัวกรอง</b></div>'}</div></div>`;
+  $$('[data-f]').forEach(x=>x.onchange=()=>{ F[x.dataset.f]=x.value; waList(); });
+  $('[data-fme]').onclick=()=>{ F.st=F.st==='me'?'all':'me'; waList(); };
   $('#wsort').onchange=e=>{ F.sort=e.target.value; waList(); };
   const rs=$('[data-freset]'); if(rs) rs.onclick=()=>{ Object.assign(F,{site:'all',type:'all',st:'all',sort:'new'}); waList(); };
 }
